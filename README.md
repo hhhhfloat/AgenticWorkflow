@@ -2,6 +2,10 @@
 
 基于 DeepSeek API 的本地 Agentic 代码生成工作流。
 
+>此文本与工作流的程序代码均由deepseek分步生成，可在
+> https://chat.deepseek.com/share/ud2i4emlkpslkmo3h2
+> 查看
+
 ## 核心功能
 
 - 自然语言驱动代码生成与修改
@@ -12,9 +16,8 @@
 
 ## 快速开始
 
-```bash
 # 1. 设置 API Key
-export DEEPSEEK_API_KEY="your-key" # (替换成您的API)
+Main.java 与 HttpServer.java 运行配置中：环境变量 添加 DEEPSEEK_API_KEY ，输入您的API值
 
 # 2. 启动 HTTP 服务
 运行 HttpServerMain.java
@@ -22,7 +25,6 @@ export DEEPSEEK_API_KEY="your-key" # (替换成您的API)
 # 3. 打开前端
 双击 display/index.html
 
-```
 **必须先运行 `HttpServerMain.java` 再打开前端，才能连接到api**
 
 **有时候会因为网络不稳定，连接失败。此时请重新在`index.html`页面上点击运行**
