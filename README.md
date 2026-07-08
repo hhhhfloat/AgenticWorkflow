@@ -16,13 +16,13 @@
 
 ## 快速开始
 
-# 1. 设置 API Key
+### 1. 设置 API Key
 Main.java 与 HttpServer.java 运行配置中：环境变量 添加 DEEPSEEK_API_KEY ，输入您的API值
 
-# 2. 启动 HTTP 服务
+### 2. 启动 HTTP 服务
 运行 HttpServerMain.java
 
-# 3. 打开前端
+### 3. 打开前端
 双击 display/index.html
 
 **必须先运行 `HttpServerMain.java` 再打开前端，才能连接到api**
