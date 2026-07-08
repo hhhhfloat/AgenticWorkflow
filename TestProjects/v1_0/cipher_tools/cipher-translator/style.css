@@ -1,0 +1,1054 @@
+/* ============================================
+   古典密码互译器 — 样式表
+   ============================================ */
+
+/* --- 基础重置与变量 --- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --bg: #f5f0e8;
+    --card-bg: #fffef9;
+    --card-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    --card-hover-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    --text: #2c2c2c;
+    --text-muted: #7a7a7a;
+    --accent: #b5443c;
+    --accent-light: #e0584e;
+    --blue: #3a5f8b;
+    --blue-light: #5b8ec4;
+    --border: #e0d9cc;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --font-serif: 'Georgia', 'Times New Roman', serif;
+    --font-sans: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+        radial-gradient(ellipse at 20% 20%, rgba(180,150,120,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(140,160,190,0.10) 0%, transparent 50%);
+}
+
+/* --- 头部 --- */
+.site-header {
+    text-align: center;
+    padding: 40px 20px 28px;
+}
+
+.header-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+}
+
+.site-header h1 {
+    font-family: var(--font-serif);
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #2c1810;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+}
+
+.subtitle {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+}
+
+/* --- 头部导航 --- */
+.header-nav {
+    margin-top: 16px;
+}
+
+.nav-caesar-link {
+    display: inline-block;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #fff;
+    background: var(--accent);
+    padding: 10px 24px;
+    border-radius: 24px;
+    transition: all 0.25s;
+    box-shadow: 0 2px 8px rgba(181,68,60,0.2);
+}
+
+.nav-caesar-link:hover {
+    background: #c9554d;
+    box-shadow: 0 4px 16px rgba(181,68,60,0.35);
+    transform: translateY(-1px);
+}
+
+/* --- 主体 --- */
+.main-content {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 0 24px 48px;
+}
+
+/* ============================================
+   输入模式选择器
+   ============================================ */
+.mode-selector-section {
+    margin-bottom: 28px;
+}
+
+.mode-selector {
+    display: flex;
+    gap: 4px;
+    background: #e8e2d6;
+    border-radius: var(--radius);
+    padding: 5px;
+    max-width: 540px;
+    margin: 0 auto;
+}
+
+.mode-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    color: #8a7e6e;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s;
+    font-family: var(--font-sans);
+}
+
+.mode-btn:hover {
+    color: #5a4e3e;
+    background: rgba(255,255,255,0.4);
+}
+
+.mode-btn.active {
+    background: #fff;
+    color: #3a2a1a;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+.mode-btn-icon {
+    font-size: 1.2rem;
+}
+
+.mode-btn-label {
+    white-space: nowrap;
+}
+
+/* ============================================
+   通用输入区域
+   ============================================ */
+.input-section {
+    text-align: center;
+    margin-bottom: 36px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    padding: 28px 32px 24px;
+    transition: box-shadow 0.3s;
+}
+
+.input-section:hover {
+    box-shadow: var(--card-hover-shadow);
+}
+
+.input-wrapper {
+    display: inline-block;
+    width: 100%;
+    max-width: 580px;
+}
+
+.input-label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+}
+
+.input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fdfcf9;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px 8px 4px 18px;
+    transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.input-row:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(181,68,60,0.08);
+}
+
+.text-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 1.25rem;
+    font-family: var(--font-sans);
+    color: var(--text);
+    letter-spacing: 0.05em;
+    padding: 10px 0;
+}
+
+.text-input::placeholder {
+    color: #c4bdb2;
+}
+
+.clear-btn {
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 50%;
+    background: #e8e2d6;
+    color: #999;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.clear-btn:hover {
+    background: #d4ccc0;
+    color: #555;
+}
+
+.char-count {
+    display: block;
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.input-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 10px;
+}
+
+/* ============================================
+   盲文点阵输入区域
+   ============================================ */
+.braille-input-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.braille-input-icon {
+    font-size: 30px;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-sm);
+    background: #f0e8f6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.braille-input-header h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #3a3028;
+}
+
+.braille-input-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 18px;
+}
+
+.braille-input-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    flex-wrap: wrap;
+}
+
+/* --- 可点击点阵 --- */
+.braille-dot-input-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 12px;
+    background: #faf8f5;
+    border-radius: 12px;
+    border: 2px solid #e0d9cc;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.braille-input-dot {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #ddd8cf;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+    border: 2px solid transparent;
+}
+
+.braille-input-dot:hover {
+    background: #c8bfb0;
+    transform: scale(1.1);
+}
+
+.braille-input-dot:active {
+    transform: scale(0.95);
+}
+
+.braille-input-dot.active {
+    background: #5b3e7a;
+    box-shadow: 0 0 0 3px rgba(91,62,122,0.25), inset 0 1px 3px rgba(0,0,0,0.2);
+    border-color: #7a5a9a;
+}
+
+/* --- 翻译结果 --- */
+.braille-input-result {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 10px 20px;
+    background: #f6f2fa;
+    border-radius: 10px;
+    border: 1px solid #e4daf0;
+}
+
+.braille-input-unicode {
+    font-size: 2.4rem;
+    line-height: 1;
+    color: #4a3a5c;
+    min-width: 48px;
+    text-align: center;
+}
+
+.braille-input-arrow {
+    font-size: 1.2rem;
+    color: #b0a0c0;
+}
+
+.braille-input-letter {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #3a2a4c;
+    min-width: 40px;
+    text-align: center;
+    font-family: var(--font-serif);
+}
+
+/* --- 操作按钮 --- */
+.braille-input-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.braille-add-btn,
+.braille-clear-dots-btn {
+    padding: 10px 18px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.braille-add-btn {
+    background: #5b3e7a;
+    color: #fff;
+}
+
+.braille-add-btn:hover:not(:disabled) {
+    background: #6e4f92;
+}
+
+.braille-add-btn:disabled {
+    background: #d0c8d8;
+    color: #a098a8;
+    cursor: not-allowed;
+}
+
+.braille-clear-dots-btn {
+    background: #f0ebe0;
+    color: #7a6e5e;
+}
+
+.braille-clear-dots-btn:hover {
+    background: #e4dcd0;
+    color: #5a4e3e;
+}
+
+/* ============================================
+   旗语九宫格输入区域
+   ============================================ */
+.semaphore-input-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.semaphore-input-icon {
+    font-size: 30px;
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-sm);
+    background: #f6e8e8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.semaphore-input-header h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #3a3028;
+}
+
+.semaphore-input-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-bottom: 18px;
+}
+
+.semaphore-input-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    flex-wrap: wrap;
+}
+
+/* --- 九宫格 --- */
+.semaphore-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 68px);
+    grid-template-rows: repeat(3, 68px);
+    gap: 6px;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.semaphore-cell {
+    width: 68px;
+    height: 68px;
+    border-radius: 12px;
+    border: 2px solid #e0d9cc;
+    background: #faf8f5;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    font-family: var(--font-sans);
+}
+
+.semaphore-cell:hover {
+    background: #f0e8e0;
+    border-color: #c8bfb0;
+    transform: scale(1.05);
+}
+
+.semaphore-cell:active {
+    transform: scale(0.95);
+}
+
+/* 两个选中格子统一使用中性高亮（不再区分左右手颜色） */
+.semaphore-cell.right-arm,
+.semaphore-cell.left-arm {
+    background: #fdf0d5;
+    border-color: #c8963e;
+    box-shadow: 0 0 0 3px rgba(200,150,62,0.25);
+}
+
+.semaphore-cell.right-arm .semaphore-dir-label,
+.semaphore-cell.left-arm .semaphore-dir-label {
+    color: #c8963e;
+}
+
+.semaphore-dir-label {
+    font-size: 1.5rem;
+    color: #b0a590;
+    transition: color 0.2s;
+}
+
+/* --- 中心区域 --- */
+.semaphore-center {
+    width: 68px;
+    height: 68px;
+    border-radius: 12px;
+    background: #fdfcf9;
+    border: 2px dashed #d8d0c0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.semaphore-center-icon {
+    font-size: 1.3rem;
+}
+
+.semaphore-center-letter {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #3a2a1a;
+    font-family: var(--font-serif);
+    min-width: 24px;
+    text-align: center;
+}
+
+.semaphore-center-letter.result-ready {
+    color: #b5443c;
+}
+
+/* --- 旗语操作按钮 --- */
+.semaphore-input-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.semaphore-add-btn,
+.semaphore-clear-btn {
+    padding: 10px 18px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.semaphore-add-btn {
+    background: #b5443c;
+    color: #fff;
+}
+
+.semaphore-add-btn:hover:not(:disabled) {
+    background: #c9554d;
+}
+
+.semaphore-add-btn:disabled {
+    background: #e0d0ce;
+    color: #b8a8a5;
+    cursor: not-allowed;
+}
+
+.semaphore-clear-btn {
+    background: #f0ebe0;
+    color: #7a6e5e;
+}
+
+.semaphore-clear-btn:hover {
+    background: #e4dcd0;
+    color: #5a4e3e;
+}
+
+/* ============================================
+   密码面板网格
+   ============================================ */
+.ciphers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+    gap: 22px;
+}
+
+/* --- 密码卡片 --- */
+.cipher-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+    transition: box-shadow 0.3s, transform 0.2s;
+}
+
+.cipher-card:hover {
+    box-shadow: var(--card-hover-shadow);
+    transform: translateY(-2px);
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 22px 14px;
+    border-bottom: 1px solid #f0ebe0;
+}
+
+.card-icon {
+    font-size: 32px;
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.braille-icon    { background: #f0e8f6; }
+.a1z26-icon      { background: #e8f0f6; }
+.base5-icon      { background: #f6f0e8; }
+.semaphore-icon  { background: #f6e8e8; }
+.nato-icon       { background: #e8f6ea; }
+
+.card-header h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #3a3028;
+}
+
+.card-tag {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.card-body {
+    padding: 18px 22px 22px;
+    min-height: 100px;
+    overflow-x: auto;
+}
+
+/* --- 占位提示 --- */
+.placeholder {
+    color: #c4bdb2;
+    font-style: italic;
+    font-size: 0.95rem;
+    text-align: center;
+    padding: 20px 0;
+}
+
+/* ============================================
+   盲文样式
+   ============================================ */
+.braille-unicode-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 18px;
+}
+
+.braille-char {
+    font-size: 2rem;
+    line-height: 1;
+    color: #4a3a5c;
+    background: #f6f2fa;
+    border-radius: 6px;
+    padding: 4px 8px;
+    min-width: 44px;
+    text-align: center;
+}
+
+.braille-dots-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: flex-end;
+}
+
+.braille-dot-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.braille-dot-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr 1fr;
+    gap: 4px;
+    padding: 6px;
+    background: #faf8f5;
+    border-radius: 8px;
+    border: 1px solid #e8e2d6;
+}
+
+.braille-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #ddd8cf;
+    transition: background 0.2s;
+}
+
+.braille-dot.active {
+    background: #5b3e7a;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.braille-letter-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.braille-space-marker,
+.braille-unknown {
+    font-size: 0.85rem;
+    color: #bbb;
+    padding: 10px 6px;
+}
+
+/* ============================================
+   A1Z26 样式
+   ============================================ */
+.a1z26-code-row {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--blue);
+    letter-spacing: 0.06em;
+    margin-bottom: 16px;
+    word-break: break-all;
+}
+
+.a1z26-cards-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.a1z26-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #eef4fb;
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    min-width: 50px;
+    border: 1px solid #d8e4f2;
+}
+
+.a1z26-letter {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #3a5f8b;
+}
+
+.a1z26-number {
+    font-size: 0.85rem;
+    color: #6b8ab5;
+    font-weight: 600;
+}
+
+.a1z26-space,
+.a1z26-other {
+    font-size: 0.85rem;
+    color: #bbb;
+    padding: 14px 8px;
+}
+
+/* ============================================
+   五进制样式
+   ============================================ */
+.base5-code-row {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #8b6914;
+    letter-spacing: 0.08em;
+    margin-bottom: 16px;
+    word-break: break-all;
+}
+
+.base5-visual-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: flex-start;
+}
+
+.base5-char-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.base5-mini-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 32px);
+    grid-template-rows: repeat(5, 28px);
+    gap: 2px;
+    background: #f5f0e5;
+    border-radius: 6px;
+    padding: 4px;
+    border: 1px solid #e0d9c4;
+}
+
+.base5-grid-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: #b0a590;
+    background: #fdfcf9;
+    border-radius: 3px;
+    transition: all 0.2s;
+}
+
+.base5-grid-cell.highlight {
+    background: #c8963e;
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 0 0 2px #f0c060;
+}
+
+.base5-char-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 600;
+}
+
+.base5-more {
+    align-self: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+}
+
+/* ============================================
+   旗语样式
+   ============================================ */
+.semaphore-figures-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-end;
+    justify-content: flex-start;
+}
+
+.semaphore-figure-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: #fdfaf8;
+    border-radius: var(--radius-sm);
+    padding: 6px 8px;
+    border: 1px solid #f0e8e0;
+}
+
+.semaphore-canvas {
+    display: block;
+}
+
+.semaphore-char-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.semaphore-space,
+.semaphore-unknown {
+    font-size: 0.85rem;
+    color: #bbb;
+    padding: 30px 8px;
+}
+
+.semaphore-more {
+    align-self: center;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-left: 8px;
+}
+
+/* ============================================
+   北约音标样式
+   ============================================ */
+.nato-cards-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.nato-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #eef7ef;
+    border-radius: var(--radius-sm);
+    padding: 10px 16px;
+    min-width: 72px;
+    border: 1px solid #d4e8d6;
+}
+
+.nato-letter-badge {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #2d6a3a;
+}
+
+.nato-word {
+    font-size: 0.82rem;
+    color: #5a8a62;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+}
+
+.nato-space,
+.nato-other {
+    font-size: 0.85rem;
+    color: #bbb;
+    padding: 14px 8px;
+}
+
+/* --- 底部 --- */
+.site-footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 0.8rem;
+    color: #c4bdb2;
+    border-top: 1px solid #e8e2d6;
+    margin-top: 20px;
+}
+
+/* --- 响应式 --- */
+@media (max-width: 860px) {
+    .ciphers-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .site-header h1 {
+        font-size: 1.6rem;
+    }
+
+    .text-input {
+        font-size: 1.1rem;
+    }
+
+    .card-body {
+        padding: 14px 14px 18px;
+    }
+
+    .braille-input-area,
+    .semaphore-input-area {
+        gap: 18px;
+    }
+
+    .braille-input-dot {
+        width: 34px;
+        height: 34px;
+    }
+
+    .mode-btn {
+        padding: 10px 10px;
+        font-size: 0.85rem;
+    }
+
+    .mode-btn-label {
+        font-size: 0.82rem;
+    }
+
+    .semaphore-grid {
+        grid-template-columns: repeat(3, 56px);
+        grid-template-rows: repeat(3, 56px);
+    }
+
+    .semaphore-cell,
+    .semaphore-center {
+        width: 56px;
+        height: 56px;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-content {
+        padding: 0 12px 32px;
+    }
+
+    .card-header {
+        padding: 14px 16px 10px;
+    }
+
+    .card-body {
+        padding: 12px 10px 16px;
+    }
+
+    .input-section {
+        padding: 16px 14px 18px;
+    }
+
+    .braille-input-area,
+    .semaphore-input-area {
+        flex-direction: column;
+        gap: 14px;
+    }
+
+    .braille-input-actions,
+    .semaphore-input-actions {
+        flex-direction: row;
+        gap: 10px;
+    }
+
+    .mode-selector {
+        gap: 2px;
+        padding: 3px;
+    }
+
+    .mode-btn {
+        padding: 8px 6px;
+        gap: 4px;
+    }
+
+    .mode-btn-icon {
+        font-size: 1rem;
+    }
+
+    .mode-btn-label {
+        font-size: 0.75rem;
+    }
+
+    .semaphore-grid {
+        grid-template-columns: repeat(3, 50px);
+        grid-template-rows: repeat(3, 50px);
+        gap: 4px;
+    }
+
+    .semaphore-cell,
+    .semaphore-center {
+        width: 50px;
+        height: 50px;
+    }
+
+    .semaphore-dir-label {
+        font-size: 1.2rem;
+    }
+}

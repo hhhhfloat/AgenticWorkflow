@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🏀 篮球局签到</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ===== Header ===== -->
+<header class="header">
+  <div class="header-inner">
+    <div class="logo-area">
+      <div class="logo-ball">
+        <div class="cross"></div>
+      </div>
+      <div class="title-group">
+        <h1 id="activityTitle">周末篮球局</h1>
+        <div class="activity-meta">
+          <span>📅 <span id="activityDate">2025-01-18</span></span>
+          <span>⏰ <span id="activityTime">15:00</span></span>
+          <span>📍 <span id="activityLocation">社区篮球场</span></span>
+        </div>
+      </div>
+    </div>
+    <button class="btn-edit-activity" onclick="openActivityModal()">✏️ 编辑活动</button>
+  </div>
+</header>
+
+<!-- ===== Stats Bar ===== -->
+<div class="stats-bar">
+  <div class="stat-card total">
+    <div class="stat-num" id="statTotal">0</div>
+    <div class="stat-label">总人数</div>
+  </div>
+  <div class="stat-card going">
+    <div class="stat-num" id="statGoing">0</div>
+    <div class="stat-label">✅ 参加</div>
+  </div>
+  <div class="stat-card pending">
+    <div class="stat-num" id="statPending">0</div>
+    <div class="stat-label">🤔 待定</div>
+  </div>
+  <div class="stat-card not-going">
+    <div class="stat-num" id="statNotGoing">0</div>
+    <div class="stat-label">❌ 不参加</div>
+  </div>
+</div>
+
+<!-- ===== Team Hint ===== -->
+<div class="team-hint">
+  <div class="team-hint-inner" id="teamHint">
+    <span class="hint-icon">🏀</span>
+    <span class="hint-text" id="hintText">等待大家报名中…</span>
+    <button class="btn-shuffle" id="btnShuffle" disabled onclick="openShuffleModal()">🎲 随机分队</button>
+  </div>
+</div>
+
+<!-- ===== Main Content ===== -->
+<div class="main-content">
+  <!-- 参加 -->
+  <div class="column col-going">
+    <div class="column-header">
+      <span><span class="col-icon">✅</span> 参加</span>
+      <span class="col-count" id="colCountGoing">0</span>
+    </div>
+    <div class="column-body" id="colGoing"></div>
+  </div>
+
+  <!-- 待定 -->
+  <div class="column col-pending">
+    <div class="column-header">
+      <span><span class="col-icon">🤔</span> 待定</span>
+      <span class="col-count" id="colCountPending">0</span>
+    </div>
+    <div class="column-body" id="colPending"></div>
+  </div>
+
+  <!-- 不参加 -->
+  <div class="column col-not">
+    <div class="column-header">
+      <span><span class="col-icon">❌</span> 不参加</span>
+      <span class="col-count" id="colCountNot">0</span>
+    </div>
+    <div class="column-body" id="colNot"></div>
+  </div>
+</div>
+
+<!-- ===== Add Section ===== -->
+<div class="add-section">
+  <div class="add-row">
+    <input type="text" class="add-input" id="inputNewMember" placeholder="输入姓名，按回车添加…" maxlength="20" autocomplete="off">
+    <button class="btn-add" onclick="addMember()">➕ 添加成员</button>
+    <button class="btn-reset" onclick="resetAllPending()" title="将所有成员状态重置为待定">🔄 全部待定</button>
+    <button class="btn-reset danger" onclick="clearAllMembers()" title="删除所有成员">🗑 清空</button>
+  </div>
+</div>
+
+<!-- ===== Activity Edit Modal ===== -->
+<div class="modal-overlay" id="modalActivity" style="display:none;" onclick="closeActivityModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>✏️ 编辑活动信息</h3>
+    <div class="form-group">
+      <label>活动标题</label>
+      <input type="text" id="inputTitle" maxlength="30" placeholder="例如：周末篮球局">
+    </div>
+    <div class="form-group">
+      <label>日期</label>
+      <input type="date" id="inputDate">
+    </div>
+    <div class="form-group">
+      <label>时间</label>
+      <input type="time" id="inputTime">
+    </div>
+    <div class="form-group">
+      <label>地点</label>
+      <input type="text" id="inputLocation" maxlength="30" placeholder="例如：社区篮球场">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeActivityModal()">取消</button>
+      <button class="btn-modal-save" onclick="saveActivity()">💾 保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== Shuffle Modal ===== -->
+<div class="modal-overlay" id="modalShuffle" style="display:none;" onclick="closeShuffleModal(event)">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>🎲 随机分队结果</h3>
+    <div class="shuffle-teams" id="shuffleTeams"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="closeShuffleModal()">关闭</button>
+      <button class="btn-modal-save" onclick="doShuffle()">🔄 重新分队</button>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

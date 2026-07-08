@@ -1,0 +1,292 @@
+/* ==========================================
+   简约清新计算器 - 样式表
+   ========================================== */
+
+:root {
+    --body-bg-start: #e8f5e9;
+    --body-bg-end: #e3f2fd;
+    --calc-bg: #ffffff;
+    --display-bg: #f8faf9;
+    --display-border: #e8eee9;
+    --btn-number-bg: #f5f7f6;
+    --btn-number-hover: #e8f0eb;
+    --btn-number-active: #d4e5d9;
+    --btn-number-text: #3b4d42;
+    --btn-operator-bg: #81c784;
+    --btn-operator-hover: #a5d6a7;
+    --btn-operator-active: #66bb6a;
+    --btn-operator-text: #ffffff;
+    --btn-operator-active-bg: #ffffff;
+    --btn-operator-active-text: #66bb6a;
+    --btn-func-bg: #eef1f0;
+    --btn-func-hover: #dfe6e2;
+    --btn-func-active: #cdd6d0;
+    --btn-func-text: #5a6d61;
+    --btn-sqrt-bg: #80cbc4;
+    --btn-sqrt-hover: #b2dfdb;
+    --btn-sqrt-active: #4db6ac;
+    --btn-sqrt-text: #ffffff;
+    --btn-equals-bg: #ff8a65;
+    --btn-equals-hover: #ffab91;
+    --btn-equals-active: #e67e54;
+    --btn-equals-text: #ffffff;
+    --display-text: #2e3b33;
+    --expression-text: #8a9b8f;
+    --hint-text: #b0beb4;
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 8px 30px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.06);
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 22px;
+}
+
+/* ========== 基础重置 ========== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(160deg, #e8f5e9 0%, #e0f2f1 30%, #e3f2fd 70%, #f3e5f5 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* ========== 计算器容器 ========== */
+.calculator {
+    background: var(--calc-bg);
+    border-radius: var(--radius-lg);
+    padding: 22px;
+    box-shadow: var(--shadow-md), var(--shadow-lg);
+    width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* ========== 显示区域 ========== */
+.display {
+    background: var(--display-bg);
+    border: 1px solid var(--display-border);
+    border-radius: var(--radius-md);
+    padding: 22px 18px;
+    min-height: 105px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-end;
+    word-break: break-all;
+    overflow: hidden;
+}
+
+.expression {
+    color: var(--expression-text);
+    font-size: 15px;
+    font-weight: 400;
+    min-height: 22px;
+    text-align: right;
+    width: 100%;
+    transition: color 0.25s;
+    letter-spacing: 0.3px;
+}
+
+.result {
+    color: var(--display-text);
+    font-size: 44px;
+    font-weight: 300;
+    letter-spacing: 0.5px;
+    text-align: right;
+    width: 100%;
+    transition: font-size 0.2s ease;
+    line-height: 1.2;
+    margin-top: 4px;
+}
+
+.result.small {
+    font-size: 28px;
+}
+
+.result.xsmall {
+    font-size: 20px;
+}
+
+/* ========== 按钮网格 ========== */
+.buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+}
+
+/* ========== 按钮基础样式 ========== */
+button {
+    border: none;
+    border-radius: var(--radius-sm);
+    height: 62px;
+    font-size: 22px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    outline: none;
+    position: relative;
+    overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button:active {
+    transform: scale(0.95);
+}
+
+/* ========== 数字按钮 ========== */
+.btn-number {
+    background: var(--btn-number-bg);
+    color: var(--btn-number-text);
+    box-shadow: var(--shadow-sm);
+}
+
+.btn-number:hover {
+    background: var(--btn-number-hover);
+}
+
+.btn-number:active {
+    background: var(--btn-number-active);
+}
+
+/* ========== 运算符按钮 ========== */
+.btn-operator {
+    background: var(--btn-operator-bg);
+    color: var(--btn-operator-text);
+    font-size: 24px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(129, 199, 132, 0.25);
+}
+
+.btn-operator:hover {
+    background: var(--btn-operator-hover);
+    box-shadow: 0 3px 12px rgba(129, 199, 132, 0.35);
+}
+
+.btn-operator:active {
+    background: var(--btn-operator-active);
+}
+
+.btn-operator.active {
+    background: var(--btn-operator-active-bg);
+    color: var(--btn-operator-active-text);
+    box-shadow: 0 0 0 3px rgba(102, 187, 106, 0.35), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ========== 功能按钮 (C, +/−) ========== */
+.btn-func {
+    background: var(--btn-func-bg);
+    color: var(--btn-func-text);
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.btn-func:hover {
+    background: var(--btn-func-hover);
+}
+
+.btn-func:active {
+    background: var(--btn-func-active);
+}
+
+/* ========== 开根号按钮 ========== */
+.btn-sqrt {
+    background: var(--btn-sqrt-bg);
+    color: var(--btn-sqrt-text);
+    font-size: 22px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(128, 203, 196, 0.25);
+}
+
+.btn-sqrt:hover {
+    background: var(--btn-sqrt-hover);
+    box-shadow: 0 3px 12px rgba(128, 203, 196, 0.35);
+}
+
+.btn-sqrt:active {
+    background: var(--btn-sqrt-active);
+}
+
+/* ========== 零按钮 - 跨两列 ========== */
+.btn-zero {
+    grid-column: span 2;
+    border-radius: var(--radius-sm);
+    text-align: left;
+    padding-left: 24px;
+}
+
+/* ========== 等号按钮 ========== */
+.btn-equals {
+    background: var(--btn-equals-bg);
+    color: var(--btn-equals-text);
+    font-size: 26px;
+    font-weight: 700;
+    box-shadow: 0 3px 10px rgba(255, 138, 101, 0.3);
+}
+
+.btn-equals:hover {
+    background: var(--btn-equals-hover);
+    box-shadow: 0 4px 16px rgba(255, 138, 101, 0.4);
+}
+
+.btn-equals:active {
+    background: var(--btn-equals-active);
+}
+
+/* ========== 键盘提示 ========== */
+.hint {
+    text-align: center;
+    color: var(--hint-text);
+    font-size: 11px;
+    margin-top: 2px;
+    letter-spacing: 0.4px;
+    font-weight: 400;
+}
+
+/* ========== 响应式 ========== */
+@media (max-width: 380px) {
+    .calculator {
+        width: 92vw;
+        padding: 16px;
+        gap: 12px;
+        border-radius: 20px;
+    }
+
+    button {
+        height: 54px;
+        font-size: 19px;
+        border-radius: 8px;
+    }
+
+    .btn-zero {
+        border-radius: 8px;
+    }
+
+    .display {
+        padding: 16px 14px;
+        min-height: 90px;
+        border-radius: 10px;
+    }
+
+    .result {
+        font-size: 36px;
+    }
+
+    .result.small {
+        font-size: 24px;
+    }
+
+    .result.xsmall {
+        font-size: 18px;
+    }
+}

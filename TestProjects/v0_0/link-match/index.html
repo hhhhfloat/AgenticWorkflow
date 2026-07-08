@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>连连看 - Link Match</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+  <!-- 游戏面板 -->
+  <div class="game-panel">
+    <div class="game-header">
+      <div class="title"><span class="icon">🔗</span> 连连看</div>
+      <div class="difficulty-selector" id="diffSelector">
+        <button class="diff-btn" data-level="easy">简单</button>
+        <button class="diff-btn active" data-level="medium">中等</button>
+        <button class="diff-btn" data-level="hard">困难</button>
+      </div>
+    </div>
+    <div class="board-wrapper" id="boardWrapper">
+      <div class="board" id="board"></div>
+      <canvas id="linkCanvas"></canvas>
+    </div>
+  </div>
+
+  <!-- 侧边栏 -->
+  <div class="sidebar" id="sidebar">
+    <div class="stat-card">
+      <div class="stat-label">⏱ 用时</div>
+      <div class="stat-value" id="timer">00:00</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">🏆 得分</div>
+      <div class="stat-value score" id="score">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">🔥 连击</div>
+      <div class="stat-value combo" id="combo">-</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">📦 剩余</div>
+      <div class="stat-value" id="remaining">48</div>
+    </div>
+    <button class="btn btn-hint" id="btnHint" title="消耗5分获得提示（快捷键 H）">💡 提示 (-5分)</button>
+    <button class="btn btn-shuffle" id="btnShuffle" title="重排剩余图案（快捷键 R）">🔀 重排</button>
+    <button class="btn btn-primary" id="btnRestart">🔄 重新开始</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>

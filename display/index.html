@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>本地 Agent 工作台</title>
+    <!-- 引入 marked.js 用于 Markdown 渲染 -->
+    <script src="marked.min.js"></script>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+        }
+        textarea {
+            width: 100%;
+            height: 80px;
+            background: #2d2d2d;
+            color: #fff;
+            border: 1px solid #444;
+            padding: 8px;
+            font-size: 14px;
+        }
+        button {
+            background: #0e639c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #1177bb;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #output {
+            background: #1e1e1e;
+            border: 1px solid #444;
+            padding: 10px;
+            height: 500px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        /* 日志行的基础样式 */
+        .log-entry {
+            margin: 2px 0;
+            padding: 0;
+            font-family: inherit;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        /* 日志颜色 */
+        .log-info {
+            color: #9cdcfe;
+        }
+        .log-error {
+            color: #f44747;
+        }
+        .log-success {
+            color: #4ec9b0;
+        }
+        .log-system {
+            color: #d4d4d4;
+        }
+        /* Markdown 渲染后的表格样式 */
+        .log-entry table {
+            border-collapse: collapse;
+            margin: 6px 0;
+            color: #d4d4d4;
+            background: #252526;
+            border-radius: 4px;
+            overflow: hidden;
+            width: 100%;
+        }
+        .log-entry th,
+        .log-entry td {
+            border: 1px solid #444;
+            padding: 4px 10px;
+            text-align: left;
+        }
+        .log-entry th {
+            background: #2d2d2d;
+            color: #4ec9b0;
+            font-weight: bold;
+        }
+        .log-entry td {
+            background: #1e1e1e;
+        }
+        .log-entry code {
+            background: #2d2d2d;
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #d4d4d4;
+        }
+        .log-entry pre {
+            background: #2d2d2d;
+            padding: 8px 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 4px 0;
+            border-left: 3px solid #0e639c;
+        }
+        .log-entry pre code {
+            background: transparent;
+            padding: 0;
+            font-size: 0.9em;
+        }
+        .log-entry h1,
+        .log-entry h2,
+        .log-entry h3,
+        .log-entry h4 {
+            margin: 6px 0 4px 0;
+            color: #4ec9b0;
+        }
+        .log-entry hr {
+            border: none;
+            border-top: 1px solid #444;
+            margin: 6px 0;
+        }
+        .log-entry blockquote {
+            border-left: 3px solid #0e639c;
+            margin: 4px 0;
+            padding-left: 12px;
+            color: #9cdcfe;
+        }
+        .log-entry ul,
+        .log-entry ol {
+            margin: 4px 0;
+            padding-left: 20px;
+        }
+        /* 特殊：系统推送的目录快照保持纯文本 */
+        .log-system .log-entry {
+            white-space: pre;
+        }
+    </style>
+</head>
+<body>
+<h2>Agentic 工作台</h2>
+<!-- 输入区 -->
+<textarea id="prompt" placeholder="输入你的需求，例如：写一个 HTML 计算器，支持加减乘除">写一个 HTML 计算器，支持加减乘除</textarea>
+
+<!-- 历史记录下拉框（将在 JavaScript 中动态创建，放在这里） -->
+<div id="historyContainer"></div>
+
+<!-- 按钮区（换行 + 按钮组） -->
+<div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap;">
+    <button id="runBtn">▶ 运行</button>
+    <button id="stopBtn" disabled>⏹ 停止</button>
+    <button id="clearBtn" style="background:#555;">🗑 清空</button>
+</div>
+
+<!-- 输出区 -->
+<div id="output">等待输入...</div>
+
+<script>
+    const output = document.getElementById('output');
+    const runBtn = document.getElementById('runBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const promptInput = document.getElementById('prompt');
+
+    // 全局状态
+    let isRunning = false;
+
+    // ========== 心跳机制 ==========
+    let heartbeatInterval = null;
+
+    // ========== 历史记录配置 ==========
+    const MAX_HISTORY = 30;
+    const STORAGE_KEY = 'promptHistory';
+
+    // 读取历史记录，如果没有则返回空数组
+    function getHistory() {
+        try {
+            const data = localStorage.getItem(STORAGE_KEY);
+            return data ? JSON.parse(data) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+
+    // 保存历史记录
+    function saveHistory(history) {
+        try {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+        } catch (e) {
+            // 存储空间不足时忽略
+        }
+    }
+
+    // 添加新提示词到历史（去重，最新的在最前面）
+    function addToHistory(prompt) {
+        if (!prompt || !prompt.trim()) return;
+        const history = getHistory();
+        // 移除已存在的相同记录（避免重复）
+        const filtered = history.filter(item => item !== prompt);
+        // 插入到最前面
+        filtered.unshift(prompt);
+        // 限制数量
+        if (filtered.length > MAX_HISTORY) {
+            filtered.length = MAX_HISTORY;
+        }
+        saveHistory(filtered);
+        return filtered;
+    }
+
+    // 渲染历史记录到界面（在页面加载时调用）
+    function renderHistory() {
+        const history = getHistory();
+        let container = document.getElementById('historyContainer');
+        let dropdown = document.getElementById('historyDropdown');
+
+        // 如果容器不存在则创建
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'historyContainer';
+            // 插入到 textarea 后面，按钮区前面
+            const textarea = document.getElementById('prompt');
+            textarea.parentNode.insertBefore(container, textarea.nextSibling);
+        }
+
+        // 清空容器
+        container.innerHTML = '';
+
+        // 创建下拉框
+        dropdown = document.createElement('select');
+        dropdown.id = 'historyDropdown';
+        dropdown.style.cssText = 'width:100%; margin-top:4px; background:#2d2d2d; color:#fff; border:1px solid #444; padding:6px; font-size:13px;';
+        container.appendChild(dropdown);
+
+        dropdown.innerHTML = '<option value="">📜 历史记录</option>';
+        if (history.length === 0) {
+            dropdown.innerHTML += '<option value="" disabled>（暂无记录）</option>';
+        } else {
+            history.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item;
+                const display = item.length > 60 ? item.substring(0, 60) + '…' : item;
+                option.textContent = display;
+                dropdown.appendChild(option);
+            });
+            const clearOption = document.createElement('option');
+            clearOption.value = '__clear__';
+            clearOption.textContent = '🗑 清空所有历史';
+            clearOption.style.color = '#f44747';
+            dropdown.appendChild(clearOption);
+        }
+
+        // 事件监听
+        dropdown.addEventListener('change', function() {
+            if (this.value === '__clear__') {
+                if (confirm('确认清空所有历史记录吗？')) {
+                    localStorage.removeItem(STORAGE_KEY);
+                    renderHistory();
+                    appendLog('[系统] 已清空所有历史记录');
+                }
+                this.value = '';
+                return;
+            }
+            if (this.value) {
+                document.getElementById('prompt').value = this.value;
+                this.value = '';
+            }
+        });
+    }
+
+    // 处理清空历史的特殊选择
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.id === 'historyDropdown' && e.target.value === '__clear__') {
+            if (confirm('确认清空所有历史记录吗？')) {
+                localStorage.removeItem(STORAGE_KEY);
+                renderHistory();
+                appendLog('[系统] 已清空所有历史记录');
+            }
+            e.target.value = '';
+        }
+    });
+
+
+    function startHeartbeat() {
+        if (heartbeatInterval) return;
+        heartbeatInterval = setInterval(() => {
+            fetch('http://localhost:8080/heartbeat', { method: 'POST' })
+                .catch(() => { /* 静默失败，避免干扰用户 */ });
+        }, 3000); // 每 3 秒发一次
+    }
+
+    function stopHeartbeat() {
+        if (heartbeatInterval) {
+            clearInterval(heartbeatInterval);
+            heartbeatInterval = null;
+        }
+    }
+
+    // 清空输出
+    clearBtn.addEventListener('click', () => {
+        output.innerHTML = '';
+    });
+
+    runBtn.addEventListener('click', () => {
+        const prompt = promptInput.value.trim();
+        if (!prompt) {
+            alert('请输入需求');
+            return;
+        }
+        output.innerHTML = '连接服务...\n';
+        isRunning = true;
+        runBtn.disabled = true;
+        stopBtn.disabled = false;
+        startHeartbeat();
+
+        fetch('http://localhost:8080/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompt })
+        })
+            .then(response => {
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(`HTTP ${response.status}: ${text}`); });
+            }
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let buffer = '';
+
+            function readChunk() {
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        runBtn.disabled = false;
+                        stopBtn.disabled = true;
+                        isRunning = false;
+                        return;
+                    }
+                    buffer += decoder.decode(value, { stream: true });
+                    const events = buffer.split('\n\n');
+                    buffer = events.pop();
+                    for (const event of events) {
+                        if (event.startsWith('data: ')) {
+                            const data = event.substring(6).trim().replace(/\\n/g, '\n');
+                            if (data === '[结束]') {
+                                runBtn.disabled = false;
+                                stopBtn.disabled = true;
+                                isRunning = false;
+                                stopHeartbeat();
+                                return;
+                            }
+                            appendLog(data);
+                        }
+                    }
+                    readChunk();
+                }).catch(err => {
+                    appendLog('[错误] ' + err.message);
+                    runBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    isRunning = false;
+                    stopHeartbeat();
+                });
+            }
+            readChunk();
+        })
+            .catch(err => {
+            appendLog('[连接错误] ' + err.message + '\n请确保 HTTP 服务已启动（运行 HttpServerMain）');
+            runBtn.disabled = false;
+            stopBtn.disabled = true;
+            isRunning = false;
+        });
+        addToHistory(prompt);
+        renderHistory(); // 刷新下拉列表
+    });
+
+    // 停止按钮逻辑
+    stopBtn.addEventListener('click', () => {
+        if (!isRunning) return;
+        stopBtn.disabled = true;
+        appendLog('[系统] 正在停止任务...');
+
+        fetch('http://localhost:8080/stop', {
+            method: 'POST'
+        })
+            .then(response => response.json())
+            .then(data => {
+            appendLog('[系统] ' + data.message);
+            stopBtn.disabled = true;
+            runBtn.disabled = false;
+            isRunning = false;
+            stopHeartbeat();
+        })
+            .catch(err => {
+            appendLog('[错误] 停止请求失败: ' + err.message);
+            stopBtn.disabled = false;
+            stopHeartbeat();
+        });
+    });
+
+    // 如果页面被直接关闭（用户关标签页），尝试发送一次停止信号
+    window.addEventListener('beforeunload', () => {
+        if (isRunning) {
+            stopHeartbeat();
+            // 尝试通知后端停止（不等待响应）
+            fetch('http://localhost:8080/stop', { method: 'POST' }).catch(() => {});
+        }
+    });
+    // 页面加载时自动恢复上次输入（也可以从历史中取第一条）
+    window.addEventListener('DOMContentLoaded', function() {
+        const history = getHistory();
+        if (history.length > 0) {
+            // 默认填入最近一条
+            promptInput.value = history[0];
+        }
+        renderHistory();
+    });
+
+    /**
+     * 判断消息是否包含 Markdown 特征
+     * 特征：表格、代码块、标题、列表、引用、分隔线
+     */
+    function isMarkdown(text) {
+        return /(\|\s*[-:]+[\s|]+\||^#{1,6}\s|\n```|\n\s*[-*]\s|\n>\s|^---\s*$|\n---\s*$)/m.test(text);
+    }
+
+    /**
+     * 将 Markdown 渲染为 HTML（使用 marked.js）
+     */
+    function renderMarkdown(text) {
+        try {
+            // 配置 marked：支持代码块、表格、GFM
+            const html = marked.parse(text, {
+                gfm: true,
+                breaks: true
+            });
+            return html;
+        } catch (e) {
+            // 渲染失败则返回原文（转义后）
+            return escapeHtml(text);
+        }
+    }
+
+    function appendLog(msg) {
+        let color = 'log-info';
+        if (msg.startsWith('[错误]')) color = 'log-error';
+        else if (msg.startsWith('[完成]') || msg.includes('✅')) color = 'log-success';
+        else if (msg.startsWith('[系统]')) color = 'log-system';
+
+        let renderedContent;
+
+        if (msg.startsWith('[系统]')) {
+            renderedContent = escapeHtml(msg);
+        }
+        // list_directory 输出直接显示（保留缩进和符号）
+        else if (msg.startsWith('📁 ') && (msg.includes('项') || msg.includes('内容'))) {
+            renderedContent = `<pre style="margin:0; font-family:inherit; white-space:pre-wrap;">${escapeHtml(msg)}</pre>`;
+        }
+        else {
+            try {
+                let cleanMsg = msg;
+                if (msg.startsWith('[完成] ')) {
+                    cleanMsg = msg.substring(4);
+                }
+                renderedContent = marked.parse(cleanMsg, {
+                    gfm: true,
+                    breaks: true
+                });
+            } catch (e) {
+                renderedContent = escapeHtml(msg);
+            }
+        }
+
+        const line = `<div class="log-entry ${color}">${renderedContent}</div>`;
+        output.innerHTML += line;
+        output.scrollTop = output.scrollHeight;
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+
+
+</script>
+</body>
+</html>

@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>古典密码互译器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-icon">🔐</div>
+        <h1>古典密码互译器</h1>
+        <p class="subtitle">Classical Cipher Translator — 盲文 · A1Z26 · 五进制 · 旗语 · 北约音标</p>
+        <nav class="header-nav">
+            <a href="../caesar-shift/index.html" class="nav-caesar-link" title="查看全部 25 种凯撒移位">🔄 凯撒移位</a>
+        </nav>
+    </header>
+
+    <main class="main-content">
+
+        <!-- ============ 输入模式选择器 ============ -->
+        <section class="mode-selector-section">
+            <div class="mode-selector" id="modeSelector">
+                <button class="mode-btn active" data-mode="text">
+                    <span class="mode-btn-icon">📝</span>
+                    <span class="mode-btn-label">文本输入</span>
+                </button>
+                <button class="mode-btn" data-mode="braille">
+                    <span class="mode-btn-icon">⠿</span>
+                    <span class="mode-btn-label">盲文输入</span>
+                </button>
+                <button class="mode-btn" data-mode="semaphore">
+                    <span class="mode-btn-icon">🏴</span>
+                    <span class="mode-btn-label">旗语输入</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- ============ 文本输入区域 ============ -->
+        <section class="input-section" id="textInputSection">
+            <div class="input-wrapper">
+                <label for="textInput" class="input-label">输入英文文本</label>
+                <div class="input-row">
+                    <input
+                        type="text"
+                        id="textInput"
+                        class="text-input"
+                        placeholder="例如：HELLO WORLD"
+                        maxlength="60"
+                    >
+                    <button id="clearBtn" class="clear-btn" title="清空">✕</button>
+                </div>
+                <span id="charCount" class="char-count">0 / 60</span>
+            </div>
+            <p class="input-hint">支持 A-Z 字母，实时转换以下五种古典密码</p>
+        </section>
+
+        <!-- ============ 盲文点阵输入区域 ============ -->
+        <section class="input-section braille-input-section" id="brailleInputSection" style="display:none;">
+            <div class="braille-input-header">
+                <span class="braille-input-icon">⠿</span>
+                <h2>盲文点阵输入</h2>
+            </div>
+            <p class="braille-input-hint">点击 2×3 点阵输入盲文，自动翻译为英文字母</p>
+            <div class="braille-input-area">
+                <!-- 2列×3行点阵 -->
+                <div class="braille-dot-input-grid" id="brailleDotInput">
+                    <span class="braille-input-dot" data-index="0" title="点 1"></span>
+                    <span class="braille-input-dot" data-index="3" title="点 4"></span>
+                    <span class="braille-input-dot" data-index="1" title="点 2"></span>
+                    <span class="braille-input-dot" data-index="4" title="点 5"></span>
+                    <span class="braille-input-dot" data-index="2" title="点 3"></span>
+                    <span class="braille-input-dot" data-index="5" title="点 6"></span>
+                </div>
+                <!-- 翻译结果 -->
+                <div class="braille-input-result">
+                    <span class="braille-input-unicode" id="brailleInputChar">⠀</span>
+                    <span class="braille-input-arrow">→</span>
+                    <span class="braille-input-letter" id="brailleInputLetter">-</span>
+                </div>
+                <!-- 操作按钮 -->
+                <div class="braille-input-actions">
+                    <button id="brailleAddBtn" class="braille-add-btn" disabled>添加到文本</button>
+                    <button id="brailleClearDotsBtn" class="braille-clear-dots-btn">清除点阵</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ 旗语九宫格输入区域 ============ -->
+        <section class="input-section semaphore-input-section" id="semaphoreInputSection" style="display:none;">
+            <div class="semaphore-input-header">
+                <span class="semaphore-input-icon">🏴</span>
+                <h2>旗语九宫格输入</h2>
+            </div>
+            <p class="semaphore-input-hint">依次点击两个方向格子（忽略顺序），分别代表两手旗位</p>
+            <div class="semaphore-input-area">
+                <!-- 3×3 九宫格 -->
+                <div class="semaphore-grid" id="semaphoreGrid">
+                    <!-- 第一行：NW, N, NE -->
+                    <button class="semaphore-cell" data-dir="7" title="左上 (NW)">
+                        <span class="semaphore-dir-label">↖</span>
+                    </button>
+                    <button class="semaphore-cell" data-dir="0" title="上 (N)">
+                        <span class="semaphore-dir-label">↑</span>
+                    </button>
+                    <button class="semaphore-cell" data-dir="1" title="右上 (NE)">
+                        <span class="semaphore-dir-label">↗</span>
+                    </button>
+                    <!-- 第二行：W, 中心, E -->
+                    <button class="semaphore-cell" data-dir="6" title="左 (W)">
+                        <span class="semaphore-dir-label">←</span>
+                    </button>
+                    <div class="semaphore-center" id="semaphoreCenter">
+                        <span class="semaphore-center-icon">🎌</span>
+                        <span class="semaphore-center-letter" id="semaphoreCenterLetter">-</span>
+                    </div>
+                    <button class="semaphore-cell" data-dir="2" title="右 (E)">
+                        <span class="semaphore-dir-label">→</span>
+                    </button>
+                    <!-- 第三行：SW, S, SE -->
+                    <button class="semaphore-cell" data-dir="5" title="左下 (SW)">
+                        <span class="semaphore-dir-label">↙</span>
+                    </button>
+                    <button class="semaphore-cell" data-dir="4" title="下 (S)">
+                        <span class="semaphore-dir-label">↓</span>
+                    </button>
+                    <button class="semaphore-cell" data-dir="3" title="右下 (SE)">
+                        <span class="semaphore-dir-label">↘</span>
+                    </button>
+                </div>
+                <!-- 操作按钮 -->
+                <div class="semaphore-input-actions">
+                    <button id="semaphoreAddBtn" class="semaphore-add-btn" disabled>添加到文本</button>
+                    <button id="semaphoreClearBtn" class="semaphore-clear-btn">清除选择</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 密码面板网格 -->
+        <section class="ciphers-grid">
+
+            <!-- 盲文 -->
+            <div class="cipher-card" id="braille-card">
+                <div class="card-header">
+                    <span class="card-icon braille-icon">⠿</span>
+                    <div>
+                        <h2>盲文</h2>
+                        <span class="card-tag">Braille · 6点盲文</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="cipher-output" id="braille-output"></div>
+                </div>
+            </div>
+
+            <!-- A1Z26 -->
+            <div class="cipher-card" id="a1z26-card">
+                <div class="card-header">
+                    <span class="card-icon a1z26-icon">#</span>
+                    <div>
+                        <h2>A1Z26</h2>
+                        <span class="card-tag">字母↔数字编码</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="cipher-output" id="a1z26-output"></div>
+                </div>
+            </div>
+
+            <!-- 五进制 / 敲击码 -->
+            <div class="cipher-card" id="base5-card">
+                <div class="card-header">
+                    <span class="card-icon base5-icon">▦</span>
+                    <div>
+                        <h2>五进制 (敲击码)</h2>
+                        <span class="card-tag">Polybius · 5×5方格</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="cipher-output" id="base5-output"></div>
+                </div>
+            </div>
+
+            <!-- 旗语 -->
+            <div class="cipher-card" id="semaphore-card">
+                <div class="card-header">
+                    <span class="card-icon semaphore-icon">🏴</span>
+                    <div>
+                        <h2>旗语</h2>
+                        <span class="card-tag">Semaphore · 双臂信号</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="cipher-output" id="semaphore-output"></div>
+                </div>
+            </div>
+
+            <!-- 北约音标 -->
+            <div class="cipher-card" id="nato-card">
+                <div class="card-header">
+                    <span class="card-icon nato-icon">📻</span>
+                    <div>
+                        <h2>北约音标</h2>
+                        <span class="card-tag">NATO Phonetic Alphabet</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="cipher-output" id="nato-output"></div>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>古典密码互译器 — 用于学习与演示 | 仅支持英文 A-Z</p>
+    </footer>
+
+    <!-- 模块脚本（按依赖顺序加载） -->
+    <script src="modules/braille.js"></script>
+    <script src="modules/a1z26.js"></script>
+    <script src="modules/base5.js"></script>
+    <script src="modules/semaphore.js"></script>
+    <script src="modules/nato-phonetic.js"></script>
+    <!-- 主脚本 -->
+    <script src="script.js"></script>
+</body>
+</html>
