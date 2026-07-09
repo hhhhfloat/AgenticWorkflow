@@ -33,14 +33,43 @@ public class HttpServerMain {
 
     public static void main(String[] args) throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
+
+        // 原有业务接口
         server.createContext("/run", new RunHandler());
         server.createContext("/stop", new StopHandler());
-        server.createContext("/heartbeat", new HeartbeatHandler()); // ← 新增心跳端点
+        server.createContext("/heartbeat", new HeartbeatHandler());
         server.createContext("/projects", new ProjectsHandler());
+
+        // 托管前端页面（jar 包内的 /static 目录）
+        server.createContext("/", new StaticHandler());
+
+        // 托管外部 TestProjects 目录（映射到 URL /TestProjects）
+        Path testProjectsDir = Paths.get("./TestProjects");
+        if (Files.exists(testProjectsDir)) {
+            server.createContext("/TestProjects", new ExternalFileHandler(testProjectsDir));
+            System.out.println("📁 已挂载外部目录: ./TestProjects -> http://localhost:" + PORT + "/TestProjects");
+        } else {
+            System.out.println("⚠️ 未找到 ./TestProjects 目录，项目入口功能将不可用（可手动创建）");
+        }
+
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
-        System.out.println("🚀 Agent 服务已启动，请双击打开 index.html（本机 " + PORT + " 端口）");
-        System.out.println("按 Enter 停止服务...");
+
+        // 🎯 自动打开浏览器（桌面环境有效）
+        try {
+            String url = "http://localhost:" + PORT;
+            if (java.awt.Desktop.isDesktopSupported()) {
+                java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
+                System.out.println("🌐 已自动打开浏览器: " + url);
+            } else {
+                // 针对非桌面环境（如 Linux 无 GUI），打印提示
+                System.out.println("请手动打开浏览器访问: " + url);
+            }
+        } catch (Exception e) {
+            System.out.println("⚠️ 自动打开浏览器失败，请手动访问 http://localhost:" + PORT);
+        }
+
+        System.out.println("🚀 Agent 服务已启动（按 Enter 停止...）");
         startHeartbeatMonitor();
         System.in.read();
         server.stop(0);
@@ -298,3 +327,95 @@ class ProjectsHandler implements HttpHandler {
     }
 }
 
+// ========== 1. 内部静态资源处理器（处理 jar 包内的 /static 资源） ==========
+class StaticHandler implements HttpHandler {
+    @Override
+    public void handle(HttpExchange exchange) throws IOException {
+        String path = exchange.getRequestURI().getPath();
+        if ("/".equals(path)) path = "/index.html";
+
+        // 从 classpath 的 /static 目录下读取
+        InputStream is = HttpServerMain.class.getResourceAsStream("/static" + path);
+        if (is == null) {
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+            return;
+        }
+
+        // 简易 Content-Type 推断
+        String contentType = "text/html";
+        if (path.endsWith(".css")) contentType = "text/css";
+        else if (path.endsWith(".js")) contentType = "application/javascript";
+        else if (path.endsWith(".png")) contentType = "image/png";
+        else if (path.endsWith(".json")) contentType = "application/json";
+
+        exchange.getResponseHeaders().set("Content-Type", contentType);
+        exchange.sendResponseHeaders(200, 0); // 分块传输
+        try (OutputStream os = exchange.getResponseBody()) {
+            is.transferTo(os);
+        }
+        exchange.close();
+    }
+}
+
+// ========== 2. 外部目录处理器（处理磁盘上的 TestProjects 文件夹） ==========
+class ExternalFileHandler implements HttpHandler {
+    private final Path basePath;
+
+    public ExternalFileHandler(Path basePath) {
+        this.basePath = basePath.toAbsolutePath().normalize();
+    }
+
+    @Override
+    public void handle(HttpExchange exchange) throws IOException {
+        String requestPath = exchange.getRequestURI().getPath();
+        // 去掉前缀 "/TestProjects"，映射到磁盘目录
+        String relative = requestPath.substring("/TestProjects".length());
+        if (relative.isEmpty() || relative.equals("/")) {
+            // 如果直接访问 /TestProjects，返回 404 或列出目录（这里简单返回 404）
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+            return;
+        }
+
+        // 安全防护：防止路径遍历攻击（如 ../../etc/passwd）
+        Path resolved = basePath.resolve(relative.substring(1)).normalize();
+        if (!resolved.startsWith(basePath)) {
+            exchange.sendResponseHeaders(403, -1);
+            exchange.close();
+            return;
+        }
+
+        File file = resolved.toFile();
+        if (!file.exists()) {
+            exchange.sendResponseHeaders(404, -1);
+            exchange.close();
+            return;
+        }
+
+        // 如果是目录，自动补全 index.html
+        if (file.isDirectory()) {
+            file = new File(file, "index.html");
+            if (!file.exists()) {
+                exchange.sendResponseHeaders(404, -1);
+                exchange.close();
+                return;
+            }
+        }
+
+        // 设置 Content-Type（根据扩展名）
+        String name = file.getName();
+        String contentType = "text/html";
+        if (name.endsWith(".css")) contentType = "text/css";
+        else if (name.endsWith(".js")) contentType = "application/javascript";
+        else if (name.endsWith(".png")) contentType = "image/png";
+
+        exchange.getResponseHeaders().set("Content-Type", contentType);
+        exchange.sendResponseHeaders(200, file.length());
+        try (FileInputStream fis = new FileInputStream(file);
+             OutputStream os = exchange.getResponseBody()) {
+            fis.transferTo(os);
+        }
+        exchange.close();
+    }
+}

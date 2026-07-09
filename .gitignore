@@ -44,5 +44,6 @@ build/
 ## 不能上传API ##
 HttpServer.xml
 Main.xml
+start.bat
 
 !TestProjects/
