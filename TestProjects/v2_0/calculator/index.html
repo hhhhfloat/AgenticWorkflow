@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>计算器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- @anchor: app_container -->
+    <div class="calculator">
+        <!-- @anchor: display_area -->
+        <div class="display">
+            <div class="expression" id="expression"></div>
+            <div class="result" id="result">0</div>
+        </div>
+
+        <!-- @anchor: button_area -->
+        <div class="buttons">
+            <!-- 第一行：清除和开根 -->
+            <button class="btn btn-func" data-action="clear">C</button>
+            <button class="btn btn-func" data-action="backspace">⌫</button>
+            <button class="btn btn-func" data-action="sqrt">√</button>
+            <button class="btn btn-op" data-action="divide">÷</button>
+
+            <!-- 第二行 -->
+            <button class="btn btn-num" data-action="digit" data-value="7">7</button>
+            <button class="btn btn-num" data-action="digit" data-value="8">8</button>
+            <button class="btn btn-num" data-action="digit" data-value="9">9</button>
+            <button class="btn btn-op" data-action="multiply">×</button>
+
+            <!-- 第三行 -->
+            <button class="btn btn-num" data-action="digit" data-value="4">4</button>
+            <button class="btn btn-num" data-action="digit" data-value="5">5</button>
+            <button class="btn btn-num" data-action="digit" data-value="6">6</button>
+            <button class="btn btn-op" data-action="subtract">−</button>
+
+            <!-- 第四行 -->
+            <button class="btn btn-num" data-action="digit" data-value="1">1</button>
+            <button class="btn btn-num" data-action="digit" data-value="2">2</button>
+            <button class="btn btn-num" data-action="digit" data-value="3">3</button>
+            <button class="btn btn-op" data-action="add">+</button>
+
+            <!-- 第五行 -->
+            <button class="btn btn-num btn-zero" data-action="digit" data-value="0">0</button>
+            <button class="btn btn-num" data-action="decimal">.</button>
+            <button class="btn btn-equals" data-action="equals">=</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

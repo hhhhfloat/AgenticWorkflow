@@ -1,0 +1,136 @@
+/* @anchor: style_reset */
+/* ===== 全局样式 ===== */
+body {
+    font-family: 'Courier New', monospace;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 20px;
+}
+
+/* @anchor: style_textarea */
+textarea {
+    width: 100%;
+    height: 80px;
+    background: #2d2d2d;
+    color: #fff;
+    border: 1px solid #444;
+    padding: 8px;
+    font-size: 14px;
+}
+
+/* @anchor: style_buttons */
+button {
+    background: #0e639c;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 16px;
+}
+button:hover {
+    background: #1177bb;
+}
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* @anchor: style_output */
+#output {
+    background: #1e1e1e;
+    border: 1px solid #444;
+    padding: 10px;
+    height: 500px;
+    overflow-y: auto;
+    margin-top: 10px;
+}
+
+/* @anchor: style_logEntry */
+.log-entry {
+    margin: 2px 0;
+    padding: 0;
+    font-family: inherit;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* @anchor: style_logColors */
+.log-info    { color: #9cdcfe; }
+.log-error   { color: #f44747; }
+.log-success { color: #4ec9b0; }
+.log-system  { color: #d4d4d4; }
+
+/* @anchor: style_mdTable */
+.log-entry table {
+    border-collapse: collapse;
+    margin: 6px 0;
+    color: #d4d4d4;
+    background: #252526;
+    border-radius: 4px;
+    overflow: hidden;
+    width: 100%;
+}
+.log-entry th,
+.log-entry td {
+    border: 1px solid #444;
+    padding: 4px 10px;
+    text-align: left;
+}
+.log-entry th {
+    background: #2d2d2d;
+    color: #4ec9b0;
+    font-weight: bold;
+}
+.log-entry td {
+    background: #1e1e1e;
+}
+
+/* @anchor: style_mdCode */
+.log-entry code {
+    background: #2d2d2d;
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.9em;
+    color: #d4d4d4;
+}
+.log-entry pre {
+    background: #2d2d2d;
+    padding: 8px 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+    margin: 4px 0;
+    border-left: 3px solid #0e639c;
+}
+.log-entry pre code {
+    background: transparent;
+    padding: 0;
+    font-size: 0.9em;
+}
+
+/* @anchor: style_mdHeading */
+.log-entry h1, .log-entry h2, .log-entry h3, .log-entry h4 {
+    margin: 6px 0 4px 0;
+    color: #4ec9b0;
+}
+.log-entry hr {
+    border: none;
+    border-top: 1px solid #444;
+    margin: 6px 0;
+}
+.log-entry blockquote {
+    border-left: 3px solid #0e639c;
+    margin: 4px 0;
+    padding-left: 12px;
+    color: #9cdcfe;
+}
+.log-entry ul,
+.log-entry ol {
+    margin: 4px 0;
+    padding-left: 20px;
+}
+
+/* @anchor: style_systemPre */
+.log-system .log-entry {
+    white-space: pre;
+}
