@@ -22,7 +22,7 @@ import java.util.concurrent.Executors;
 public class HttpServerMain {
     // @anchor: httpserver_config
     private static final int PORT = 8080;
-    private static final long HEARTBEAT_TIMEOUT_MS = 40000;
+    private static final long HEARTBEAT_TIMEOUT_MS = 120000;
     private static final long HEARTBEAT_CHECK_INTERVAL_MS = 5000;
 
     // @anchor: httpserver_state

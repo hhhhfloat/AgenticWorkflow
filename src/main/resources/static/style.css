@@ -134,3 +134,24 @@ button:disabled {
 .log-system .log-entry {
     white-space: pre;
 }
+
+/* @anchor: style_iterationTip */
+#iterationTip {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: rgba(30, 30, 30, 0.85);
+    color: #9cdcfe;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    border: 1px solid #444;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+    transition: opacity 0.3s ease;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 999;
+    max-width: 280px;
+    text-align: center;
+    font-family: 'Courier New', monospace;
+}

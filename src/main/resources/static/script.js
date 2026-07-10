@@ -357,3 +357,67 @@ window.addEventListener('DOMContentLoaded', function () {
     }
     renderHistory();
 });
+
+// @anchor: script_visibility
+// ===== 页面可见性变化：切回前台时立即心跳，防止后端超时断开 =====
+document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) {
+        // 页面重新变为可见（用户切回来了）
+        console.log('🔄 页面回到前台，立即发送心跳续命...');
+        fetch(BASE_URL + '/heartbeat', { method: 'POST' }).catch(() => {
+            // 静默失败，避免干扰
+        });
+    }
+});
+
+// ============================================================
+// @anchor: script_iterationTip
+// ===== 迭代提示框（随机文案） =====
+// ============================================================
+
+const tipElement = document.getElementById('iterationTip');
+let lastTip = '';
+
+function showRandomTip() {
+    if (!QUOTES || QUOTES.length === 0) return;
+    let newTip;
+    do {
+        newTip = QUOTES[Math.floor(Math.random() * QUOTES.length)];
+    } while (newTip === lastTip && QUOTES.length > 1);
+    lastTip = newTip;
+    tipElement.textContent = newTip;
+    tipElement.style.opacity = '1';
+    // 5秒后淡出（如果新消息没来）
+    clearTimeout(tipElement._timeout);
+    tipElement._timeout = setTimeout(() => {
+        tipElement.style.opacity = '0';
+    }, 5000);
+}
+
+// 在 appendLog 中检测迭代标记
+const originalAppendLog = appendLog;
+appendLog = function(msg) {
+    // 先执行原逻辑
+    originalAppendLog(msg);
+    // 检测是否包含迭代标记
+    if (msg.includes('--- 第') && msg.includes('次迭代 ---')) {
+        showRandomTip();
+    }
+};
+
+// 如果页面刚加载，也可以先显示一句（但此时无迭代，可不显示）
+// 或者当运行开始时显示一个初始句
+// 在 runAgent 开始时也可以调用一次
+const originalRunAgent = runAgent;
+runAgent = function(prompt) {
+    // 显示第一句
+    if (QUOTES && QUOTES.length) {
+        tipElement.textContent = QUOTES[0]; // 或随机
+        tipElement.style.opacity = '1';
+        clearTimeout(tipElement._timeout);
+        tipElement._timeout = setTimeout(() => {
+            tipElement.style.opacity = '0';
+        }, 5000);
+    }
+    originalRunAgent(prompt);
+};
