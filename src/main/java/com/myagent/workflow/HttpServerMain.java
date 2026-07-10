@@ -33,7 +33,7 @@ public class HttpServerMain {
 
     // @anchor: httpserver_entry
     public static void main(String[] args) throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(PORT), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
 
         // 业务接口
         server.createContext("/run", new RunHandler());

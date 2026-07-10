@@ -51,6 +51,30 @@ public class ToolExecutor {
      * @anchor: toolExecutor_dispatch
      * 根据工具名和参数分发执行，返回结果字符串。
      */
+
+    private Path safeResolve(String... parts) throws IOException {
+        // 1. 获取沙箱根目录的绝对规范化路径
+        Path root = Paths.get(this.sandboxDir).toAbsolutePath().normalize();
+
+        // 2. 从根目录开始拼接用户传入的片段
+        Path resolved = root;
+        for (String part : parts) {
+            if (part != null && !part.isEmpty()) {
+                resolved = resolved.resolve(part);
+            }
+        }
+
+        // 3. 规范化（消除 .. 和 .）
+        resolved = resolved.normalize();
+
+        // 4. 核心校验：确保最终路径仍然以沙箱根目录开头
+        if (!resolved.startsWith(root)) {
+            throw new IOException("安全拒绝：路径穿越检测 -> " + String.join("/", parts));
+        }
+
+        return resolved;
+    }
+
     public String dispatch(String functionName, Map<String, Object> args) throws IOException {
         switch (functionName) {
             case "write_java_file":
@@ -92,7 +116,7 @@ public class ToolExecutor {
 
     private String writeJavaFile(String filename, String code) {
         try {
-            Path filePath = Paths.get(sandboxDir, filename);
+            Path filePath = safeResolve(filename);
             Files.createDirectories(filePath.getParent());
             try (FileWriter writer = new FileWriter(filePath.toFile())) {
                 writer.write(code);
@@ -108,8 +132,11 @@ public class ToolExecutor {
 
     private String compileAndRun(String filename) {
         try {
+            // 【唯一改动点】获取安全解析后的路径
+            Path filePath = safeResolve(filename);
+
             if (filename.endsWith(".html") || filename.endsWith(".htm")) {
-                File htmlFile = Paths.get(sandboxDir, filename).toFile();
+                File htmlFile = filePath.toFile(); // 替换原有的 Paths.get(...).toFile()
                 if (!htmlFile.exists()) {
                     return "HTML 文件不存在: " + filename;
                 }
@@ -121,9 +148,10 @@ public class ToolExecutor {
                 }
             }
 
+            // 编译 Java 文件
             ProcessBuilder compilePb = new ProcessBuilder(
                     "javac", "-d", sandboxDir,
-                    Paths.get(sandboxDir, filename).toString());
+                    filePath.toString()); // 替换 Paths.get(sandboxDir, filename).toString()
             compilePb.redirectErrorStream(true);
             Process compileProc = compilePb.start();
             int compileExit = compileProc.waitFor();
@@ -165,7 +193,8 @@ public class ToolExecutor {
             path = ".";
         }
         try {
-            Path dirPath = Paths.get(sandboxDir, path);
+            // 【唯一改动】将 Paths.get(sandboxDir, path) 替换为 safeResolve(path)
+            Path dirPath = safeResolve(path);
             if (!Files.exists(dirPath) || !Files.isDirectory(dirPath)) {
                 return "路径不存在或不是目录: " + path;
             }
@@ -236,7 +265,7 @@ public class ToolExecutor {
 
     private String readFile(String filename) {
         try {
-            Path filePath = Paths.get(sandboxDir, filename);
+            Path filePath = safeResolve(filename);
             if (!Files.exists(filePath) || Files.isDirectory(filePath)) {
                 return "文件不存在或是一个目录: " + filename;
             }
@@ -256,7 +285,7 @@ public class ToolExecutor {
 
     private String deleteFile(String filename) {
         try {
-            Path filePath = Paths.get(sandboxDir, filename);
+            Path filePath = safeResolve(filename);
             if (!Files.exists(filePath)) {
                 return "文件不存在: " + filename;
             }
@@ -275,7 +304,7 @@ public class ToolExecutor {
 
     private String searchText(String keyword, String filePattern, String path) {
         try {
-            Path startPath = Paths.get(sandboxDir, path);
+            Path startPath = safeResolve(path);
             if (!Files.exists(startPath) || !Files.isDirectory(startPath)) {
                 return "路径不存在或不是目录: " + path;
             }
@@ -379,7 +408,7 @@ public class ToolExecutor {
 
     private String buildAnchorIndex(String projectPath) {
         try {
-            Path projectDir = Paths.get(sandboxDir, projectPath);
+            Path projectDir = safeResolve(projectPath);
             if (!Files.exists(projectDir) || !Files.isDirectory(projectDir)) {
                 return "项目目录不存在: " + projectPath;
             }
@@ -533,7 +562,7 @@ public class ToolExecutor {
         if (loc == null) return "❌ 锚点不存在: " + anchorId;
 
         try {
-            Path filePath = Paths.get(sandboxDir, loc.projectPath, loc.filePath);
+            Path filePath = safeResolve(loc.projectPath, loc.filePath);
             if (!Files.exists(filePath)) return "❌ 文件不存在: " + loc.filePath;
 
             List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
@@ -562,7 +591,7 @@ public class ToolExecutor {
         if (loc == null) return "❌ 锚点不存在: " + anchorId;
 
         try {
-            Path filePath = Paths.get(sandboxDir, loc.projectPath, loc.filePath);
+            Path filePath = safeResolve(loc.projectPath, loc.filePath);
             if (!Files.exists(filePath)) return "❌ 文件不存在: " + loc.filePath;
 
             List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
