@@ -22,6 +22,7 @@ const QUOTES = [
     "大风起兮云飞扬，安得猛士兮守四方",
     "You are waiting for a train...",
     "Do not go gentle into the dark night...",
-    "And now I am become death, destroyer of the world."
+    "And now I am become death, destroyer of the world.",
+    "目前尚未支持agent自主多文件架构编译"
 
 ];
