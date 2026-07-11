@@ -7,9 +7,16 @@ package com.myagent.workflow;
  */
 public final class AgentConfig {
 
+    public static final String ARCHIVE_VERSION = "v2_0";
+
+
     private AgentConfig() {
         // 工具类，禁止实例化
     }
+
+    // @anchor: agentConfig_compile
+    /** compile_and_run 是否自动打开浏览器预览（false 时只返回访问链接） */
+    public static final boolean AUTO_OPEN_BROWSER = false;
 
     // @anchor: agentConfig_api
     /** DeepSeek API 地址 */
@@ -27,5 +34,5 @@ public final class AgentConfig {
 
     // @anchor: agentConfig_iteration
     /** Agent 最大迭代次数，防止无限循环 */
-    public static final int MAX_ITERATIONS = 20;
+    public static final int MAX_ITERATIONS = 30;
 }

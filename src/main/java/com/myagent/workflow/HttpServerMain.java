@@ -15,6 +15,7 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 
 /**
  * @anchor: httpserver_class
@@ -54,14 +55,25 @@ public class HttpServerMain {
         server.createContext("/heartbeat", new HeartbeatHandler());
         server.createContext("/projects", new Handlers.ProjectsHandler());
         server.createContext("/browse", new Handlers.BrowseHandler());
+        server.createContext("/archive", new Handlers.ArchiveHandler());
+        server.createContext("/upload", new Handlers.UploadHandler());
+        server.createContext("/createProject", new Handlers.CreateProjectHandler());
+        // 替换原来的 /openSandbox 为 /openFolder
+        server.createContext("/openFolder", new Handlers.OpenFolderHandler());
+        server.createContext("/config", new Handlers.ConfigHandler());
 
         // 静态资源
         server.createContext("/", new Handlers.StaticHandler());
 
-        // 外部项目目录挂载（目录已确保存在）
+        // 外部项目目录挂载
         Path testProjectsDir = Paths.get("./TestProjects");
-        server.createContext("/TestProjects", new Handlers.ExternalFileHandler(testProjectsDir));
+        server.createContext("/TestProjects", new Handlers.ExternalFileHandler(testProjectsDir, "/TestProjects"));
         System.out.println("📁 已挂载外部目录: ./TestProjects -> http://localhost:" + PORT + "/TestProjects");
+
+// 沙箱目录挂载
+        Path sandboxDir = Paths.get("./sandbox");
+        server.createContext("/sandbox", new Handlers.ExternalFileHandler(sandboxDir, "/sandbox"));
+        System.out.println("📁 已挂载沙箱目录: ./sandbox -> http://localhost:" + PORT + "/sandbox");
 
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
@@ -118,7 +130,7 @@ public class HttpServerMain {
                 if (root.has("maxIterations")) {
                     maxIterations = root.get("maxIterations").asInt();
                     // 安全限制：1~50
-                    if (maxIterations < 1) maxIterations = AgentConfig.MAX_ITERATIONS;
+                    if (maxIterations < 3) maxIterations = 3;
                     if (maxIterations > 50) maxIterations = 50;
                 }
 
@@ -151,7 +163,7 @@ public class HttpServerMain {
             // 新增：日志文件写入器
             LogFileWriter logWriter = null;
             try {
-                logWriter = new LogFileWriter();
+                logWriter = new LogFileWriter(userRequest);
             } catch (IOException e) {
                 // 日志文件创建失败不影响主流程
                 System.err.println("⚠️ 无法创建日志文件: " + e.getMessage());
@@ -311,18 +323,49 @@ class LogFileWriter implements AutoCloseable {
     private final Path logFile;
     private final BufferedWriter writer;
 
-    public LogFileWriter() throws IOException {
+    public LogFileWriter(String prompt) throws IOException {
         // 创建 HistoryOutput 目录
         Path logDir = Paths.get("./HistoryOutput");
         if (!Files.exists(logDir)) {
             Files.createDirectories(logDir);
         }
 
+        cleanOldLogs();
+
         // 生成文件名：2026-07-11_14-23-45.log
         String timestamp = LocalDateTime.now()
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
         logFile = logDir.resolve(timestamp + ".log");
         writer = Files.newBufferedWriter(logFile, StandardCharsets.UTF_8);
+
+        // 写入提示词作为第一行
+        writer.write("📝 本次需求: " + prompt);
+        writer.newLine();
+        writer.write("--- 开始执行 ---");
+        writer.newLine();
+        writer.flush();
+    }
+
+    private static void cleanOldLogs() throws IOException {
+        Path logDir = Paths.get("./HistoryOutput");
+        if (!Files.exists(logDir)) return;
+
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
+        try (Stream<Path> files = Files.list(logDir)) {
+            files.filter(p -> p.toString().endsWith(".log"))
+                    .forEach(p -> {
+                        try {
+                            // 从文件名解析日期（格式：2026-07-11_14-23-45.log）
+                            String name = p.getFileName().toString();
+                            String datePart = name.substring(0, 10); // "2026-07-11"
+                            LocalDateTime fileDate = LocalDateTime.parse(datePart + "T00:00:00");
+                            if (fileDate.isBefore(cutoff)) {
+                                Files.delete(p);
+                                System.out.println("🗑️ 已删除旧日志: " + p.getFileName());
+                            }
+                        } catch (Exception ignored) {}
+                    });
+        }
     }
 
     public void write(String message) throws IOException {

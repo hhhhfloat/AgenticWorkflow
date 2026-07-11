@@ -103,10 +103,11 @@ public class ToolExecutor {
                         (String) args.get("anchor_id"),
                         (String) args.get("content"),
                         (String) args.getOrDefault("position", "after"));
-            case "replace_at_anchor":
-                return replaceAtAnchor(
-                        (String) args.get("anchor_id"),
-                        (String) args.get("new_content"));
+            case "delete_between_anchors":
+                return deleteBetweenAnchors(
+                        (String) args.get("startAnchor"),
+                        (String) args.get("endAnchor")
+                );
             default:
                 return "未知工具: " + functionName;
         }
@@ -136,15 +137,27 @@ public class ToolExecutor {
             Path filePath = safeResolve(filename);
 
             if (filename.endsWith(".html") || filename.endsWith(".htm")) {
-                File htmlFile = filePath.toFile(); // 替换原有的 Paths.get(...).toFile()
+                File htmlFile = filePath.toFile();
                 if (!htmlFile.exists()) {
                     return "HTML 文件不存在: " + filename;
                 }
-                if (Desktop.isDesktopSupported()) {
+
+                // 构造访问 URL：统一加上 /sandbox/ 前缀
+                String relativePath = filename.replace("\\", "/");
+                // 如果已经以 sandbox/ 开头，去掉，避免重复
+                if (relativePath.startsWith("sandbox/")) {
+                    relativePath = relativePath.substring("sandbox/".length());
+                }
+                if (relativePath.startsWith("/sandbox/")) {
+                    relativePath = relativePath.substring("/sandbox/".length());
+                }
+                String url = "http://localhost:8080/sandbox/" + relativePath;
+
+                if (AgentConfig.AUTO_OPEN_BROWSER && Desktop.isDesktopSupported()) {
                     Desktop.getDesktop().browse(htmlFile.toURI());
-                    return "✅ 已在默认浏览器中打开 " + filename + "（请查看弹窗或新标签页）";
+                    return "✅ 已在浏览器中打开 " + filename + "\n🔗 访问地址: " + url;
                 } else {
-                    return "⚠️ 当前系统不支持自动打开浏览器，请手动打开文件: " + htmlFile.getAbsolutePath();
+                    return "✅ 预览就绪，请手动访问: " + url;
                 }
             }
 
@@ -584,31 +597,57 @@ public class ToolExecutor {
         }
     }
 
-    // ==================== 工具 10: replace_at_anchor ====================
+    // ==================== 工具：delete_between_anchors ====================
 
-    private String replaceAtAnchor(String anchorId, String newContent) {
-        AnchorLocation loc = findAnchor(anchorId);
-        if (loc == null) return "❌ 锚点不存在: " + anchorId;
+    private String deleteBetweenAnchors(String startAnchor, String endAnchor) {
+        // 1. 查找两个锚点
+        AnchorLocation startLoc = findAnchor(startAnchor);
+        AnchorLocation endLoc = findAnchor(endAnchor);
+        if (startLoc == null) return "❌ 起始锚点不存在: " + startAnchor;
+        if (endLoc == null) return "❌ 结束锚点不存在: " + endAnchor;
 
+        // 2. 必须在同一文件中
+        if (!startLoc.filePath.equals(endLoc.filePath)) {
+            return "❌ 两个锚点不在同一个文件中";
+        }
+
+        // 3. 起始行必须在结束行之前
+        if (startLoc.line >= endLoc.line) {
+            return "❌ 起始锚点必须在结束锚点之前";
+        }
+
+        // 4. 读取文件，删除中间内容
         try {
-            Path filePath = safeResolve(loc.projectPath, loc.filePath);
-            if (!Files.exists(filePath)) return "❌ 文件不存在: " + loc.filePath;
-
+            Path filePath = safeResolve(startLoc.projectPath, startLoc.filePath);
             List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
-            int targetLine = loc.line - 1;
 
-            if (targetLine < 0 || targetLine >= lines.size()) {
-                return "❌ 行号超出范围: " + loc.line;
+            int startLine = startLoc.line - 1;
+            int endLine = endLoc.line - 1;
+
+            // 如果中间没有内容，返回提示
+            if (endLine - startLine <= 1) {
+                return "⚠️ 两个锚点之间没有内容可删除";
             }
 
-            lines.set(targetLine, newContent);
-            Files.write(filePath, lines, StandardCharsets.UTF_8);
-            buildAnchorIndex(loc.projectPath);
-            return "✅ 已替换 " + loc.filePath + " 的锚点 [" + anchorId + "] 所在行";
+            List<String> newLines = new ArrayList<>();
+            for (int i = 0; i < lines.size(); i++) {
+                if (i > startLine && i < endLine) {
+                    continue; // 跳过中间行
+                }
+                newLines.add(lines.get(i));
+            }
+
+            Files.write(filePath, newLines, StandardCharsets.UTF_8);
+
+            // 5. 更新锚点索引
+            buildAnchorIndex(startLoc.projectPath);
+
+            int deletedLines = (endLine - startLine) - 1;
+            return "✅ 已删除从 [" + startAnchor + "] 到 [" + endAnchor + "] 之间的 " + deletedLines + " 行代码";
 
         } catch (IOException e) {
-            logger.error("替换代码失败", e);
-            return "❌ 替换失败: " + e.getMessage();
+            logger.error("删除代码块失败", e);
+            return "❌ 删除失败: " + e.getMessage();
         }
     }
 }

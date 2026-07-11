@@ -120,15 +120,15 @@ public final class ToolDefinitions {
                 List.of("anchor_id", "content")
         ));
 
-        // @anchor: toolDef_replaceAnchor
+        // @anchor: toolDef_deleteBetween
         tools.add(defineTool(
-                "replace_at_anchor",
-                "替换锚点所在行的内容为新的代码。",
+                "delete_between_anchors",
+                "删除从 startAnchor 所在行开始，到 endAnchor 所在行结束之间的所有内容（不包含锚点所在行）。删除后索引自动更新。常用于配合 insert_at_anchor 实现区间替换。",
                 defineParams()
-                        .prop("anchor_id", "string", "锚点 ID")
-                        .prop("new_content", "string", "新的代码内容")
+                        .prop("startAnchor", "string", "起始锚点 ID")
+                        .prop("endAnchor", "string", "结束锚点 ID")
                         .build(),
-                List.of("anchor_id", "new_content")
+                List.of("startAnchor", "endAnchor")
         ));
 
         return tools;

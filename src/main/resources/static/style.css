@@ -262,3 +262,99 @@ html, body {
     min-height: 300px;
     margin-top: 10px;
 }
+
+/* @anchor: style_iterationControl */
+.iteration-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.iteration-control label {
+    color: #d4d4d4;
+    font-size: 14px;
+}
+
+.iteration-control input[type="number"] {
+    width: 70px;
+    background: #2d2d2d;
+    color: #fff;
+    border: 1px solid #444;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.iteration-control input[type="number"]:focus {
+    outline: none;
+    border-color: #0e639c;
+}
+
+.iteration-control .hint {
+    color: #888;
+    font-size: 12px;
+}
+
+.button-row {
+    margin-top: 8px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.clear-btn {
+    background: #555;
+}
+.clear-btn:hover {
+    background: #777;
+}
+
+/* @anchor: style_archiveBtn */
+.archive-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: #4ec9b0;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0 4px;
+    margin-left: auto;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+.tree-item:hover .archive-btn {
+    display: inline-block;
+}
+.archive-btn:hover {
+    opacity: 1;
+    color: #fff;
+}
+
+/* @anchor: style_treeActions */
+.tree-action-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: #9cdcfe;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0 4px;
+    margin-left: 2px;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+}
+.tree-item:hover .tree-action-btn {
+    display: inline-block;
+}
+.tree-action-btn:hover {
+    opacity: 1;
+    color: #fff;
+}
+
+.log-btn {
+    background: #444;
+}
+.log-btn:hover {
+    background: #666;
+}

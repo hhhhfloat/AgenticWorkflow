@@ -80,7 +80,7 @@ public class Main {
         // 工具定义（委托给 ToolDefinitions）
         List<Map<String, Object>> tools = ToolDefinitions.build();
 
-        for (int iteration = 0; iteration < AgentConfig.MAX_ITERATIONS; iteration++) {
+        for (int iteration = 0; iteration < maxIterations; iteration++) {
             checkStop();
             logIf("--- 第 " + (iteration + 1) + " 次迭代 ---");
 
@@ -119,6 +119,14 @@ public class Main {
             JsonNode messageNode = choices.get(0).get("message");
             Map<String, Object> assistantMsg = objectMapper.convertValue(messageNode, Map.class);
             messages.add(assistantMsg);
+
+            // ✅ 新增：记录模型返回的 content（解释性文字）
+            if (messageNode.has("content") && !messageNode.get("content").isNull()) {
+                String content = messageNode.get("content").asText();
+                if (!content.isEmpty()) {
+                    logIf("💬 " + content);
+                }
+            }
 
             // 无 tool_calls → Agent 已完成
             if (!messageNode.has("tool_calls") || messageNode.get("tool_calls").size() == 0) {

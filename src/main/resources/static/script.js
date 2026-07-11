@@ -154,7 +154,7 @@ function escapeHtml(text) {
 // ===== SSE 流式请求模块 =====
 // ============================================================
 
-function runAgent(prompt) {
+function runAgent(prompt, maxIterations) {
     output.innerHTML = '连接服务...\n';
     isRunning = true;
     runBtn.disabled = true;
@@ -217,6 +217,8 @@ function finishRun() {
     stopBtn.disabled = true;
     isRunning = false;
     stopHeartbeat();
+    // 刷新沙箱目录树（Agent 可能创建了新文件）
+    refreshSandbox();
 }
 
 // @anchor: script_stop
@@ -405,6 +407,36 @@ function renderTreeNode(path, container, isRoot = false, hasIndexHtml = false, i
     nameSpan.textContent = displayName;
     label.appendChild(nameSpan);
 
+    // ---- 如果是 sandbox 根节点，添加操作按钮 ----
+    if (isRoot && path === 'sandbox') {
+        // 1. 打开文件夹按钮
+        const openBtn = document.createElement('button');
+        openBtn.className = 'tree-action-btn';
+        openBtn.title = '📂 在文件管理器中打开 sandbox 文件夹';
+        openBtn.textContent = '📂';
+        openBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await openFolder('sandbox');
+        });
+        label.appendChild(openBtn);
+
+        // 2. 新建项目按钮
+        const createBtn = document.createElement('button');
+        createBtn.className = 'tree-action-btn';
+        createBtn.title = '➕ 在 sandbox 下创建新项目文件夹';
+        createBtn.textContent = '➕';
+        createBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const projectName = prompt('请输入新项目名称（仅允许字母、数字、- 和 _）：');
+            if (projectName && projectName.trim()) {
+                await createProject(projectName.trim());
+            }
+        });
+        label.appendChild(createBtn);
+    }
+
+
+
     // ---- 如果是 TestProjects 下的项目入口，添加 🚀 标记 ----
     if (!isRoot && isTestProjects && hasIndexHtml) {
         const badge = document.createElement('span');
@@ -412,6 +444,61 @@ function renderTreeNode(path, container, isRoot = false, hasIndexHtml = false, i
         badge.style.color = '#4ec9b0';
         badge.style.fontSize = '12px';
         label.appendChild(badge);
+    }
+
+    // ---- 如果是 sandbox 下的一级子目录，添加归档按钮和上传按钮 ----
+    const parts = path.split('/');
+    const isSandboxProject = parts.length === 2 && parts[0] === 'sandbox';
+    if (isSandboxProject) {
+        const projectName = parts[1];
+
+        // 归档按钮（原有）
+        const archiveBtn = document.createElement('button');
+        archiveBtn.className = 'tree-action-btn';
+        archiveBtn.title = '📦 归档此项目到 TestProjects';
+        archiveBtn.textContent = '📦';
+        archiveBtn.dataset.project = projectName;
+        archiveBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await archiveProject(projectName);
+        });
+        label.appendChild(archiveBtn);
+
+        // 新增：上传文件按钮
+        const uploadBtn = document.createElement('button');
+        uploadBtn.className = 'tree-action-btn';
+        uploadBtn.title = '📤 上传文件到此项目';
+        uploadBtn.textContent = '📤';
+        uploadBtn.dataset.project = projectName;
+        uploadBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            // 创建隐藏的 file input
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.multiple = true;
+            input.style.display = 'none';
+            document.body.appendChild(input);
+            input.addEventListener('change', async () => {
+                if (input.files && input.files.length > 0) {
+                    await uploadFiles(projectName, input.files);
+                }
+                document.body.removeChild(input);
+            });
+            input.click();
+        });
+        label.appendChild(uploadBtn);
+    }
+    // ---- 如果是 TestProjects 根节点，添加打开文件夹按钮 ----
+    if (isRoot && path === 'TestProjects') {
+        const openBtn = document.createElement('button');
+        openBtn.className = 'tree-action-btn';
+        openBtn.title = '📂 在文件管理器中打开 TestProjects 文件夹';
+        openBtn.textContent = '📂';
+        openBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await openFolder('TestProjects');
+        });
+        label.appendChild(openBtn);
     }
 
     wrapper.appendChild(label);
@@ -537,14 +624,17 @@ function openProjectPreview(projectPath) {
 function handleFileClick(filePath) {
     appendLog(`[系统] 点击文件: ${filePath}`);
 
-    // 如果是以 .html 结尾，尝试在新窗口打开
     if (filePath.endsWith('.html') || filePath.endsWith('.htm')) {
         if (filePath.startsWith('TestProjects/')) {
             const url = '/' + filePath;
             appendLog(`[系统] 在浏览器中打开: ${url}`);
             window.open(url, '_blank');
+        } else if (filePath.startsWith('sandbox/')) {
+            const url = '/' + filePath;  // 同样构造 /sandbox/xxx/index.html
+            appendLog(`[系统] 在浏览器中打开: ${url}`);
+            window.open(url, '_blank');
         } else {
-            appendLog('[系统] sandbox 下的 HTML 文件暂不支持直接预览');
+            appendLog('[系统] 无法预览此文件');
         }
     }
 }
@@ -573,6 +663,9 @@ function showErrorMessage(container, msg) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
+
+    loadConfig(); // 新增
+
     // 历史记录恢复
     const history = getHistory();
     if (history.length > 0) {
@@ -586,4 +679,255 @@ document.addEventListener('DOMContentLoaded', function() {
     sidebarContent.innerHTML = '';
     renderTreeNode('sandbox', sidebarContent, true, false, false);
     renderTreeNode('TestProjects', sidebarContent, true, false, true);
+
+    const iterInput = document.getElementById('maxIterations');
+    iterInput.addEventListener('change', function() {
+        let val = parseInt(this.value);
+        if (isNaN(val)) val = 20;
+        if (val < 3) val = 3;
+        if (val > 50) val = 50;
+        this.value = val;
+    });
 });
+
+// 从后端加载配置
+async function loadConfig() {
+    try {
+        const res = await fetch('/config');
+        const config = await res.json();
+        if (config.maxIterations) {
+            const input = document.getElementById('maxIterations');
+            if (input) {
+                input.value = config.maxIterations;
+                // 同时更新 change 事件里的兜底值（通过全局变量或直接修改）
+            }
+        }
+    } catch (e) {
+        // 配置加载失败，使用硬编码兜底（30）
+        console.warn('配置加载失败，使用默认值');
+    }
+}
+
+document.getElementById('logBtn').addEventListener('click', () => {
+    openFolder('HistoryOutput');
+});
+
+// ============================================================
+// @anchor: script_archive
+// ===== 归档功能 =====
+// ============================================================
+
+async function archiveProject(projectName) {
+    // 防止重复点击
+    const btn = document.querySelector(`.archive-btn[data-project="${projectName}"]`);
+    if (btn) btn.disabled = true;
+
+    try {
+        // 1. 第一次请求：尝试归档
+        let res = await fetch('/archive', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectName })
+        });
+
+        let data = await res.json();
+
+        // 2. 如果目标已存在，询问用户是否覆盖
+        if (data.status === 'exists') {
+            const confirmMsg = `项目 "${projectName}" 已存在于 TestProjects/v0_0/，是否覆盖？`;
+            if (!confirm(confirmMsg)) {
+                appendLog(`[系统] 已取消归档: ${projectName}`);
+                return;
+            }
+
+            // 用户确认覆盖：强制归档
+            res = await fetch('/archive?force=true', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ projectName })
+            });
+            data = await res.json();
+        }
+
+        // 3. 处理结果
+        if (data.status === 'success') {
+            appendLog(`[系统] ✅ 项目已归档: ${data.path}`);
+            // 刷新侧边栏
+            refreshSidebar();
+        } else {
+            appendLog(`[系统] ❌ 归档失败: ${data.message || '未知错误'}`);
+        }
+    } catch (err) {
+        appendLog(`[系统] ❌ 归档失败: ${err.message}`);
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+/**
+ * 刷新侧边栏：重新加载 TestProjects 目录
+ */
+function refreshSidebar() {
+    // 找到 TestProjects 根节点
+    const sidebarContent = document.getElementById('sidebarContent');
+    if (!sidebarContent) return;
+
+    // 找到 TestProjects 对应的树节点
+    const testRoot = sidebarContent.querySelector('[data-path="TestProjects"]');
+    if (!testRoot) return;
+
+    // 找到它的子节点容器（即 tree-node 内部的 tree-children）
+    const treeNode = testRoot.closest('.tree-node');
+    if (!treeNode) return;
+
+    const childrenContainer = treeNode.querySelector('.tree-children');
+    if (!childrenContainer) return;
+
+    // 清空并重置状态
+    childrenContainer.innerHTML = '';
+    childrenContainer.dataset.loaded = '';
+    childrenContainer.style.display = 'none';
+
+    // 触发点击事件重新加载
+    const label = treeNode.querySelector('.tree-item');
+    if (label) {
+        label.click();
+    }
+}
+
+async function createProject(projectName) {
+    // 前端二次校验：只允许字母、数字、- 和 _
+    if (!/^[a-zA-Z0-9\-_]+$/.test(projectName)) {
+        alert('项目名仅允许字母、数字、- 和 _');
+        return;
+    }
+    try {
+        const res = await fetch('/createProject', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectName })
+        });
+        const data = await res.json();
+        if (data.status === 'success') {
+            appendLog(`[系统] ✅ 项目已创建: ${data.path}`);
+            refreshSandbox();  // 刷新侧边栏
+        } else if (data.status === 'exists') {
+            alert(`项目 "${projectName}" 已存在，请换一个名称`);
+        } else {
+            appendLog(`[系统] ❌ 创建失败: ${data.message}`);
+        }
+    } catch (err) {
+        appendLog(`[系统] ❌ 创建失败: ${err.message}`);
+    }
+}
+
+async function uploadFiles(projectName, fileList) {
+    if (!fileList || fileList.length === 0) return;
+
+    const formData = new FormData();
+    formData.append('projectName', projectName);
+    for (const file of fileList) {
+        formData.append('files', file);
+    }
+
+    try {
+        // 第一次请求：检查是否存在
+        let res = await fetch('/upload', {
+            method: 'POST',
+            body: formData
+        });
+        let data = await res.json();
+
+        // 如果有文件已存在，询问用户是否覆盖
+        if (data.status === 'check' && data.existing && data.existing.length > 0) {
+            const confirmMsg = `以下 ${data.existing.length} 个文件已存在：\n${data.existing.join('\n')}\n\n是否覆盖？`;
+            if (!confirm(confirmMsg)) {
+                appendLog(`[系统] 已取消上传: ${projectName}`);
+                return;
+            }
+            // 强制覆盖
+            res = await fetch('/upload?force=true', {
+                method: 'POST',
+                body: formData
+            });
+            data = await res.json();
+        }
+
+        // 处理结果
+        if (data.status === 'success' || data.status === 'partial') {
+            const uploaded = data.uploaded || [];
+            const failed = data.failed || [];
+            let msg = `✅ 上传完成: ${uploaded.length} 个文件`;
+            if (failed.length > 0) {
+                msg += `，${failed.length} 个失败 (${failed.join(', ')})`;
+            }
+            appendLog(`[系统] ${msg}`);
+            refreshSandbox();  // 刷新侧边栏
+        } else {
+            appendLog(`[系统] ❌ 上传失败: ${data.message}`);
+        }
+    } catch (err) {
+        appendLog(`[系统] ❌ 上传失败: ${err.message}`);
+    }
+}
+
+function refreshSandbox() {
+    const sidebarContent = document.getElementById('sidebarContent');
+    if (!sidebarContent) return;
+
+    // 找到 sandbox 根节点
+    const sandboxRoot = sidebarContent.querySelector('[data-path="sandbox"]');
+    if (!sandboxRoot) return;
+
+    const treeNode = sandboxRoot.closest('.tree-node');
+    if (!treeNode) return;
+
+    const childrenContainer = treeNode.querySelector('.tree-children');
+    if (!childrenContainer) return;
+
+    // ✅ 递归清除所有子节点的缓存
+    clearCacheRecursively(childrenContainer);
+
+    // 清空并重置
+    childrenContainer.innerHTML = '';
+    childrenContainer.dataset.loaded = '';
+    childrenContainer.style.display = 'none';
+
+    // 触发重新加载
+    const label = treeNode.querySelector('.tree-item');
+    if (label) {
+        label.click();
+    }
+}
+
+function clearCacheRecursively(container) {
+    // 清除所有 tree-node 的 dataset.loaded
+    const nodes = container.querySelectorAll('.tree-node');
+    nodes.forEach(node => {
+        const childContainer = node.querySelector('.tree-children');
+        if (childContainer) {
+            childContainer.dataset.loaded = '';
+            // 递归清除更深层的缓存
+            clearCacheRecursively(childContainer);
+        }
+    });
+}
+
+// ============================================================
+// @anchor: script_openFolder
+// ===== 打开文件夹 =====
+// ============================================================
+
+async function openFolder(path) {
+    try {
+        const res = await fetch(`/openFolder?path=${encodeURIComponent(path)}`);
+        const data = await res.json();
+        if (data.status === 'success') {
+            appendLog(`[系统] 📂 已打开 ${path} 文件夹`);
+        } else {
+            appendLog(`[系统] ❌ 打开失败: ${data.message}`);
+        }
+    } catch (err) {
+        appendLog(`[系统] ❌ 打开失败: ${err.message}`);
+    }
+}

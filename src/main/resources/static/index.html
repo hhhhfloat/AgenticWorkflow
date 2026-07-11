@@ -29,17 +29,17 @@
 
         <div id="historyContainer"></div>
 
-        <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap;">
-            <label for="maxIterations" style="color:#d4d4d4; font-size:14px;">🔄 最大迭代次数：</label>
-            <input type="number" id="maxIterations" value="20" min="1" max="50"
-                   style="width:70px; background:#2d2d2d; color:#fff; border:1px solid #444; padding:4px 8px; border-radius:4px; font-size:14px;">
-            <span style="color:#888; font-size:12px;">（1-50）</span>
+        <div class = "iteration-control">
+            <label for="maxIterations" >🔄 最大迭代次数：</label>
+            <input type="number" id="maxIterations" value="20" min="3" max="50">
+            <span class="hint">（3-50, 建议 > 15）</span>
         </div>
 
-        <div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap;">
+        <div class="button-row">
             <button id="runBtn">▶ 运行</button>
             <button id="stopBtn" disabled>⏹ 停止</button>
-            <button id="clearBtn" style="background:#555;">🗑 清空</button>
+            <button id="clearBtn" class="clear-btn">🗑 清空</button>
+            <button id="logBtn" class="log-btn" title="打开 HistoryOutput 日志文件夹">📂 日志</button>
         </div>
 
         <div id="output">等待输入...</div>

@@ -31,6 +31,11 @@ public final class SystemPrompt {
         - script.js（全部逻辑）
         Java 项目按 Maven 标准组织。
 
+        ## 项目文档
+        - 每个项目完成后，在根目录生成 PROJECT.md，记录：目录结构、数据模型、关键锚点、功能清单。
+        - 后续修改前，先 read_file PROJECT.md 了解全貌，避免盲目读所有文件。
+        - 重大变更后同步更新 PROJECT.md。
+
         ## 操作流程
         1. 动手前：list_directory + read_file 了解现状。
         2. 动手后：compile_and_run 验证。
@@ -39,21 +44,31 @@ public final class SystemPrompt {
 
         ## 工具速查
         - list_directory / read_file / write_java_file / delete_file
-        - compile_and_run：编译 .java 或打开 .html 预览
+        - compile_and_run：编译 .java 或预览 .html（自动生成 /sandbox/ 链接）
         - search_text：修改前必须先查引用
-        - build_anchor_index / list_anchors / insert_at_anchor / replace_at_anchor
-        - 插入/替换后索引自动更新
-
-        ## 约束
-        - 所有操作已限制在沙箱内。
-        - 后端仅用 Java 标准库。
-        - 修改方法/变量前必须先 search_text 查引用。
+        - build_anchor_index / list_anchors
+        - insert_at_anchor(锚点ID, 内容, before|after) —— 在锚点处插入
+        - delete_between_anchors(起始锚点, 结束锚点) —— 删除两锚点之间的代码块（锚点行保留）
+        - 插入/删除后索引自动更新
 
         ## 锚点系统
         - 标记格式：Java/JS: // @anchor: 名称，CSS: /* @anchor: 名称 */，HTML: <!-- @anchor: 名称 -->
         - 命名：模块_功能，如 braille_encode
-        - insert_at_anchor / replace_at_anchor 修改后，若涉及方法名/变量名变更，必须 search_text 追踪所有引用并联动修改。
-        - 锚点定位 + search 追踪 = 完整修改链路。
+        - **组合用法**：
+          - 替换代码块 = delete_between_anchors(起始, 结束) + insert_at_anchor(起始, 新代码, "after")
+          - 删除代码块 = delete_between_anchors(起始, 结束)
+          - 插入新块 = insert_at_anchor(相邻锚点, 新代码, "after")
+        - **定位性锚点**：若文件末尾没有合适的结束锚点，可先插入一个临时锚点（命名如 `原锚点_end`）作为结束边界，再执行删除。
+        - 修改涉及方法名/变量名时，必须 search_text 追踪所有引用并联动修改。
+
+        ## 约束
+        - 所有操作已限制在沙箱内。
+        - 后端仅用 Java 标准库。
+        - 修改标识符前必须先 search_text 查引用。
+
+        ## 效率
+        - 支持并发调用多个工具，减少迭代轮数。
+        - 示例：同时 list_directory + search_text，或 read_file 多个文件。
     """;
     }
 }
