@@ -154,7 +154,7 @@
             </div>
             <p class="semaphore-input-hint">依次点击两个方向格子（忽略顺序），分别代表两手旗位</p>
             <div class="semaphore-input-area">
-                <!-- 3×3 九宫格 -->
+                <!-- 3×3 九宫格：箭头标签与 data-dir 均使用信号员自身视角（原形态，不做镜像翻转） -->
                 <div class="semaphore-grid" id="semaphoreGrid">
                     <!-- 第一行：NW, N, NE -->
                     <button class="semaphore-cell" data-dir="7" title="左上 (NW)">
@@ -288,6 +288,9 @@
         <p>古典密码互译器 — 用于学习与演示 | 仅支持英文 A-Z</p>
     </footer>
 
+    <!-- @anchor: html_scripts -->
+    <!-- 数据文件（最先加载，供模块引用） -->
+    <script src="cipher-data.js"></script>
     <!-- 模块脚本（按依赖顺序加载） -->
     <script src="modules/braille.js"></script>
     <script src="modules/a1z26.js"></script>

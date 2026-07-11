@@ -1,27 +1,14 @@
 /**
  * 盲文 (Braille) 模块
  * 支持英文到6点盲文Unicode字符的编码/解码，以及点阵可视化。
+ *
+ * 映射数据来自 cipher-data.js 中的 CipherData.braille
  */
 const BrailleCipher = (() => {
-    // 字母 → [dot1, dot2, dot3, dot4, dot5, dot6] 是否激活
-    // 点阵布局:  1 4
-    //            2 5
-    //            3 6
-    const letterToDots = {
-        'A': [1,0,0,0,0,0], 'B': [1,1,0,0,0,0], 'C': [1,0,0,1,0,0],
-        'D': [1,0,0,1,1,0], 'E': [1,0,0,0,1,0], 'F': [1,1,0,1,0,0],
-        'G': [1,1,0,1,1,0], 'H': [1,1,0,0,1,0], 'I': [0,1,0,1,0,0],
-        'J': [0,1,0,1,1,0], 'K': [1,0,1,0,0,0], 'L': [1,1,1,0,0,0],
-        'M': [1,0,1,1,0,0], 'N': [1,0,1,1,1,0], 'O': [1,0,1,0,1,0],
-        'P': [1,1,1,1,0,0], 'Q': [1,1,1,1,1,0], 'R': [1,1,1,0,1,0],
-        'S': [0,1,1,1,0,0], 'T': [0,1,1,1,1,0], 'U': [1,0,1,0,0,1],
-        'V': [1,1,1,0,0,1], 'W': [0,1,0,1,1,1], 'X': [1,0,1,1,0,1],
-        'Y': [1,0,1,1,1,1], 'Z': [1,0,1,0,1,1]
-    };
-
+    // @anchor: braille_reverse_map
     // 预计算 braille Unicode 码点 → 字母 的反向映射
     const brailleToLetter = {};
-    for (const [letter, dots] of Object.entries(letterToDots)) {
+    for (const [letter, dots] of Object.entries(CipherData.braille)) {
         let codePoint = 0x2800;
         if (dots[0]) codePoint |= 0x01;  // dot1
         if (dots[1]) codePoint |= 0x02;  // dot2
@@ -32,12 +19,13 @@ const BrailleCipher = (() => {
         brailleToLetter[String.fromCodePoint(codePoint)] = letter;
     }
 
+    // @anchor: braille_encode
     /** 将文本编码为盲文Unicode字符串 */
     function encode(text) {
         const results = [];
         for (const ch of text.toUpperCase()) {
-            if (letterToDots[ch]) {
-                const dots = letterToDots[ch];
+            if (CipherData.braille[ch]) {
+                const dots = CipherData.braille[ch];
                 let cp = 0x2800;
                 if (dots[0]) cp |= 0x01;
                 if (dots[1]) cp |= 0x02;
@@ -55,6 +43,7 @@ const BrailleCipher = (() => {
         return results.join('');
     }
 
+    // @anchor: braille_decode
     /** 将盲文Unicode字符串解码为英文 */
     function decode(braille) {
         const results = [];
@@ -70,11 +59,13 @@ const BrailleCipher = (() => {
         return results.join('');
     }
 
+    // @anchor: braille_getDots
     /** 获取字母的点阵数组 */
     function getDots(letter) {
-        return letterToDots[letter.toUpperCase()] || null;
+        return CipherData.braille[letter.toUpperCase()] || null;
     }
 
+    // @anchor: braille_render
     /** 在容器中渲染盲文可视化 */
     function render(container, text) {
         container.innerHTML = '';
