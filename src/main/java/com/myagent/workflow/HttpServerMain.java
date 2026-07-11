@@ -49,12 +49,13 @@ public class HttpServerMain {
 
         // 外部项目目录挂载
         Path testProjectsDir = Paths.get("./TestProjects");
-        if (Files.exists(testProjectsDir)) {
-            server.createContext("/TestProjects", new Handlers.ExternalFileHandler(testProjectsDir));
-            System.out.println("📁 已挂载外部目录: ./TestProjects -> http://localhost:" + PORT + "/TestProjects");
-        } else {
-            System.out.println("⚠️ 未找到 ./TestProjects 目录，项目入口功能将不可用（可手动创建）");
+        if (!Files.exists(testProjectsDir)) {
+            Files.createDirectories(testProjectsDir);
+            System.out.println("📁 已自动创建 TestProjects 目录");
         }
+        // 然后直接挂载，不再判断 if (Files.exists(...))
+        server.createContext("/TestProjects", new Handlers.ExternalFileHandler(testProjectsDir));
+        System.out.println("📁 已挂载外部目录: ./TestProjects -> http://localhost:" + PORT + "/TestProjects");
 
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
