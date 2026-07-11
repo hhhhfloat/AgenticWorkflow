@@ -19,7 +19,7 @@ const QUOTES = [
     "还记得上次出现这条tips是什么时候吗",
     "oiiAIoiiiiiAIo",
     "欧拉知道为什么世上没有 π 人",
-    "大风起兮云飞扬，安得猛士兮守四方",
+    "大↘风→起↓兮→云↗飞→扬↗，安得猛↓士↘兮→守四方",
     "You are waiting for a train...",
     "Do not go gentle into the dark night...",
     "And now I am become death, destroyer of the world.",

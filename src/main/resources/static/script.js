@@ -108,46 +108,6 @@ function renderHistory() {
 }
 
 // ============================================================
-// @anchor: script_projects
-// ===== 历史项目模块 =====
-// ============================================================
-
-async function loadProjects() {
-    const container = document.getElementById('projectsList');
-    try {
-        const response = await fetch(BASE_URL + '/projects');
-        if (!response.ok) throw new Error('HTTP ' + response.status);
-        const data = await response.json();
-        renderProjects(data.versions);
-    } catch (e) {
-        container.innerHTML = `<span style="color:#f44747;">⚠️ 加载失败: ${e.message}</span>`;
-    }
-}
-
-function renderProjects(versions) {
-    const container = document.getElementById('projectsList');
-    if (!versions || versions.length === 0) {
-        container.innerHTML = '<span style="color:#888;">暂无归档项目</span>';
-        return;
-    }
-    let html = '';
-    for (const v of versions) {
-        const version = v.version;
-        const projects = v.projects || [];
-        if (projects.length === 0) continue;
-        html += `<div style="margin-bottom:6px;"><strong style="color:#4ec9b0;">📁 ${version}</strong>`;
-        html += `<div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; padding-left:12px;">`;
-        for (const p of projects) {
-            const name = p.name;
-            const path = p.path;
-            html += `<a href="${path}" target="_blank" style="background:#2d2d2d; padding:3px 10px; border-radius:12px; text-decoration:none; color:#9cdcfe; font-size:13px; border:1px solid #444;">${name}</a>`;
-        }
-        html += `</div></div>`;
-    }
-    container.innerHTML = html;
-}
-
-// ============================================================
 // @anchor: script_heartbeat
 // ===== 心跳机制 =====
 // ============================================================
@@ -337,17 +297,6 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-// 展开/折叠项目列表
-document.getElementById('toggleProjectsBtn').addEventListener('click', function () {
-    const container = document.getElementById('projectsContainer');
-    const isHidden = container.style.display === 'none';
-    container.style.display = isHidden ? 'block' : 'none';
-    this.textContent = isHidden ? '📂 历史成型项目 (点击收起)' : '📂 历史成型项目 (点击展开)';
-    if (isHidden && !container.dataset.loaded) {
-        container.dataset.loaded = 'true';
-        loadProjects();
-    }
-});
 
 // 页面加载时恢复上次输入
 window.addEventListener('DOMContentLoaded', function () {
@@ -371,53 +320,306 @@ document.addEventListener('visibilitychange', function() {
 });
 
 // ============================================================
-// @anchor: script_iterationTip
-// ===== 迭代提示框（随机文案） =====
+// @anchor: script_quote
+// ===== 随机文案抽取 =====
 // ============================================================
-
-const tipElement = document.getElementById('iterationTip');
-let lastTip = '';
-
-function showRandomTip() {
-    if (!QUOTES || QUOTES.length === 0) return;
-    let newTip;
-    do {
-        newTip = QUOTES[Math.floor(Math.random() * QUOTES.length)];
-    } while (newTip === lastTip && QUOTES.length > 1);
-    lastTip = newTip;
-    tipElement.textContent = newTip;
-    tipElement.style.opacity = '1';
-    // 5秒后淡出（如果新消息没来）
-    clearTimeout(tipElement._timeout);
-    tipElement._timeout = setTimeout(() => {
-        tipElement.style.opacity = '0';
-    }, 5000);
+function getRandomQuote() {
+    if (!QUOTES || QUOTES.length === 0) return '';
+    const idx = Math.floor(Math.random() * QUOTES.length);
+    return QUOTES[idx];
 }
 
-// 在 appendLog 中检测迭代标记
-const originalAppendLog = appendLog;
-appendLog = function(msg) {
-    // 先执行原逻辑
-    originalAppendLog(msg);
-    // 检测是否包含迭代标记
-    if (msg.includes('--- 第') && msg.includes('次迭代 ---')) {
-        showRandomTip();
-    }
-};
+// ============================================================
+// @anchor: script_log
+// ===== 日志输出模块（已整合迭代提示） =====
+// ============================================================
 
-// 如果页面刚加载，也可以先显示一句（但此时无迭代，可不显示）
-// 或者当运行开始时显示一个初始句
-// 在 runAgent 开始时也可以调用一次
-const originalRunAgent = runAgent;
-runAgent = function(prompt) {
-    // 显示第一句
-    if (QUOTES && QUOTES.length) {
-        tipElement.textContent = QUOTES[0]; // 或随机
-        tipElement.style.opacity = '1';
-        clearTimeout(tipElement._timeout);
-        tipElement._timeout = setTimeout(() => {
-            tipElement.style.opacity = '0';
-        }, 5000);
+function appendLog(msg) {
+    let color = 'log-info';
+    if (msg.startsWith('[错误]')) color = 'log-error';
+    else if (msg.startsWith('[完成]') || msg.includes('✅')) color = 'log-success';
+    else if (msg.startsWith('[系统]')) color = 'log-system';
+
+    let renderedContent;
+
+    if (msg.startsWith('[系统]')) {
+        renderedContent = escapeHtml(msg);
+    } else if (msg.startsWith('📁 ') && (msg.includes('项') || msg.includes('内容'))) {
+        renderedContent = `<pre style="margin:0; font-family:inherit; white-space:pre-wrap;">${escapeHtml(msg)}</pre>`;
+    } else {
+        try {
+            let cleanMsg = msg;
+            if (msg.startsWith('[完成] ')) {
+                cleanMsg = msg.substring(4);
+            }
+            renderedContent = marked.parse(cleanMsg, { gfm: true, breaks: true });
+        } catch (e) {
+            renderedContent = escapeHtml(msg);
+        }
     }
-    originalRunAgent(prompt);
-};
+
+    const line = `<div class="log-entry ${color}">${renderedContent}</div>`;
+    output.innerHTML += line;
+    output.scrollTop = output.scrollHeight;
+
+    // --- 新增：如果这条日志是迭代标记，则追加一条提示 ---
+    if (msg.includes('--- 第') && msg.includes('次迭代 ---')) {
+        const tip = getRandomQuote();
+        if (tip) {
+            const tipLine = `<div class="log-entry log-tip">> ${escapeHtml(tip)}</div>`;
+            output.innerHTML += tipLine;
+            output.scrollTop = output.scrollHeight;
+        }
+    }
+}
+
+// ============================================================
+// @anchor: script_sidebarToggle
+// ===== 侧边栏折叠切换 =====
+// ============================================================
+const sidebar = document.getElementById('sidebar');
+const toggleBtn = document.getElementById('toggleSidebarBtn');
+
+if (toggleBtn && sidebar) {
+    toggleBtn.addEventListener('click', function() {
+        sidebar.classList.toggle('collapsed');
+        this.textContent = sidebar.classList.contains('collapsed') ? '▶' : '◀';
+    });
+}
+
+// ============================================================
+// @anchor: script_tree
+// ===== 文件树核心逻辑 =====
+// ============================================================
+
+// ============================================================
+// @anchor: script_tree
+// ===== 文件树核心逻辑（第4步：差异化交互） =====
+// ============================================================
+
+/**
+ * 调用后端 /browse 接口获取目录内容
+ */
+async function fetchDir(path) {
+    const url = `/browse?path=${encodeURIComponent(path)}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    }
+    return await res.json();
+}
+
+/**
+ * 渲染一个树节点
+ * @param {string} path           - 相对路径
+ * @param {HTMLElement} container - 父容器
+ * @param {boolean} isRoot        - 是否为根节点
+ * @param {boolean} hasIndexHtml  - 该目录是否包含 index.html（TestProjects 专用）
+ * @param {boolean} isTestProjects - 是否在 TestProjects 下
+ */
+function renderTreeNode(path, container, isRoot = false, hasIndexHtml = false, isTestProjects = false) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'tree-node';
+    wrapper.dataset.path = path;
+
+    const displayName = path.split('/').pop() || path;
+
+    // ---- 创建节点标签 ----
+    const label = document.createElement('div');
+    label.className = 'tree-item';
+    if (isRoot) {
+        label.style.fontWeight = 'bold';
+        label.style.color = '#9cdcfe';
+    }
+
+    // 图标
+    const iconSpan = document.createElement('span');
+    iconSpan.textContent = '📁 ';
+    label.appendChild(iconSpan);
+
+    // 名称
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'node-label';
+    nameSpan.textContent = displayName;
+    label.appendChild(nameSpan);
+
+    // ---- 如果是 TestProjects 下的项目入口，添加 🚀 标记 ----
+    if (!isRoot && isTestProjects && hasIndexHtml) {
+        const badge = document.createElement('span');
+        badge.textContent = ' 🚀';
+        badge.style.color = '#4ec9b0';
+        badge.style.fontSize = '12px';
+        label.appendChild(badge);
+    }
+
+    wrapper.appendChild(label);
+
+    // ---- 子节点容器（初始隐藏） ----
+    const childrenContainer = document.createElement('div');
+    childrenContainer.className = 'tree-children';
+    childrenContainer.style.display = 'none';
+    wrapper.appendChild(childrenContainer);
+
+    // ---- 判断是否为项目入口（TestProjects + 含 index.html） ----
+    const isProjectEntry = !isRoot && isTestProjects && hasIndexHtml;
+
+    // ---- 点击事件：项目入口 → 打开预览，否则 → 展开/折叠 ----
+    label.addEventListener('click', async (e) => {
+        e.stopPropagation();
+
+        if (isProjectEntry) {
+            // 项目入口：直接打开预览
+            openProjectPreview(path);
+            return;
+        }
+
+        // 非项目入口：展开/折叠
+        const isHidden = childrenContainer.style.display === 'none';
+
+        if (isHidden) {
+            // 懒加载
+            if (!childrenContainer.dataset.loaded) {
+                try {
+                    const data = await fetchDir(path);
+                    childrenContainer.dataset.loaded = 'true';
+
+                    if (data.entries && data.entries.length > 0) {
+                        for (const entry of data.entries) {
+                            const childPath = path + '/' + entry.name;
+                            if (entry.type === 'dir') {
+                                // 传递 hasIndexHtml 和是否为 TestProjects 路径
+                                const childIsTestProjects = childPath.startsWith('TestProjects/');
+                                renderTreeNode(
+                                    childPath,
+                                    childrenContainer,
+                                    false,
+                                    entry.hasIndexHtml || false,
+                                    childIsTestProjects
+                                );
+                            } else {
+                                // 文件节点
+                                renderFileNode(childPath, entry.name, childrenContainer);
+                            }
+                        }
+                    } else {
+                        showEmptyMessage(childrenContainer);
+                    }
+                } catch (err) {
+                    console.error('加载目录失败:', err);
+                    showErrorMessage(childrenContainer, err.message);
+                }
+            }
+
+            childrenContainer.style.display = 'block';
+        } else {
+            childrenContainer.style.display = 'none';
+        }
+    });
+
+    container.appendChild(wrapper);
+}
+
+/**
+ * 渲染文件节点
+ */
+function renderFileNode(filePath, fileName, container) {
+    const fileDiv = document.createElement('div');
+    fileDiv.className = 'tree-item';
+    fileDiv.dataset.path = filePath;
+
+    const fileIcon = document.createElement('span');
+    const ext = fileName.split('.').pop().toLowerCase();
+    if (ext === 'html' || ext === 'htm') fileIcon.textContent = '🌐 ';
+    else if (ext === 'css') fileIcon.textContent = '🎨 ';
+    else if (ext === 'js') fileIcon.textContent = '⚡ ';
+    else if (ext === 'java') fileIcon.textContent = '☕ ';
+    else if (ext === 'json') fileIcon.textContent = '📋 ';
+    else if (ext === 'md') fileIcon.textContent = '📝 ';
+    else if (['png', 'jpg', 'jpeg', 'svg', 'gif', 'ico'].includes(ext)) fileIcon.textContent = '🖼️ ';
+    else fileIcon.textContent = '📄 ';
+    fileDiv.appendChild(fileIcon);
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'node-label';
+    nameSpan.textContent = fileName;
+    fileDiv.appendChild(nameSpan);
+
+    fileDiv.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleFileClick(filePath);
+    });
+
+    container.appendChild(fileDiv);
+}
+
+/**
+ * 打开项目预览（TestProjects 下含 index.html 的目录）
+ * 复用 ExternalFileHandler 的路径映射
+ */
+function openProjectPreview(projectPath) {
+    // 确保路径以 TestProjects/ 开头
+    if (!projectPath.startsWith('TestProjects/')) {
+        appendLog('[系统] 非 TestProjects 项目，无法预览');
+        return;
+    }
+
+    // 构造访问路径：/TestProjects/.../index.html
+    const url = '/' + projectPath + '/index.html';
+    appendLog(`[系统] 打开项目预览: ${url}`);
+    window.open(url, '_blank');
+}
+
+/**
+ * 处理文件点击
+ */
+function handleFileClick(filePath) {
+    appendLog(`[系统] 点击文件: ${filePath}`);
+
+    // 如果是以 .html 结尾，尝试在新窗口打开
+    if (filePath.endsWith('.html') || filePath.endsWith('.htm')) {
+        if (filePath.startsWith('TestProjects/')) {
+            const url = '/' + filePath;
+            appendLog(`[系统] 在浏览器中打开: ${url}`);
+            window.open(url, '_blank');
+        } else {
+            appendLog('[系统] sandbox 下的 HTML 文件暂不支持直接预览');
+        }
+    }
+}
+
+/**
+ * 辅助：显示空目录
+ */
+function showEmptyMessage(container) {
+    const emptyMsg = document.createElement('div');
+    emptyMsg.className = 'tree-item';
+    emptyMsg.style.color = '#666';
+    emptyMsg.style.fontStyle = 'italic';
+    emptyMsg.textContent = '📭 空目录';
+    container.appendChild(emptyMsg);
+}
+
+/**
+ * 辅助：显示错误信息
+ */
+function showErrorMessage(container, msg) {
+    const errMsg = document.createElement('div');
+    errMsg.className = 'tree-item';
+    errMsg.style.color = '#f44747';
+    errMsg.textContent = '⚠️ 加载失败: ' + msg;
+    container.appendChild(errMsg);
+}
+
+// ===== 初始化：挂载两个根节点 =====
+document.addEventListener('DOMContentLoaded', function() {
+    const sidebarContent = document.getElementById('sidebarContent');
+    if (!sidebarContent) return;
+
+    sidebarContent.innerHTML = '';
+
+    // sandbox 根节点：纯目录浏览
+    renderTreeNode('sandbox', sidebarContent, true, false, false);
+
+    // TestProjects 根节点：开启项目入口检测
+    renderTreeNode('TestProjects', sidebarContent, true, false, true);
+});

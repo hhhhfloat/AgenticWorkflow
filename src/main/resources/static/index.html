@@ -8,42 +8,40 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- @anchor: html_header -->
-    <h2>Agentic 工作台</h2>
-
-    <!-- @anchor: html_input -->
-    <textarea id="prompt" placeholder="输入你的需求，例如：写一个 HTML 计算器，支持加减乘除">写一个 HTML 计算器，支持加减乘除</textarea>
-
-    <!-- @anchor: html_history -->
-    <div id="historyContainer"></div>
-
-    <!-- @anchor: html_buttons -->
-    <div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap;">
-        <button id="runBtn">▶ 运行</button>
-        <button id="stopBtn" disabled>⏹ 停止</button>
-        <button id="clearBtn" style="background:#555;">🗑 清空</button>
-    </div>
-
-    <!-- @anchor: html_projects -->
-    <div style="margin-top:12px;">
-        <button id="toggleProjectsBtn" style="background:#444; width:100%; text-align:left; padding:8px 12px;">
-            📂 历史成型项目 (点击展开)
-        </button>
-        <div id="projectsContainer" style="display:none; margin-top:4px; background:#252526; border:1px solid #444; border-radius:4px; padding:8px; max-height:300px; overflow-y:auto;">
-            <div id="projectsList">加载中...</div>
+<div id="app">
+    <!-- ===== 侧边栏 ===== -->
+    <div id="sidebar">
+        <div id="sidebarHeader">
+            <span>📁 文件浏览器</span>
+            <button id="toggleSidebarBtn" title="折叠侧边栏">◀</button>
+        </div>
+        <div id="sidebarContent">
+            <div class="tree-root" data-path="sandbox">📂 sandbox</div>
+            <div class="tree-root" data-path="TestProjects">📂 TestProjects</div>
         </div>
     </div>
 
-    <!-- @anchor: html_output -->
-    <div id="output">等待输入...</div>
+    <!-- ===== 主工作区 ===== -->
+    <div id="main">
+        <h2>Agentic 工作台</h2>
 
-    <!-- 引入文案列表 -->
-    <script src="tips.js"></script>
+        <textarea id="prompt" placeholder="输入你的需求，例如：写一个 HTML 计算器，支持加减乘除">写一个 HTML 计算器，支持加减乘除</textarea>
 
-    <!-- 右下角提示框 -->
-    <div id="iterationTip">等待开始...</div>
+        <div id="historyContainer"></div>
 
-    <!-- @anchor: html_scripts -->
-    <script src="script.js"></script>
+        <div style="margin-top:8px; display:flex; gap:10px; flex-wrap:wrap;">
+            <button id="runBtn">▶ 运行</button>
+            <button id="stopBtn" disabled>⏹ 停止</button>
+            <button id="clearBtn" style="background:#555;">🗑 清空</button>
+        </div>
+
+        <div id="output">等待输入...</div>
+    </div>
+</div>
+
+<!-- 引入文案列表 -->
+<script src="tips.js"></script>
+<!-- 主脚本 -->
+<script src="script.js"></script>
 </body>
 </html>

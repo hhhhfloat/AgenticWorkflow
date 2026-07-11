@@ -1,258 +1,426 @@
-// @anchor: state
-let currentInput = '0';       // 当前正在输入的数字
-let previousInput = '';       // 前一个数字
-let operator = null;          // 当前运算符
-let shouldResetInput = false; // 是否需要重置输入
-let expressionText = '';      // 表达式显示文本
+// ==============================
+// 计算器主调度器
+// 负责：状态管理、DOM 引用、UI 更新、模式切换、键盘处理、事件分发
+// 实数逻辑 → RealCalc（real-calc.js）
+// 复数逻辑 → ComplexCalc（complex-calc.js）
+// ==============================
 
-// @anchor: dom_refs
-const resultDisplay = document.getElementById('result');
-const expressionDisplay = document.getElementById('expression');
+// @anchor: js_state
+var state = {
+    mode: 'normal',           // 'normal' | 'complex'
+    angleMode: 'rad',         // 'rad' | 'deg'
 
-// @anchor: button_event_listener
-document.querySelector('.buttons').addEventListener('click', (e) => {
-    const btn = e.target.closest('button');
-    if (!btn) return;
+    // 普通模式
+    currentOperand: '0',
+    previousOperand: '',
+    operator: null,
+    shouldResetScreen: false,
+    expressionText: '',
 
-    const action = btn.dataset.action;
-    const value = btn.dataset.value;
+    // 复数模式
+    editingPart: 'real',      // 'real' | 'imag'
+    realStr: '0',
+    imagStr: '0',
+    prevRealStr: '',
+    prevImagStr: '',
+};
 
-    switch (action) {
-        case 'digit':
-            handleDigit(value);
-            break;
-        case 'decimal':
-            handleDecimal();
-            break;
-        case 'add':
-        case 'subtract':
-        case 'multiply':
-        case 'divide':
-            handleOperator(action);
-            break;
-        case 'sqrt':
-            handleSqrt();
-            break;
-        case 'equals':
-            handleEquals();
-            break;
-        case 'clear':
-            handleClear();
-            break;
-        case 'backspace':
-            handleBackspace();
-            break;
-    }
+// @anchor: js_domRefs
+var resultDisplay = document.getElementById('result');
+var expressionDisplay = document.getElementById('expression');
+var realDisplay = document.getElementById('realDisplay');
+var imagDisplay = document.getElementById('imagDisplay');
+var imagSign = document.getElementById('imagSign');
+var complexIndicator = document.getElementById('complexIndicator');
+var modeIndicator = document.getElementById('modeIndicator');
+var modeToggle = document.getElementById('modeToggle');
+var btnImag = document.getElementById('btnImag');
+var angleToggle = document.getElementById('angleToggle');
 
-    updateDisplay();
-});
+// ==============================
+// 共享工具函数
+// ==============================
 
-// @anchor: keyboard_listener
-document.addEventListener('keydown', (e) => {
-    const key = e.key;
-
-    if (key >= '0' && key <= '9') {
-        handleDigit(key);
-    } else if (key === '.') {
-        handleDecimal();
-    } else if (key === '+') {
-        handleOperator('add');
-    } else if (key === '-') {
-        handleOperator('subtract');
-    } else if (key === '*') {
-        handleOperator('multiply');
-    } else if (key === '/') {
-        e.preventDefault();
-        handleOperator('divide');
-    } else if (key === 'Enter' || key === '=') {
-        e.preventDefault();
-        handleEquals();
-    } else if (key === 'Backspace') {
-        handleBackspace();
-    } else if (key === 'Escape' || key === 'c' || key === 'C') {
-        handleClear();
-    } else if (key === 'r' || key === 'R') {
-        // @anchor: sqrt_keyboard
-        handleSqrt();
-    }
-
-    updateDisplay();
-});
-
-// @anchor: handleDigit
-function handleDigit(digit) {
-    if (shouldResetInput) {
-        currentInput = '';
-        shouldResetInput = false;
-    }
-
-    if (currentInput === '0' && digit !== '0') {
-        currentInput = digit;
-    } else if (currentInput === '0' && digit === '0') {
-        // 已经是 0，不再追加
-    } else {
-        if (currentInput.replace(/[.-]/g, '').length >= 12) return; // 限制 12 位
-        currentInput += digit;
-    }
+// @anchor: js_angleConvert
+function toRadians(value) {
+    return state.angleMode === 'deg' ? value * Math.PI / 180 : value;
 }
 
-// @anchor: handleDecimal
-function handleDecimal() {
-    if (shouldResetInput) {
-        currentInput = '0';
-        shouldResetInput = false;
-    }
-
-    if (!currentInput.includes('.')) {
-        currentInput += '.';
-    }
+function fromRadians(value) {
+    return state.angleMode === 'deg' ? value * 180 / Math.PI : value;
 }
 
-// @anchor: handleOperator
-function handleOperator(op) {
-    if (operator !== null && !shouldResetInput) {
-        // 连续运算：先计算结果再设置新运算符
-        const result = calculate(parseFloat(previousInput), parseFloat(currentInput), operator);
-        currentInput = formatResult(result);
-        previousInput = currentInput;
-        expressionText = currentInput;
-    } else {
-        previousInput = currentInput;
-    }
-
-    operator = op;
-    shouldResetInput = true;
-    updateExpression();
-}
-
-// @anchor: handleSqrt
-function handleSqrt() {
-    const num = parseFloat(currentInput);
-    if (num < 0) {
-        currentInput = '错误';
-        expressionText = '√(' + currentInput + ')';
-    } else {
-        const result = Math.sqrt(num);
-        expressionText = '√(' + formatDisplay(num) + ')';
-        currentInput = formatResult(result);
-    }
-    operator = null;
-    shouldResetInput = true;
-}
-
-// @anchor: handleEquals
-function handleEquals() {
-    if (operator === null) return;
-
-    const prev = parseFloat(previousInput);
-    const curr = parseFloat(currentInput);
-
-    expressionText = formatDisplay(prev) + ' ' + getOpSymbol(operator) + ' ' + formatDisplay(curr);
-
-    const result = calculate(prev, curr, operator);
-    currentInput = formatResult(result);
-    previousInput = '';
-    operator = null;
-    shouldResetInput = true;
-}
-
-// @anchor: handleClear
-function handleClear() {
-    currentInput = '0';
-    previousInput = '';
-    operator = null;
-    shouldResetInput = false;
-    expressionText = '';
-}
-
-// @anchor: handleBackspace
-function handleBackspace() {
-    if (shouldResetInput) return;
-
-    if (currentInput.length === 1 || (currentInput.length === 2 && currentInput.startsWith('-'))) {
-        currentInput = '0';
-    } else {
-        currentInput = currentInput.slice(0, -1);
-    }
-}
-
-// @anchor: calculate
-function calculate(a, b, op) {
-    switch (op) {
-        case 'add':
-            return a + b;
-        case 'subtract':
-            return a - b;
-        case 'multiply':
-            return a * b;
-        case 'divide':
-            if (b === 0) return NaN;
-            return a / b;
-        default:
-            return b;
-    }
-}
-
-// @anchor: formatResult
-function formatResult(num) {
+// @anchor: js_formatNumber
+function formatNumber(num) {
     if (!isFinite(num)) return '错误';
-
-    // 避免浮点数精度问题：限制 10 位有效数字
-    const str = parseFloat(num.toPrecision(10)).toString();
-
-    // 结果太长则用科学计数法
-    if (str.length > 14) {
-        return parseFloat(num.toPrecision(8)).toString();
-    }
-
-    return str;
+    if (Number.isInteger(num)) return num.toString();
+    var formatted = parseFloat(num.toPrecision(12));
+    return formatted.toString();
 }
 
-// @anchor: formatDisplay
-function formatDisplay(num) {
-    const str = num.toString();
-    if (str.length > 14) {
-        return parseFloat(num.toPrecision(8)).toString();
+// @anchor: js_getCurrentNumber
+function getCurrentNumberStr() {
+    if (state.mode === 'complex') {
+        return state.editingPart === 'real' ? state.realStr : state.imagStr;
     }
-    return str;
+    return state.currentOperand;
 }
 
-// @anchor: getOpSymbol
-function getOpSymbol(op) {
-    switch (op) {
-        case 'add': return '+';
-        case 'subtract': return '−';
-        case 'multiply': return '×';
-        case 'divide': return '÷';
-        default: return '';
+// @anchor: js_setCurrentNumber
+function setCurrentNumberStr(value) {
+    if (state.mode === 'complex') {
+        if (state.editingPart === 'real') {
+            state.realStr = value;
+        } else {
+            state.imagStr = value;
+        }
+    } else {
+        state.currentOperand = value;
     }
 }
 
-// @anchor: updateExpression
-function updateExpression() {
-    expressionText = formatDisplay(previousInput) + ' ' + getOpSymbol(operator);
+// ==============================
+// 调度函数（根据 mode 分发）
+// ==============================
+
+// @anchor: js_handleNumber
+function handleNumber(num) {
+    if (state.mode === 'complex') {
+        ComplexCalc.handleNumber(num);
+    } else {
+        RealCalc.handleNumber(num);
+    }
 }
 
-// @anchor: updateDisplay
+// @anchor: js_handleDecimal
+function handleDecimal() {
+    if (state.mode === 'complex') {
+        ComplexCalc.handleDecimal();
+    } else {
+        RealCalc.handleDecimal();
+    }
+}
+
+// @anchor: js_handleOperator
+function handleOperator(op) {
+    if (state.mode === 'complex') {
+        ComplexCalc.handleOperator(op);
+    } else {
+        RealCalc.handleOperator(op);
+    }
+}
+
+// @anchor: js_handleEquals
+function handleEquals() {
+    if (state.mode === 'complex') {
+        ComplexCalc.handleEquals();
+    } else {
+        RealCalc.handleEquals();
+    }
+}
+
+// @anchor: js_handleBackspace
+function handleBackspace() {
+    if (state.mode === 'complex') {
+        ComplexCalc.handleBackspace();
+    } else {
+        RealCalc.handleBackspace();
+    }
+}
+
+// @anchor: js_handlePercent
+function handlePercent() {
+    if (state.mode === 'complex') {
+        ComplexCalc.handlePercent();
+    } else {
+        RealCalc.handlePercent();
+    }
+}
+
+// @anchor: js_handleScientific
+function handleScientific(func) {
+    if (state.mode === 'complex') {
+        ComplexCalc.handleScientific(func);
+    } else {
+        RealCalc.handleScientific(func);
+    }
+}
+
+// ==============================
+// 清空（两种模式共享）
+// @anchor: js_handleClear
+// ==============================
+function handleClear() {
+    if (state.mode === 'complex') {
+        state.realStr = '0';
+        state.imagStr = '0';
+        state.prevRealStr = '';
+        state.prevImagStr = '';
+        state.editingPart = 'real';
+        btnImag.classList.remove('active-imag');
+    }
+    state.currentOperand = '0';
+    state.previousOperand = '';
+    state.operator = null;
+    state.shouldResetScreen = false;
+    state.expressionText = '';
+}
+
+// ==============================
+// 模式切换
+// ==============================
+
+// @anchor: js_toggleAngleMode
+function toggleAngleMode() {
+    state.angleMode = state.angleMode === 'rad' ? 'deg' : 'rad';
+    if (state.angleMode === 'deg') {
+        angleToggle.textContent = 'DEG';
+        angleToggle.classList.add('deg');
+    } else {
+        angleToggle.textContent = 'RAD';
+        angleToggle.classList.remove('deg');
+    }
+}
+
+// @anchor: js_switchMode
+function switchMode(newMode) {
+    handleClear();
+    state.mode = newMode;
+
+    // 更新模式切换按钮
+    document.querySelectorAll('.mode-option').forEach(function(opt) {
+        opt.classList.toggle('active', opt.dataset.mode === newMode);
+    });
+
+    // 更新模式指示器
+    if (newMode === 'complex') {
+        modeIndicator.textContent = '复数模式';
+        modeIndicator.classList.add('complex');
+        complexIndicator.classList.remove('hidden');
+        btnImag.style.display = '';
+        btnImag.classList.remove('active-imag');
+    } else {
+        modeIndicator.textContent = '普通模式';
+        modeIndicator.classList.remove('complex');
+        complexIndicator.classList.add('hidden');
+        btnImag.style.display = 'none';
+        btnImag.classList.remove('active-imag');
+    }
+
+    updateDisplay();
+}
+
+// @anchor: js_handleImagToggle
+function handleImagToggle() {
+    if (state.mode !== 'complex') return;
+
+    state.editingPart = state.editingPart === 'real' ? 'imag' : 'real';
+
+    if (state.editingPart === 'imag') {
+        btnImag.classList.add('active-imag');
+    } else {
+        btnImag.classList.remove('active-imag');
+    }
+}
+
+// ==============================
+// 显示更新
+// @anchor: js_updateDisplay
+// ==============================
 function updateDisplay() {
-    // 更新结果区
-    let displayText = currentInput;
+    if (state.mode === 'complex') {
+        updateComplexDisplay();
+    } else {
+        updateNormalDisplay();
+    }
+    expressionDisplay.textContent = state.expressionText;
+}
 
-    // 调整字体大小
-    if (displayText.length > 10) {
+function updateNormalDisplay() {
+    complexIndicator.classList.add('hidden');
+    realDisplay.textContent = state.currentOperand;
+    realDisplay.classList.remove('editing');
+    imagDisplay.classList.remove('editing');
+
+    if (state.currentOperand.length > 10) {
         resultDisplay.classList.add('small');
     } else {
         resultDisplay.classList.remove('small');
     }
+}
 
-    resultDisplay.textContent = displayText;
+function updateComplexDisplay() {
+    resultDisplay.classList.remove('small');
 
-    // 更新表达式区
-    if (expressionText) {
-        expressionDisplay.textContent = expressionText;
-    } else if (operator) {
-        expressionDisplay.textContent = formatDisplay(previousInput) + ' ' + getOpSymbol(operator);
+    var imagNum = parseFloat(state.imagStr) || 0;
+
+    complexIndicator.classList.remove('hidden');
+
+    realDisplay.textContent = state.realStr;
+
+    // 符号与虚部数值
+    if (imagNum >= 0) {
+        imagSign.textContent = '+';
+        imagDisplay.textContent = state.imagStr;
     } else {
-        expressionDisplay.textContent = '';
+        imagSign.textContent = '−';
+        imagDisplay.textContent = formatNumber(Math.abs(imagNum));
+    }
+
+    // 高亮当前编辑部分
+    if (state.editingPart === 'real') {
+        realDisplay.classList.add('editing');
+        imagDisplay.classList.remove('editing');
+    } else {
+        imagDisplay.classList.add('editing');
+        realDisplay.classList.remove('editing');
+    }
+
+    // 调整字体大小
+    var totalLen = state.realStr.length + state.imagStr.length + 4;
+    if (totalLen > 16) {
+        resultDisplay.classList.add('small');
     }
 }
+
+// @anchor: js_updateActiveOperator
+function updateActiveOperator() {
+    document.querySelectorAll('.btn-operator, .btn-scientific[data-value="^"]').forEach(function(btn) {
+        btn.classList.remove('active');
+        if (btn.dataset.value === state.operator) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// ==============================
+// 键盘支持
+// @anchor: js_handleKeyboard
+// ==============================
+function handleKeyboard(e) {
+    var key = e.key;
+
+    // 模式切换快捷键 Ctrl+M
+    if (e.ctrlKey && key === 'm') {
+        e.preventDefault();
+        var newMode = state.mode === 'normal' ? 'complex' : 'normal';
+        switchMode(newMode);
+        updateDisplay();
+        updateActiveOperator();
+        return;
+    }
+
+    // 角度模式切换快捷键 Ctrl+D
+    if (e.ctrlKey && key === 'd') {
+        e.preventDefault();
+        toggleAngleMode();
+        return;
+    }
+
+    if (key >= '0' && key <= '9') {
+        handleNumber(key);
+    } else if (key === '.') {
+        handleDecimal();
+    } else if (key === 'i' || key === 'I') {
+        if (state.mode === 'complex') {
+            handleImagToggle();
+        }
+    } else if (key === '+') {
+        handleOperator('+');
+    } else if (key === '-') {
+        handleOperator('−');
+    } else if (key === '*') {
+        handleOperator('×');
+    } else if (key === '/') {
+        e.preventDefault();
+        handleOperator('÷');
+    } else if (key === '^') {
+        e.preventDefault();
+        handleScientific('^');
+    } else if (key === 'Enter' || key === '=') {
+        e.preventDefault();
+        handleEquals();
+    } else if (key === 'Escape' || key === 'c' || key === 'C') {
+        handleClear();
+    } else if (key === 'Backspace') {
+        handleBackspace();
+    } else if (key === '%') {
+        handlePercent();
+    } else if (key === 's' || key === 'S') {
+        handleScientific('sin');
+    } else if (key === 'o' || key === 'O') {
+        handleScientific('cos');
+    } else if (key === 't' || key === 'T') {
+        handleScientific('tan');
+    }
+
+    updateDisplay();
+    updateActiveOperator();
+}
+
+// ==============================
+// 初始化
+// @anchor: js_init
+// ==============================
+function init() {
+    // 按钮点击
+    document.querySelectorAll('.btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var action = btn.dataset.action;
+            var value = btn.dataset.value;
+
+            switch (action) {
+                case 'number':
+                    handleNumber(value);
+                    break;
+                case 'decimal':
+                    handleDecimal();
+                    break;
+                case 'operator':
+                    handleOperator(value);
+                    break;
+                case 'equals':
+                    handleEquals();
+                    break;
+                case 'clear':
+                    handleClear();
+                    break;
+                case 'backspace':
+                    handleBackspace();
+                    break;
+                case 'percent':
+                    handlePercent();
+                    break;
+                case 'scientific':
+                    handleScientific(value);
+                    break;
+                case 'imag':
+                    handleImagToggle();
+                    break;
+            }
+            updateDisplay();
+            updateActiveOperator();
+        });
+    });
+
+    // 模式切换
+    modeToggle.addEventListener('click', function(e) {
+        var option = e.target.closest('.mode-option');
+        if (!option) return;
+        var newMode = option.dataset.mode;
+        if (newMode !== state.mode) {
+            switchMode(newMode);
+        }
+    });
+
+    // 角度模式切换
+    angleToggle.addEventListener('click', function() {
+        toggleAngleMode();
+    });
+
+    // 键盘支持
+    document.addEventListener('keydown', handleKeyboard);
+}
+
+// @anchor: js_start
+init();

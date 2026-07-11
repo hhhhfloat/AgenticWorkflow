@@ -7,47 +7,86 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- @anchor: app_container -->
+    <!-- @anchor: html_calculatorContainer -->
     <div class="calculator">
-        <!-- @anchor: display_area -->
+        <!-- @anchor: html_display -->
         <div class="display">
             <div class="expression" id="expression"></div>
-            <div class="result" id="result">0</div>
+            <!-- @anchor: html_result -->
+            <div class="result" id="result">
+                <span id="realDisplay">0</span>
+                <span id="complexIndicator" class="complex-indicator hidden">
+                    <span id="imagSign">+</span>
+                    <span id="imagDisplay">0</span><i>i</i>
+                </span>
+            </div>
+            <div class="mode-indicator-row">
+                <div class="mode-indicator" id="modeIndicator">普通模式</div>
+                <!-- @anchor: html_angleToggle -->
+                <button class="angle-toggle" id="angleToggle" title="角度/弧度切换">RAD</button>
+            </div>
         </div>
 
-        <!-- @anchor: button_area -->
+        <!-- @anchor: html_modeToggle -->
+        <div class="mode-toggle-container">
+            <button class="mode-toggle" id="modeToggle" data-mode="normal">
+                <span class="mode-option active" data-mode="normal">普通</span>
+                <span class="mode-option" data-mode="complex">复数</span>
+            </button>
+        </div>
+
         <div class="buttons">
-            <!-- 第一行：清除和开根 -->
-            <button class="btn btn-func" data-action="clear">C</button>
-            <button class="btn btn-func" data-action="backspace">⌫</button>
-            <button class="btn btn-func" data-action="sqrt">√</button>
-            <button class="btn btn-op" data-action="divide">÷</button>
+            <!-- 三角函数行 -->
+            <button class="btn btn-trig" data-action="scientific" data-value="sin">sin</button>
+            <button class="btn btn-trig" data-action="scientific" data-value="cos">cos</button>
+            <button class="btn btn-trig" data-action="scientific" data-value="tan">tan</button>
+            <button class="btn btn-trig" data-action="scientific" data-value="asin">sin⁻¹</button>
 
-            <!-- 第二行 -->
-            <button class="btn btn-num" data-action="digit" data-value="7">7</button>
-            <button class="btn btn-num" data-action="digit" data-value="8">8</button>
-            <button class="btn btn-num" data-action="digit" data-value="9">9</button>
-            <button class="btn btn-op" data-action="multiply">×</button>
+            <!-- 反三角函数 + 科学函数 -->
+            <button class="btn btn-trig" data-action="scientific" data-value="acos">cos⁻¹</button>
+            <button class="btn btn-trig" data-action="scientific" data-value="atan">tan⁻¹</button>
+            <button class="btn btn-scientific" data-action="scientific" data-value="log">log</button>
+            <button class="btn btn-scientific" data-action="scientific" data-value="ln">ln</button>
 
-            <!-- 第三行 -->
-            <button class="btn btn-num" data-action="digit" data-value="4">4</button>
-            <button class="btn btn-num" data-action="digit" data-value="5">5</button>
-            <button class="btn btn-num" data-action="digit" data-value="6">6</button>
-            <button class="btn btn-op" data-action="subtract">−</button>
+            <!-- 幂运算 + 控制 -->
+            <button class="btn btn-scientific" data-action="scientific" data-value="^">xʸ</button>
+            <button class="btn btn-scientific" data-action="scientific" data-value="√">√</button>
+            <button class="btn btn-clear" data-action="clear">C</button>
+            <button class="btn btn-backspace" data-action="backspace">⌫</button>
 
-            <!-- 第四行 -->
-            <button class="btn btn-num" data-action="digit" data-value="1">1</button>
-            <button class="btn btn-num" data-action="digit" data-value="2">2</button>
-            <button class="btn btn-num" data-action="digit" data-value="3">3</button>
-            <button class="btn btn-op" data-action="add">+</button>
+            <!-- 运算符行 -->
+            <button class="btn btn-percent" data-action="percent">%</button>
+            <button class="btn btn-operator" data-action="operator" data-value="÷">÷</button>
+            <button class="btn btn-operator" data-action="operator" data-value="×">×</button>
+            <button class="btn btn-operator" data-action="operator" data-value="−">−</button>
 
-            <!-- 第五行 -->
-            <button class="btn btn-num btn-zero" data-action="digit" data-value="0">0</button>
-            <button class="btn btn-num" data-action="decimal">.</button>
+            <!-- 数字行 1 -->
+            <button class="btn btn-number" data-action="number" data-value="7">7</button>
+            <button class="btn btn-number" data-action="number" data-value="8">8</button>
+            <button class="btn btn-number" data-action="number" data-value="9">9</button>
+            <button class="btn btn-operator" data-action="operator" data-value="+">+</button>
+
+            <!-- 数字行 2 -->
+            <button class="btn btn-number" data-action="number" data-value="4">4</button>
+            <button class="btn btn-number" data-action="number" data-value="5">5</button>
+            <button class="btn btn-number" data-action="number" data-value="6">6</button>
             <button class="btn btn-equals" data-action="equals">=</button>
+
+            <!-- 数字行 3 -->
+            <button class="btn btn-number" data-action="number" data-value="1">1</button>
+            <button class="btn btn-number" data-action="number" data-value="2">2</button>
+            <button class="btn btn-number" data-action="number" data-value="3">3</button>
+            <button class="btn btn-decimal" data-action="decimal" data-value=".">.</button>
+
+            <!-- 底行：0 占据两列 + i -->
+            <button class="btn btn-number btn-zero" data-action="number" data-value="0">0</button>
+            <button class="btn btn-imag" data-action="imag" id="btnImag">i</button>
         </div>
     </div>
 
+    <!-- 加载顺序：实数模块 → 复数模块 → 主调度器 -->
+    <script src="real-calc.js"></script>
+    <script src="complex-calc.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

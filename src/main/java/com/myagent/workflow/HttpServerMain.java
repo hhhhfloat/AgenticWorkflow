@@ -40,6 +40,7 @@ public class HttpServerMain {
         server.createContext("/stop", new StopHandler());
         server.createContext("/heartbeat", new HeartbeatHandler());
         server.createContext("/projects", new Handlers.ProjectsHandler());
+        server.createContext("/browse", new Handlers.BrowseHandler());
 
         // 静态资源
         server.createContext("/", new Handlers.StaticHandler());
