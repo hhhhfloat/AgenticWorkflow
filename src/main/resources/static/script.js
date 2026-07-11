@@ -143,35 +143,6 @@ function renderMarkdown(text) {
     }
 }
 
-function appendLog(msg) {
-    let color = 'log-info';
-    if (msg.startsWith('[错误]')) color = 'log-error';
-    else if (msg.startsWith('[完成]') || msg.includes('✅')) color = 'log-success';
-    else if (msg.startsWith('[系统]')) color = 'log-system';
-
-    let renderedContent;
-
-    if (msg.startsWith('[系统]')) {
-        renderedContent = escapeHtml(msg);
-    } else if (msg.startsWith('📁 ') && (msg.includes('项') || msg.includes('内容'))) {
-        renderedContent = `<pre style="margin:0; font-family:inherit; white-space:pre-wrap;">${escapeHtml(msg)}</pre>`;
-    } else {
-        try {
-            let cleanMsg = msg;
-            if (msg.startsWith('[完成] ')) {
-                cleanMsg = msg.substring(4);
-            }
-            renderedContent = marked.parse(cleanMsg, { gfm: true, breaks: true });
-        } catch (e) {
-            renderedContent = escapeHtml(msg);
-        }
-    }
-
-    const line = `<div class="log-entry ${color}">${renderedContent}</div>`;
-    output.innerHTML += line;
-    output.scrollTop = output.scrollHeight;
-}
-
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -193,7 +164,10 @@ function runAgent(prompt) {
     fetch(BASE_URL + '/run', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: prompt })
+        body: JSON.stringify({
+            prompt: prompt,
+            maxIterations: maxIterations  // 新增
+        })
     })
         .then(response => {
             if (!response.ok) {
@@ -276,13 +250,15 @@ clearBtn.addEventListener('click', () => {
     output.innerHTML = '';
 });
 
+// runBtn 点击事件中获取值
 runBtn.addEventListener('click', () => {
     const prompt = promptInput.value.trim();
     if (!prompt) {
         alert('请输入需求');
         return;
     }
-    runAgent(prompt);
+    const maxIterations = parseInt(document.getElementById('maxIterations').value) || 20;
+    runAgent(prompt, maxIterations);
     addToHistory(prompt);
     renderHistory();
 });
@@ -297,15 +273,6 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-
-// 页面加载时恢复上次输入
-window.addEventListener('DOMContentLoaded', function () {
-    const history = getHistory();
-    if (history.length > 0) {
-        promptInput.value = history[0];
-    }
-    renderHistory();
-});
 
 // @anchor: script_visibility
 // ===== 页面可见性变化：切回前台时立即心跳，防止后端超时断开 =====
@@ -390,11 +357,6 @@ if (toggleBtn && sidebar) {
 // ============================================================
 // @anchor: script_tree
 // ===== 文件树核心逻辑 =====
-// ============================================================
-
-// ============================================================
-// @anchor: script_tree
-// ===== 文件树核心逻辑（第4步：差异化交互） =====
 // ============================================================
 
 /**
@@ -610,16 +572,18 @@ function showErrorMessage(container, msg) {
     container.appendChild(errMsg);
 }
 
-// ===== 初始化：挂载两个根节点 =====
 document.addEventListener('DOMContentLoaded', function() {
+    // 历史记录恢复
+    const history = getHistory();
+    if (history.length > 0) {
+        promptInput.value = history[0];
+    }
+    renderHistory();
+
+    // 树渲染
     const sidebarContent = document.getElementById('sidebarContent');
     if (!sidebarContent) return;
-
     sidebarContent.innerHTML = '';
-
-    // sandbox 根节点：纯目录浏览
     renderTreeNode('sandbox', sidebarContent, true, false, false);
-
-    // TestProjects 根节点：开启项目入口检测
     renderTreeNode('TestProjects', sidebarContent, true, false, true);
 });

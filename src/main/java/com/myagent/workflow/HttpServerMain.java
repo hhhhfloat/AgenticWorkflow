@@ -12,6 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.concurrent.Executors;
 
 /**
@@ -97,10 +99,22 @@ public class HttpServerMain {
 
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             String userRequest;
+
+            int maxIterations = AgentConfig.MAX_ITERATIONS;
+
             try {
                 ObjectMapper mapper = new ObjectMapper();
                 JsonNode root = mapper.readTree(body);
                 userRequest = root.get("prompt").asText();
+
+                // 新增：读取 maxIterations，若无则使用默认值
+                if (root.has("maxIterations")) {
+                    maxIterations = root.get("maxIterations").asInt();
+                    // 安全限制：1~50
+                    if (maxIterations < 1) maxIterations = AgentConfig.MAX_ITERATIONS;
+                    if (maxIterations > 50) maxIterations = 50;
+                }
+
             } catch (Exception e) {
                 String err = "请求格式错误: " + e.getMessage();
                 exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
@@ -127,6 +141,15 @@ public class HttpServerMain {
                 return;
             }
 
+            // 新增：日志文件写入器
+            LogFileWriter logWriter = null;
+            try {
+                logWriter = new LogFileWriter();
+            } catch (IOException e) {
+                // 日志文件创建失败不影响主流程
+                System.err.println("⚠️ 无法创建日志文件: " + e.getMessage());
+            }
+
             Main agent = new Main(apiKey);
             synchronized (lock) {
                 if (currentAgent != null) {
@@ -136,17 +159,29 @@ public class HttpServerMain {
                 lastHeartbeatTime = System.currentTimeMillis();
             }
 
+
+            final LogFileWriter finalLogWriter = logWriter;
             agent.setLogConsumer(msg -> {
                 try {
+                    // 1. 发送到前端（原有逻辑）
                     sendEvent(out, msg);
+                    // 2. 写入日志文件
+                    if (finalLogWriter != null) {
+                        try {
+                            finalLogWriter.write(msg);
+                        } catch (IOException e) {
+                            System.err.println("⚠️ 写入日志失败: " + e.getMessage());
+                        }
+                    }
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             });
 
+            int finalMaxIterations = maxIterations;
             new Thread(() -> {
                 try {
-                    String result = agent.run(userRequest);
+                    String result = agent.run(userRequest, finalMaxIterations);
                     sendEvent(out, "[完成] " + result);
                     sendEvent(out, "[结束]");
                     out.close();
@@ -158,6 +193,16 @@ public class HttpServerMain {
                         ex.printStackTrace();
                     }
                 } finally {
+                    // 关闭日志文件
+                    if (finalLogWriter != null) {
+                        try {
+                            finalLogWriter.close();
+                            System.out.println("📝 日志已保存: " + finalLogWriter.getLogFilePath());
+                        } catch (IOException e) {
+                            System.err.println("⚠️ 关闭日志文件失败: " + e.getMessage());
+                        }
+                    }
+
                     synchronized (lock) {
                         if (currentAgent == agent) {
                             currentAgent = null;
@@ -249,5 +294,44 @@ public class HttpServerMain {
                 }
             }
         }, "HeartbeatMonitor").start();
+    }
+}
+
+/**
+ * 日志持久化工具：将 SSE 流写入本地文件
+ */
+class LogFileWriter implements AutoCloseable {
+    private final Path logFile;
+    private final BufferedWriter writer;
+
+    public LogFileWriter() throws IOException {
+        // 创建 HistoryOutput 目录
+        Path logDir = Paths.get("./HistoryOutput");
+        if (!Files.exists(logDir)) {
+            Files.createDirectories(logDir);
+        }
+
+        // 生成文件名：2026-07-11_14-23-45.log
+        String timestamp = LocalDateTime.now()
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
+        logFile = logDir.resolve(timestamp + ".log");
+        writer = Files.newBufferedWriter(logFile, StandardCharsets.UTF_8);
+    }
+
+    public void write(String message) throws IOException {
+        writer.write(message);
+        writer.newLine();
+        writer.flush();
+    }
+
+    @Override
+    public void close() throws IOException {
+        if (writer != null) {
+            writer.close();
+        }
+    }
+
+    public Path getLogFilePath() {
+        return logFile;
     }
 }

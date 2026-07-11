@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>凯撒移位 — Caesar Cipher</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="site-header">
+        <a href="../cipher-translator/index.html" class="back-link" title="返回密码互译器">← 返回密码互译器</a>
+        <div class="header-icon">🔄</div>
+        <h1>凯撒移位</h1>
+        <p class="subtitle">Caesar Cipher — 查看所有 25 种移位结果</p>
+    </header>
+
+    <main class="main-content">
+        <!-- 输入区域 -->
+        <section class="input-section">
+            <div class="input-wrapper">
+                <label for="textInput" class="input-label">输入英文文本</label>
+                <div class="input-row">
+                    <input
+                        type="text"
+                        id="textInput"
+                        class="text-input"
+                        placeholder="例如：HELLO WORLD"
+                        maxlength="60"
+                    >
+                    <button id="clearBtn" class="clear-btn" title="清空">✕</button>
+                </div>
+                <span id="charCount" class="char-count">0 / 60</span>
+            </div>
+            <p class="input-hint">支持 A-Z 字母，自动展示全部 25 种移位（ROT1 ~ ROT25）</p>
+        </section>
+
+        <!-- 移位结果表格 -->
+        <section class="results-section" id="resultsSection">
+            <div class="placeholder" id="placeholder">输入文本以查看所有凯撒移位结果</div>
+            <div class="results-table-wrapper" id="resultsTableWrapper" style="display:none;">
+                <table class="results-table" id="resultsTable">
+                    <thead>
+                        <tr>
+                            <th>移位量</th>
+                            <th>简称</th>
+                            <th>结果</th>
+                        </tr>
+                    </thead>
+                    <tbody id="resultsBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <footer class="site-footer">
+        <p>凯撒移位工具 · 从 <a href="../cipher-translator/index.html">古典密码互译器</a> 进入</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>

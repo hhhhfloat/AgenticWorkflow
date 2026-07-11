@@ -1,0 +1,355 @@
+/* ============================================
+   凯撒移位 — 样式表
+   ============================================ */
+
+/* --- 基础重置与变量 --- */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+:root {
+    --bg: #f5f0e8;
+    --card-bg: #fffef9;
+    --card-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    --text: #2c2c2c;
+    --text-muted: #7a7a7a;
+    --accent: #b5443c;
+    --accent-light: #e0584e;
+    --border: #e0d9cc;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --font-serif: 'Georgia', 'Times New Roman', serif;
+    --font-sans: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    --highlight: #fdf0d5;
+    --highlight-border: #e8c860;
+}
+
+html {
+    font-size: 16px;
+}
+
+body {
+    font-family: var(--font-sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+        radial-gradient(ellipse at 20% 20%, rgba(180,150,120,0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 80%, rgba(140,160,190,0.10) 0%, transparent 50%);
+}
+
+/* --- 头部 --- */
+.site-header {
+    text-align: center;
+    padding: 36px 20px 24px;
+    position: relative;
+}
+
+.back-link {
+    position: absolute;
+    left: 24px;
+    top: 24px;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent);
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: #fff;
+    border: 1px solid var(--border);
+    transition: all 0.2s;
+}
+
+.back-link:hover {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.header-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+}
+
+.site-header h1 {
+    font-family: var(--font-serif);
+    font-size: 2.2rem;
+    font-weight: 700;
+    color: #2c1810;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+}
+
+.subtitle {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    letter-spacing: 0.03em;
+}
+
+/* --- 主体 --- */
+.main-content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 24px 48px;
+}
+
+/* --- 输入区域 --- */
+.input-section {
+    text-align: center;
+    margin-bottom: 32px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    padding: 28px 32px 24px;
+}
+
+.input-wrapper {
+    display: inline-block;
+    width: 100%;
+    max-width: 580px;
+}
+
+.input-label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+}
+
+.input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #fdfcf9;
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px 8px 4px 18px;
+    transition: border-color 0.25s, box-shadow 0.25s;
+}
+
+.input-row:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(181,68,60,0.08);
+}
+
+.text-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 1.25rem;
+    font-family: var(--font-sans);
+    color: var(--text);
+    letter-spacing: 0.05em;
+    padding: 10px 0;
+}
+
+.text-input::placeholder {
+    color: #c4bdb2;
+}
+
+.clear-btn {
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 50%;
+    background: #e8e2d6;
+    color: #999;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.clear-btn:hover {
+    background: #d4ccc0;
+    color: #555;
+}
+
+.char-count {
+    display: block;
+    text-align: right;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.input-hint {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    margin-top: 10px;
+}
+
+/* --- 占位提示 --- */
+.placeholder {
+    color: #c4bdb2;
+    font-style: italic;
+    font-size: 1rem;
+    text-align: center;
+    padding: 60px 0;
+}
+
+/* --- 结果表格 --- */
+.results-section {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--card-shadow);
+    overflow: hidden;
+}
+
+.results-table-wrapper {
+    overflow-x: auto;
+}
+
+.results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.results-table thead {
+    background: #f5f0e8;
+}
+
+.results-table th {
+    padding: 14px 18px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #5a4e3e;
+    border-bottom: 2px solid #d8d0c0;
+    position: sticky;
+    top: 0;
+}
+
+.results-table th:first-child {
+    width: 90px;
+}
+
+.results-table th:nth-child(2) {
+    width: 100px;
+}
+
+.results-table td {
+    padding: 12px 18px;
+    border-bottom: 1px solid #f0ebe0;
+    vertical-align: middle;
+}
+
+.results-table tbody tr {
+    transition: background 0.15s;
+}
+
+.results-table tbody tr:hover {
+    background: #fdfaf4;
+}
+
+/* 经典凯撒 ROT3 高亮 */
+.results-table tbody tr.row-rot3 {
+    background: var(--highlight);
+    border-left: 3px solid var(--highlight-border);
+}
+
+.results-table tbody tr.row-rot3:hover {
+    background: #fdf3d0;
+}
+
+.shift-num {
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: #3a5f8b;
+    white-space: nowrap;
+}
+
+.shift-name {
+    font-weight: 600;
+    color: #5a4e3e;
+    white-space: nowrap;
+}
+
+.shift-result {
+    font-family: 'Courier New', 'SF Mono', 'Consolas', monospace;
+    font-size: 1.05rem;
+    letter-spacing: 0.04em;
+    color: #2c2c2c;
+    word-break: break-all;
+}
+
+/* ROT13 特殊标识 */
+.row-rot13 .shift-num {
+    color: #b5443c;
+}
+
+.row-rot13 .shift-name {
+    color: #b5443c;
+}
+
+.row-rot13 .shift-result {
+    font-weight: 700;
+}
+
+/* --- 底部 --- */
+.site-footer {
+    text-align: center;
+    padding: 20px;
+    font-size: 0.8rem;
+    color: #c4bdb2;
+    border-top: 1px solid #e8e2d6;
+    margin-top: 20px;
+}
+
+.site-footer a {
+    color: #b5443c;
+    text-decoration: none;
+}
+
+.site-footer a:hover {
+    text-decoration: underline;
+}
+
+/* --- 响应式 --- */
+@media (max-width: 640px) {
+    .main-content {
+        padding: 0 12px 32px;
+    }
+
+    .site-header h1 {
+        font-size: 1.6rem;
+    }
+
+    .back-link {
+        position: static;
+        display: inline-block;
+        margin-bottom: 12px;
+    }
+
+    .input-section {
+        padding: 16px 14px 18px;
+    }
+
+    .text-input {
+        font-size: 1.1rem;
+    }
+
+    .results-table th,
+    .results-table td {
+        padding: 10px 12px;
+        font-size: 0.85rem;
+    }
+
+    .shift-result {
+        font-size: 0.9rem;
+    }
+}

@@ -62,7 +62,7 @@ public class Main {
      * @param userRequest 用户自然语言需求
      * @return Agent 的最终回答
      */
-    public String run(String userRequest) throws IOException {
+    public String run(String userRequest, int maxIterations) throws IOException {
         List<Map<String, Object>> messages = new ArrayList<>();
 
         // 系统提示
@@ -164,6 +164,11 @@ public class Main {
         }
 
         return "达到最大迭代次数，任务可能未完成。请检查生成的代码。";
+    }
+
+    // 原有 run(String) 保持兼容，调用新方法
+    public String run(String userRequest) throws IOException {
+        return run(userRequest, AgentConfig.MAX_ITERATIONS);
     }
 
     // @anchor: main_stop

@@ -27,5 +27,5 @@ public final class AgentConfig {
 
     // @anchor: agentConfig_iteration
     /** Agent 最大迭代次数，防止无限循环 */
-    public static final int MAX_ITERATIONS = 15;
+    public static final int MAX_ITERATIONS = 20;
 }

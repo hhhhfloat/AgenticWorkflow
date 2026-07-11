@@ -1,0 +1,538 @@
+{
+  "caesar-shift" : {
+    "script.js" : [ {
+      "preview" : "// @anchor: caesar_dom_refs",
+      "line" : 8,
+      "id" : "caesar_dom_refs"
+    }, {
+      "preview" : "// @anchor: caesar_shift_char",
+      "line" : 16,
+      "id" : "caesar_shift_char"
+    }, {
+      "preview" : "// @anchor: caesar_shift_text",
+      "line" : 36,
+      "id" : "caesar_shift_text"
+    }, {
+      "preview" : "// @anchor: caesar_render",
+      "line" : 51,
+      "id" : "caesar_render"
+    }, {
+      "preview" : "// @anchor: caesar_input_handler",
+      "line" : 115,
+      "id" : "caesar_input_handler"
+    }, {
+      "preview" : "// @anchor: caesar_event_bindings",
+      "line" : 136,
+      "id" : "caesar_event_bindings"
+    }, {
+      "preview" : "// @anchor: caesar_init",
+      "line" : 140,
+      "id" : "caesar_init"
+    } ]
+  },
+  "cipher-translator" : {
+    "index.html" : [ {
+      "preview" : "<!-- @anchor: html_textInputSection -->",
+      "line" : 44,
+      "id" : "html_textInputSection"
+    } ],
+    "script.js" : [ {
+      "preview" : "// @anchor: js_inputSections",
+      "line" : 15,
+      "id" : "js_inputSections"
+    }, {
+      "preview" : "// @anchor: js_a1z26InputDom",
+      "line" : 34,
+      "id" : "js_a1z26InputDom"
+    }, {
+      "preview" : "// @anchor: js_switchModeDisplay",
+      "line" : 106,
+      "id" : "js_switchModeDisplay"
+    }, {
+      "preview" : "// @anchor: js_computeA1Z26",
+      "line" : 179,
+      "id" : "js_computeA1Z26"
+    } ],
+    "modules/semaphore.js" : [ {
+      "preview" : "// @anchor: semaphore_dir_angles",
+      "line" : 17,
+      "id" : "semaphore_dir_angles"
+    }, {
+      "preview" : "// @anchor: semaphore_letter_map",
+      "line" : 30,
+      "id" : "semaphore_letter_map"
+    }, {
+      "preview" : "// @anchor: semaphore_bitmask",
+      "line" : 68,
+      "id" : "semaphore_bitmask"
+    }, {
+      "preview" : "// @anchor: semaphore_reverse_map",
+      "line" : 74,
+      "id" : "semaphore_reverse_map"
+    }, {
+      "preview" : "// @anchor: semaphore_draw_arm",
+      "line" : 176,
+      "id" : "semaphore_draw_arm"
+    } ]
+  },
+  "calculator" : {
+    "complex-calc.js" : [ {
+      "preview" : "// @anchor: complex_handleNumber",
+      "line" : 13,
+      "id" : "complex_handleNumber"
+    }, {
+      "preview" : "// @anchor: complex_handleDecimal",
+      "line" : 36,
+      "id" : "complex_handleDecimal"
+    }, {
+      "preview" : "// @anchor: complex_handleOperator",
+      "line" : 44,
+      "id" : "complex_handleOperator"
+    }, {
+      "preview" : "// @anchor: complex_handleEquals",
+      "line" : 68,
+      "id" : "complex_handleEquals"
+    }, {
+      "preview" : "// @anchor: complex_handleBackspace",
+      "line" : 92,
+      "id" : "complex_handleBackspace"
+    }, {
+      "preview" : "// @anchor: complex_handlePercent",
+      "line" : 103,
+      "id" : "complex_handlePercent"
+    }, {
+      "preview" : "// @anchor: complex_handleScientific",
+      "line" : 111,
+      "id" : "complex_handleScientific"
+    }, {
+      "preview" : "// @anchor: complex_handleTrig",
+      "line" : 171,
+      "id" : "complex_handleTrig"
+    }, {
+      "preview" : "// @anchor: complex_calculate",
+      "line" : 221,
+      "id" : "complex_calculate"
+    }, {
+      "preview" : "// @anchor: complex_pow",
+      "line" : 252,
+      "id" : "complex_pow"
+    }, {
+      "preview" : "// @anchor: complex_log",
+      "line" : 267,
+      "id" : "complex_log"
+    }, {
+      "preview" : "// @anchor: complex_sqrt",
+      "line" : 281,
+      "id" : "complex_sqrt"
+    }, {
+      "preview" : "// @anchor: complex_sin",
+      "line" : 293,
+      "id" : "complex_sin"
+    }, {
+      "preview" : "// @anchor: complex_cos",
+      "line" : 302,
+      "id" : "complex_cos"
+    }, {
+      "preview" : "// @anchor: complex_tan",
+      "line" : 311,
+      "id" : "complex_tan"
+    }, {
+      "preview" : "// @anchor: complex_arcsin",
+      "line" : 324,
+      "id" : "complex_arcsin"
+    }, {
+      "preview" : "// @anchor: complex_arccos",
+      "line" : 341,
+      "id" : "complex_arccos"
+    }, {
+      "preview" : "// @anchor: complex_arctan",
+      "line" : 351,
+      "id" : "complex_arctan"
+    }, {
+      "preview" : "// @anchor: complex_formatComplexStr",
+      "line" : 370,
+      "id" : "complex_formatComplexStr"
+    } ],
+    "index.html" : [ {
+      "preview" : "<!-- @anchor: html_calculatorContainer -->",
+      "line" : 10,
+      "id" : "html_calculatorContainer"
+    }, {
+      "preview" : "<!-- @anchor: html_display -->",
+      "line" : 12,
+      "id" : "html_display"
+    }, {
+      "preview" : "<!-- @anchor: html_result -->",
+      "line" : 15,
+      "id" : "html_result"
+    }, {
+      "preview" : "<!-- @anchor: html_angleToggle -->",
+      "line" : 25,
+      "id" : "html_angleToggle"
+    }, {
+      "preview" : "<!-- @anchor: html_modeToggle -->",
+      "line" : 30,
+      "id" : "html_modeToggle"
+    } ],
+    "script.js" : [ {
+      "preview" : "// @anchor: js_state",
+      "line" : 8,
+      "id" : "js_state"
+    }, {
+      "preview" : "// @anchor: js_domRefs",
+      "line" : 28,
+      "id" : "js_domRefs"
+    }, {
+      "preview" : "// @anchor: js_angleConvert",
+      "line" : 44,
+      "id" : "js_angleConvert"
+    }, {
+      "preview" : "// @anchor: js_formatNumber",
+      "line" : 53,
+      "id" : "js_formatNumber"
+    }, {
+      "preview" : "// @anchor: js_getCurrentNumber",
+      "line" : 61,
+      "id" : "js_getCurrentNumber"
+    }, {
+      "preview" : "// @anchor: js_setCurrentNumber",
+      "line" : 69,
+      "id" : "js_setCurrentNumber"
+    }, {
+      "preview" : "// @anchor: js_handleNumber",
+      "line" : 86,
+      "id" : "js_handleNumber"
+    }, {
+      "preview" : "// @anchor: js_handleDecimal",
+      "line" : 95,
+      "id" : "js_handleDecimal"
+    }, {
+      "preview" : "// @anchor: js_handleOperator",
+      "line" : 104,
+      "id" : "js_handleOperator"
+    }, {
+      "preview" : "// @anchor: js_handleEquals",
+      "line" : 113,
+      "id" : "js_handleEquals"
+    }, {
+      "preview" : "// @anchor: js_handleBackspace",
+      "line" : 122,
+      "id" : "js_handleBackspace"
+    }, {
+      "preview" : "// @anchor: js_handlePercent",
+      "line" : 131,
+      "id" : "js_handlePercent"
+    }, {
+      "preview" : "// @anchor: js_handleScientific",
+      "line" : 140,
+      "id" : "js_handleScientific"
+    }, {
+      "preview" : "// @anchor: js_handleClear",
+      "line" : 151,
+      "id" : "js_handleClear"
+    }, {
+      "preview" : "// @anchor: js_toggleAngleMode",
+      "line" : 173,
+      "id" : "js_toggleAngleMode"
+    }, {
+      "preview" : "// @anchor: js_switchMode",
+      "line" : 185,
+      "id" : "js_switchMode"
+    }, {
+      "preview" : "// @anchor: js_handleImagToggle",
+      "line" : 213,
+      "id" : "js_handleImagToggle"
+    }, {
+      "preview" : "// @anchor: js_updateDisplay",
+      "line" : 228,
+      "id" : "js_updateDisplay"
+    }, {
+      "preview" : "// @anchor: js_updateActiveOperator",
+      "line" : 286,
+      "id" : "js_updateActiveOperator"
+    }, {
+      "preview" : "// @anchor: js_handleKeyboard",
+      "line" : 298,
+      "id" : "js_handleKeyboard"
+    }, {
+      "preview" : "// @anchor: js_init",
+      "line" : 363,
+      "id" : "js_init"
+    }, {
+      "preview" : "// @anchor: js_start",
+      "line" : 425,
+      "id" : "js_start"
+    } ],
+    "real-calc.js" : [ {
+      "preview" : "// @anchor: real_handleNumber",
+      "line" : 9,
+      "id" : "real_handleNumber"
+    }, {
+      "preview" : "// @anchor: real_handleDecimal",
+      "line" : 23,
+      "id" : "real_handleDecimal"
+    }, {
+      "preview" : "// @anchor: real_handleOperator",
+      "line" : 35,
+      "id" : "real_handleOperator"
+    }, {
+      "preview" : "// @anchor: real_handleEquals",
+      "line" : 49,
+      "id" : "real_handleEquals"
+    }, {
+      "preview" : "// @anchor: real_handleBackspace",
+      "line" : 64,
+      "id" : "real_handleBackspace"
+    }, {
+      "preview" : "// @anchor: real_handlePercent",
+      "line" : 74,
+      "id" : "real_handlePercent"
+    }, {
+      "preview" : "// @anchor: real_handleScientific",
+      "line" : 81,
+      "id" : "real_handleScientific"
+    }, {
+      "preview" : "// @anchor: real_handleTrigonometric",
+      "line" : 149,
+      "id" : "real_handleTrigonometric"
+    }, {
+      "preview" : "// @anchor: real_calculate",
+      "line" : 215,
+      "id" : "real_calculate"
+    } ],
+    "style.css" : [ {
+      "preview" : "/* @anchor: css_reset */",
+      "line" : 1,
+      "id" : "css_reset"
+    }, {
+      "preview" : "/* @anchor: css_body */",
+      "line" : 8,
+      "id" : "css_body"
+    }, {
+      "preview" : "/* @anchor: css_calculator */",
+      "line" : 18,
+      "id" : "css_calculator"
+    }, {
+      "preview" : "/* @anchor: css_display */",
+      "line" : 30,
+      "id" : "css_display"
+    }, {
+      "preview" : "/* @anchor: css_modeIndicatorRow */",
+      "line" : 71,
+      "id" : "css_modeIndicatorRow"
+    }, {
+      "preview" : "/* @anchor: css_angleToggle */",
+      "line" : 91,
+      "id" : "css_angleToggle"
+    }, {
+      "preview" : "/* @anchor: css_complexDisplay */",
+      "line" : 122,
+      "id" : "css_complexDisplay"
+    }, {
+      "preview" : "/* @anchor: css_modeToggle */",
+      "line" : 161,
+      "id" : "css_modeToggle"
+    }, {
+      "preview" : "/* @anchor: css_buttons */",
+      "line" : 195,
+      "id" : "css_buttons"
+    }, {
+      "preview" : "/* @anchor: css_btnBase */",
+      "line" : 202,
+      "id" : "css_btnBase"
+    }, {
+      "preview" : "/* @anchor: css_btnNumber */",
+      "line" : 221,
+      "id" : "css_btnNumber"
+    }, {
+      "preview" : "/* @anchor: css_btnOperator */",
+      "line" : 236,
+      "id" : "css_btnOperator"
+    }, {
+      "preview" : "/* @anchor: css_btnClear */",
+      "line" : 257,
+      "id" : "css_btnClear"
+    }, {
+      "preview" : "/* @anchor: css_btnBackspace */",
+      "line" : 273,
+      "id" : "css_btnBackspace"
+    }, {
+      "preview" : "/* @anchor: css_btnPercent */",
+      "line" : 284,
+      "id" : "css_btnPercent"
+    }, {
+      "preview" : "/* @anchor: css_btnScientific */",
+      "line" : 295,
+      "id" : "css_btnScientific"
+    }, {
+      "preview" : "/* @anchor: css_btnTrig */",
+      "line" : 319,
+      "id" : "css_btnTrig"
+    }, {
+      "preview" : "/* @anchor: css_btnDecimal */",
+      "line" : 337,
+      "id" : "css_btnDecimal"
+    }, {
+      "preview" : "/* @anchor: css_btnImag */",
+      "line" : 353,
+      "id" : "css_btnImag"
+    }, {
+      "preview" : "/* @anchor: css_btnEquals */",
+      "line" : 379,
+      "id" : "css_btnEquals"
+    }, {
+      "preview" : "/* @anchor: css_btnZero */",
+      "line" : 396,
+      "id" : "css_btnZero"
+    }, {
+      "preview" : "/* @anchor: css_responsive */",
+      "line" : 401,
+      "id" : "css_responsive"
+    } ]
+  },
+  "expense-tracker" : {
+    "index.html" : [ {
+      "preview" : "<!-- @anchor: header -->",
+      "line" : 11,
+      "id" : "header"
+    }, {
+      "preview" : "<!-- @anchor: expense_form -->",
+      "line" : 17,
+      "id" : "expense_form"
+    }, {
+      "preview" : "<!-- @anchor: summary_section -->",
+      "line" : 53,
+      "id" : "summary_section"
+    }, {
+      "preview" : "<!-- @anchor: chart_section -->",
+      "line" : 72,
+      "id" : "chart_section"
+    }, {
+      "preview" : "<!-- @anchor: table_section -->",
+      "line" : 83,
+      "id" : "table_section"
+    }, {
+      "preview" : "<!-- @anchor: clear_all_btn -->",
+      "line" : 89,
+      "id" : "clear_all_btn"
+    }, {
+      "preview" : "<!-- @anchor: footer -->",
+      "line" : 113,
+      "id" : "footer"
+    } ],
+    "script.js" : [ {
+      "preview" : "// @anchor: constants",
+      "line" : 1,
+      "id" : "constants"
+    }, {
+      "preview" : "// @anchor: state",
+      "line" : 5,
+      "id" : "state"
+    }, {
+      "preview" : "// @anchor: dom_refs",
+      "line" : 8,
+      "id" : "dom_refs"
+    }, {
+      "preview" : "// @anchor: init",
+      "line" : 22,
+      "id" : "init"
+    }, {
+      "preview" : "// @anchor: storage",
+      "line" : 38,
+      "id" : "storage"
+    }, {
+      "preview" : "// @anchor: event_binding",
+      "line" : 59,
+      "id" : "event_binding"
+    }, {
+      "preview" : "// @anchor: add_expense",
+      "line" : 65,
+      "id" : "add_expense"
+    }, {
+      "preview" : "// @anchor: delete_expense",
+      "line" : 95,
+      "id" : "delete_expense"
+    }, {
+      "preview" : "// @anchor: clear_all",
+      "line" : 103,
+      "id" : "clear_all"
+    }, {
+      "preview" : "// @anchor: render_all",
+      "line" : 115,
+      "id" : "render_all"
+    }, {
+      "preview" : "// @anchor: render_summary",
+      "line" : 124,
+      "id" : "render_summary"
+    }, {
+      "preview" : "// @anchor: render_table",
+      "line" : 135,
+      "id" : "render_table"
+    }, {
+      "preview" : "// @anchor: render_chart",
+      "line" : 166,
+      "id" : "render_chart"
+    }, {
+      "preview" : "// @anchor: update_clear_button",
+      "line" : 208,
+      "id" : "update_clear_button"
+    }, {
+      "preview" : "// @anchor: update_record_hint",
+      "line" : 220,
+      "id" : "update_record_hint"
+    }, {
+      "preview" : "// @anchor: escape_html",
+      "line" : 229,
+      "id" : "escape_html"
+    }, {
+      "preview" : "// @anchor: bootstrap",
+      "line" : 236,
+      "id" : "bootstrap"
+    } ],
+    "style.css" : [ {
+      "preview" : "/* @anchor: reset_base */",
+      "line" : 1,
+      "id" : "reset_base"
+    }, {
+      "preview" : "/* @anchor: header_styles */",
+      "line" : 38,
+      "id" : "header_styles"
+    }, {
+      "preview" : "/* @anchor: card_styles */",
+      "line" : 56,
+      "id" : "card_styles"
+    }, {
+      "preview" : "/* @anchor: form_styles */",
+      "line" : 71,
+      "id" : "form_styles"
+    }, {
+      "preview" : "/* @anchor: button_styles */",
+      "line" : 114,
+      "id" : "button_styles"
+    }, {
+      "preview" : "/* @anchor: summary_styles */",
+      "line" : 156,
+      "id" : "summary_styles"
+    }, {
+      "preview" : "/* @anchor: chart_styles */",
+      "line" : 184,
+      "id" : "chart_styles"
+    }, {
+      "preview" : "/* @anchor: table_styles */",
+      "line" : 293,
+      "id" : "table_styles"
+    }, {
+      "preview" : "/* @anchor: animation */",
+      "line" : 398,
+      "id" : "animation"
+    }, {
+      "preview" : "/* @anchor: footer_styles */",
+      "line" : 414,
+      "id" : "footer_styles"
+    }, {
+      "preview" : "/* @anchor: responsive */",
+      "line" : 422,
+      "id" : "responsive"
+    } ]
+  }
+}
