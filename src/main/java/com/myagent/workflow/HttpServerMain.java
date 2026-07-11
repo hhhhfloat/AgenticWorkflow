@@ -35,6 +35,17 @@ public class HttpServerMain {
 
     // @anchor: httpserver_entry
     public static void main(String[] args) throws IOException {
+
+        // 确保运行时目录存在
+        String[] requiredDirs = {"./sandbox", "./TestProjects", "./HistoryOutput"};
+        for (String dir : requiredDirs) {
+            Path p = Paths.get(dir);
+            if (!Files.exists(p)) {
+                Files.createDirectories(p);
+                System.out.println("📁 已自动创建: " + dir);
+            }
+        }
+
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
 
         // 业务接口
@@ -47,13 +58,8 @@ public class HttpServerMain {
         // 静态资源
         server.createContext("/", new Handlers.StaticHandler());
 
-        // 外部项目目录挂载
+        // 外部项目目录挂载（目录已确保存在）
         Path testProjectsDir = Paths.get("./TestProjects");
-        if (!Files.exists(testProjectsDir)) {
-            Files.createDirectories(testProjectsDir);
-            System.out.println("📁 已自动创建 TestProjects 目录");
-        }
-        // 然后直接挂载，不再判断 if (Files.exists(...))
         server.createContext("/TestProjects", new Handlers.ExternalFileHandler(testProjectsDir));
         System.out.println("📁 已挂载外部目录: ./TestProjects -> http://localhost:" + PORT + "/TestProjects");
 
