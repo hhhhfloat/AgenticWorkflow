@@ -12,8 +12,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
@@ -134,6 +137,8 @@ public class HttpServerMain {
                     if (maxIterations > 50) maxIterations = 50;
                 }
 
+                appendHistory(userRequest);
+
             } catch (Exception e) {
                 String err = "请求格式错误: " + e.getMessage();
                 exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
@@ -229,6 +234,31 @@ public class HttpServerMain {
                     }
                 }
             }).start();
+        }
+
+        // 在 RunHandler 类中添加
+        private void appendHistory(String userRequest) {
+            try {
+                Path historyFile = Paths.get("./HistoryOutput/history.jsonl");
+                // 确保目录存在
+                if (!Files.exists(historyFile.getParent())) {
+                    Files.createDirectories(historyFile.getParent());
+                }
+
+                ObjectMapper mapper = new ObjectMapper();
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put("timestamp", LocalDateTime.now().toString());
+                entry.put("prompt", userRequest);
+
+                String jsonLine = mapper.writeValueAsString(entry) + System.lineSeparator();
+                Files.writeString(historyFile, jsonLine, StandardCharsets.UTF_8,
+                        StandardOpenOption.CREATE,
+                        StandardOpenOption.APPEND);
+
+            } catch (IOException e) {
+                // 历史记录写入失败不影响主流程
+                System.err.println("⚠️ 写入历史记录失败: " + e.getMessage());
+            }
         }
 
         private void sendEvent(OutputStream out, String data) throws IOException {
