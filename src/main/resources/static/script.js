@@ -215,7 +215,7 @@ function runAgent(prompt, maxIterations) {
             readChunk();
         })
         .catch(err => {
-            appendLog('[连接错误] ' + err.message + '\n请确保 HTTP 服务已启动（运行 HttpServerMain）');
+            appendLog('[连接错误] ' + err.message + '\n请确保 HTTP 服务已启动（运行 start.bat）');
             finishRun();
         });
 }
