@@ -50,6 +50,53 @@ public class Main {
         this.toolExecutor = new ToolExecutor(AgentConfig.SANDBOX_DIR, AgentConfig.ANCHOR_INDEX_FILE, objectMapper);
     }
 
+    // ==================== API Key 校验 ====================
+
+    /**
+     * 校验 DeepSeek API Key 是否有效。
+     * 调用 /v1/models 接口，如果返回 200 则有效，401 则无效。
+     * 网络异常时返回 true（允许启动），避免因网络问题误判。
+     */
+    public static boolean checkApiKey(String apiKey) {
+        if (apiKey == null || apiKey.isEmpty()) {
+            return false;
+        }
+
+        try {
+            OkHttpClient client = new OkHttpClient.Builder()
+                    .connectTimeout(5, TimeUnit.SECONDS)
+                    .readTimeout(5, TimeUnit.SECONDS)
+                    .build();
+
+            Request request = new Request.Builder()
+                    .url("https://api.deepseek.com/v1/models")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .get()
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                int code = response.code();
+                if (code == 200) {
+                    return true;
+                } else if (code == 401) {
+                    return false;
+                } else {
+                    // 其他状态码（如 429、500 等）视为 Key 可能有效但服务有问题
+                    System.err.println("⚠️ API 返回异常状态码: " + code + "，请稍后重试");
+                    return false;
+                }
+            }
+        } catch (java.net.UnknownHostException e) {
+            // 网络不通，提示但不阻止启动
+            System.err.println("⚠️ 无法连接 DeepSeek API，请检查网络连接");
+            return true; // 允许继续启动
+        } catch (Exception e) {
+            // 其他异常，如超时等，也允许继续（避免误判）
+            System.err.println("⚠️ 验证 API Key 时发生异常: " + e.getMessage());
+            return true;
+        }
+    }
+
     // @anchor: main_setLogConsumer
     public void setLogConsumer(Consumer<String> consumer) {
         this.logConsumer = consumer;

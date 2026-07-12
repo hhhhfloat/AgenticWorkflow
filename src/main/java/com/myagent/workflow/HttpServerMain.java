@@ -40,6 +40,18 @@ public class HttpServerMain {
     // @anchor: httpserver_entry
     public static void main(String[] args) throws IOException {
 
+        // ===== 1. 校验 API Key =====
+        String apiKey = System.getenv("DEEPSEEK_API_KEY");
+        if (apiKey == null || apiKey.isEmpty()) {
+            System.err.println("❌ 未设置 DEEPSEEK_API_KEY 环境变量");
+            System.exit(10);
+        }
+        if (!Main.checkApiKey(apiKey)) {
+            System.err.println("❌ API Key 无效，请检查是否正确");
+            System.exit(10);
+        }
+
+
         // 确保运行时目录存在
         String[] requiredDirs = {"./sandbox", "./TestProjects", "./HistoryOutput"};
         for (String dir : requiredDirs) {
