@@ -42,10 +42,10 @@ public final class SystemPrompt {
         3. 出错：分析 → 修改 → 重验，直至成功。
         4. 完成后：输出清晰文档。
 
-        ## 工具速查
+        ## 主要工具速查
         - list_directory / read_file / write_java_file / delete_file
-        - compile_and_run：编译 .java 或预览 .html（自动生成 /sandbox/ 链接）
-        - search_text：修改前必须先查引用
+        - compile_and_run：编译 .java 或预览 .html
+        - search_text：修改前必须先查引用（已有特化的 find_references , find_callers , find_callees 工具）
         - build_anchor_index / list_anchors
         - insert_at_anchor(锚点ID, 内容, before|after) —— 在锚点处插入
         - delete_between_anchors(起始锚点, 结束锚点) —— 删除两锚点之间的代码块（锚点行保留）
@@ -54,11 +54,9 @@ public final class SystemPrompt {
         ## 锚点系统
         - 标记格式：Java/JS: // @anchor: 名称，CSS: /* @anchor: 名称 */，HTML: <!-- @anchor: 名称 -->
         - 命名：模块_功能，如 braille_encode
-        - **组合用法**：
-          - 替换代码块 = delete_between_anchors(起始, 结束) + insert_at_anchor(起始, 新代码, "after")
-          - 删除代码块 = delete_between_anchors(起始, 结束)
-          - 插入新块 = insert_at_anchor(相邻锚点, 新代码, "after")
-        - **定位性锚点**：若文件末尾没有合适的结束锚点，可先插入一个临时锚点（命名如 `原锚点_end`）作为结束边界，再执行删除。
+        - 【重要观察】**组合用法**：
+          - 替换代码块 = delete_between_anchors(起始锚点, 结束锚点) + insert_at_anchor(起始锚点, 新代码, "after")
+        - 为让delete_between_anchors为文档末尾的代码块起效，可在单个文档最后的一个有效模块结束后，添加一个定位锚点，仅用于删除
         - 修改涉及方法名/变量名时，必须 search_text 追踪所有引用并联动修改。
 
         ## 约束

@@ -131,6 +131,43 @@ public final class ToolDefinitions {
                 List.of("startAnchor", "endAnchor")
         ));
 
+        // @anchor: toolDef_findReferences
+        tools.add(defineTool(
+                "find_references",
+                "查找函数、变量、类、方法在项目中的所有引用位置。返回文件、行号和代码预览。修改代码前先用此工具评估影响范围。",
+                defineParams()
+                        .prop("symbol", "string", "要查找的符号名称，如 'handleNumber'、'renderTimeline'")
+                        .prop("path", "string", "搜索起始相对路径，默认为项目根目录")
+                        .prop("file_pattern", "string", "文件匹配模式，如 '*.js'，默认为所有代码文件")
+                        .build(),
+                List.of("symbol")
+        ));
+
+        // @anchor: toolDef_findCallers
+        tools.add(defineTool(
+                "find_callers",
+                "查找函数被调用的所有位置。返回文件路径、行号、调用所在函数上下文和参数预览。比 search_text 更精准，只会匹配函数调用表达式，跳过定义、声明和注释。",
+                defineParams()
+                        .prop("functionName", "string", "要查找的函数名称")
+                        .prop("path", "string", "搜索起始相对路径，默认为项目根目录")
+                        .prop("file_pattern", "string", "文件匹配模式，如 '*.js'，默认为所有代码文件")
+                        .build(),
+                List.of("functionName")
+        ));
+
+        // @anchor: toolDef_findCallees
+        tools.add(defineTool(
+                "find_callees",
+                "查找函数内部直接调用的所有其他函数。返回被调用函数名称、调用行号和上下文。用于理解函数依赖和重构评估。",
+                defineParams()
+                        .prop("functionName", "string", "要分析的函数名称")
+                        .prop("path", "string", "搜索起始相对路径，默认为项目根目录")
+                        .prop("recursive", "boolean", "是否递归分析被调用函数的内部调用，默认为 false")
+                        .prop("depth", "integer", "当 recursive 为 true 时的分析深度，默认为 1")
+                        .build(),
+                List.of("functionName")
+        ));
+
         return tools;
     }
 

@@ -7,7 +7,7 @@ package com.myagent.workflow;
  */
 public final class AgentConfig {
 
-    public static final String ARCHIVE_VERSION = "v2_0";
+    public static final String ARCHIVE_VERSION = "v2_2";
 
 
     private AgentConfig() {

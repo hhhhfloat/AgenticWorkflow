@@ -6,6 +6,14 @@ const stopBtn = document.getElementById('stopBtn');
 const clearBtn = document.getElementById('clearBtn');
 const promptInput = document.getElementById('prompt');
 
+// ===== 配置 marked 渲染器：所有链接在新标签页打开 =====
+const renderer = new marked.Renderer();
+renderer.link = function(href, title, text) {
+    // 保留原有链接功能，添加 target="_blank"
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer"${title ? ` title="${title}"` : ''}>${text}</a>`;
+};
+marked.use({ renderer });
+
 // @anchor: script_state
 // ===== 全局状态 =====
 let isRunning = false;
