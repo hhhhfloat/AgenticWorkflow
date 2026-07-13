@@ -1,4 +1,3 @@
-// quotes.js
 // 备选文案列表（可随时增删改）
 const QUOTES = [
     "🔁\"服务器繁忙，请稍候再试\"🐋 (doge",
@@ -20,17 +19,14 @@ const QUOTES = [
     "增量开发会让token越来越便宜！",
     "增量开发会让token越来越便宜！",
     "增量开发会让token越来越便宜！",
-    "尽量避免将工作台放到后台运行哦，极小概率触发意外断联",
-    "尽量避免将工作台放到后台运行哦，极小概率触发意外断联",
-    "尽量避免将工作台放到后台运行哦，极小概率触发意外断联",
-    "尽量避免将工作台放到后台运行哦，极小概率触发意外断联",
+    "将工作台放到后台运行哦，极小概率触发意外断联",
     "吃不消太复杂的提示词？可以让网页版DeepSeek帮你拆分成多步提示词",
     "吃不消太复杂的提示词？可以让网页版DeepSeek帮你拆分成多步提示词",
     "吃不消太复杂的提示词？可以让网页版DeepSeek帮你拆分成多步提示词",
     "吃不消太复杂的提示词？可以让网页版DeepSeek帮你拆分成多步提示词",
-    "目前尚未支持agent自主多文件架构（如 Maven 项目）编译（啊啊在改了在改了）",
-    "目前尚未支持agent自主多文件架构（如 Maven 项目）编译",
-    "目前尚未支持agent自主多文件架构（如 Maven 项目）编译",
+    "已支持 Maven 多文件项目编译运行！",
+    "Java / Python / Node.js / C++ 全语言支持已就绪",
+    "C++ 同时支持 MSVC 和 MinGW 双编译器",
     "文件浏览器支持直接打开沙盒下的html！",
     "文件浏览器支持直接打开沙盒下的html！",
     "文件浏览器支持直接打开沙盒下的html！",
@@ -58,5 +54,8 @@ const QUOTES = [
     "大↘风→起↓兮→云↗飞→扬↗，安得猛↓士↘兮→守四方",
     "You are waiting for a train...",
     "Do not go gentle into the dark night...",
-    "And now I am become death, destroyer of the world."
+    "And now I am become death, destroyer of the world.",
+    "C++ 项目已支持 MSVC 和 MinGW 双编译器，配置面板自由切换",
+    "前端配置修改后自动重启，无需手动操作",
+    "一键清除 API Key，自动重启并重新输入"
 ];

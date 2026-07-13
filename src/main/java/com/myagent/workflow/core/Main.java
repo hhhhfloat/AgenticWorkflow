@@ -1,8 +1,10 @@
-package com.myagent.workflow;
+package com.myagent.workflow.core;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.myagent.workflow.tools.ToolDefinitions;
+import com.myagent.workflow.tools.ToolExecutor;
 import okhttp3.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,9 +32,12 @@ public class Main {
     private Consumer<String> logConsumer = null;
     private volatile boolean stopRequested = false;
 
+    private final AgentConfig runConfig;
+
     // @anchor: main_constructor
-    public Main(String apiKey) {
-        this.apiKey = apiKey;
+    public Main(AgentConfig runConfig) {
+        this.apiKey = runConfig.apiKey();
+        this.runConfig = runConfig;  // 存下来供 run 使用
         this.httpClient = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
@@ -40,14 +45,12 @@ public class Main {
                 .build();
         this.objectMapper = new ObjectMapper();
 
-        // 确保沙箱目录存在
-        File sandbox = new File(AgentConfig.SANDBOX_DIR);
+        File sandbox = new File(AgentConfig.getSandboxDir());
         if (!sandbox.exists()) {
             sandbox.mkdirs();
         }
 
-        // 初始化工具执行器
-        this.toolExecutor = new ToolExecutor(AgentConfig.SANDBOX_DIR, AgentConfig.ANCHOR_INDEX_FILE, objectMapper);
+        this.toolExecutor = new ToolExecutor(runConfig, objectMapper);
     }
 
     // ==================== API Key 校验 ====================
@@ -133,7 +136,7 @@ public class Main {
 
             // 构建 API 请求体
             Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("model", AgentConfig.MODEL);
+            requestBody.put("model", runConfig.model());
             requestBody.put("messages", messages);
             requestBody.put("tools", tools);
             requestBody.put("tool_choice", "auto");
@@ -143,7 +146,7 @@ public class Main {
             // 发送 HTTP 请求
             checkStop();
             Request httpRequest = new Request.Builder()
-                    .url(AgentConfig.API_URL)
+                    .url(AgentConfig.getApiUrl())
                     .header("Authorization", "Bearer " + apiKey)
                     .header("Content-Type", "application/json")
                     .post(RequestBody.create(jsonBody, MediaType.parse("application/json")))
@@ -223,7 +226,7 @@ public class Main {
 
     // 原有 run(String) 保持兼容，调用新方法
     public String run(String userRequest) throws IOException {
-        return run(userRequest, AgentConfig.MAX_ITERATIONS);
+        return run(userRequest, AgentConfig.getDefaultMaxIterations());
     }
 
     // @anchor: main_stop
@@ -271,7 +274,7 @@ public class Main {
         String request = args[0];
         System.out.println("📝 收到需求: " + request);
 
-        Main agent = new Main(apiKey);
+        Main agent = new Main(ConfigEditor.buildDefault());
         try {
             String result = agent.run(request);
             System.out.println("========== Agent 最终回答 ==========");

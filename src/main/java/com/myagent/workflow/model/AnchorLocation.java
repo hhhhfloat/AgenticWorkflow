@@ -1,4 +1,4 @@
-package com.myagent.workflow;
+package com.myagent.workflow.model;
 
 /**
  * @anchor: anchorLocation_class

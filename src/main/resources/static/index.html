@@ -40,15 +40,105 @@
             <button id="stopBtn" disabled>⏹ 停止</button>
             <button id="clearBtn" class="clear-btn">🗑 清空</button>
             <button id="logBtn" class="log-btn" title="打开 HistoryOutput 日志文件夹">📂 日志</button>
+            <button id="configBtn" class="config-btn" title="高级配置">⚙️ 配置</button>
+        </div>
+
+        <!-- ===== 配置弹窗 ===== -->
+        <div id="configModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span>⚙️ 配置</span>
+                    <button id="closeModalBtn" class="close-btn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-row">
+                        <label>🔑 API Key 管理</label>
+                        <div class="api-key-control">
+                            <button id="clearApiKeyBtn" class="danger-btn">🗑️ 修改 API</button>
+                            <span class="hint-text">当前从环境变量读取</span>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <label>模型</label>
+                        <input type="text" id="setModel" value="deepseek-v4-pro">
+                    </div>
+                    <div class="setting-row">
+                        <label>自动打开浏览器</label>
+                        <input type="checkbox" id="setAutoOpenBrowser">
+                    </div>
+                    <hr>
+                    <div class="setting-row">
+                        <label>Maven 路径</label>
+                        <input type="text" id="setMavenCommand" placeholder="留空使用默认">
+                    </div>
+                    <div class="setting-row">
+                        <label>JAVA_HOME</label>
+                        <input type="text" id="setJavaHome" placeholder="留空使用默认">
+                    </div>
+                    <div class="setting-row">
+                        <label>Python 路径</label>
+                        <input type="text" id="setPythonInterpreter" placeholder="留空使用默认">
+                    </div>
+                    <div class="setting-row">
+                        <label>Node.js 路径</label>
+                        <input type="text" id="setNodeInterpreter" placeholder="留空使用默认">
+                    </div>
+                    <hr>
+                    <div class="setting-row">
+                        <label>C++ 编译器类型</label>
+                        <select id="setCppCompilerType">
+                            <option value="msvc">MSVC</option>
+                            <option value="mingw">MinGW</option>
+                        </select>
+                    </div>
+                    <div class="setting-row">
+                        <label>MSVC 编译器路径</label>
+                        <input type="text" id="setMsvcCompiler" placeholder="cl.exe 路径">
+                    </div>
+                    <div class="setting-row">
+                        <label>MinGW 编译器路径</label>
+                        <input type="text" id="setMingwCompiler" placeholder="g++.exe 路径">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="saveSettingsBtn">💾 保存</button>
+                    <button id="resetSettingsBtn">↩️ 恢复默认</button>
+                    <button id="closeModalBtn2">✕ 关闭</button>
+                </div>
+            </div>
         </div>
 
         <div id="output">等待输入...</div>
     </div>
 </div>
 
-<!-- 引入文案列表 -->
+<!-- @anchor: html_scripts -->
+<!-- 第三方库 -->
 <script src="tips.js"></script>
-<!-- 主脚本 -->
-<script src="script.js"></script>
+
+<!-- 核心模块：DOM引用、状态、常量 -->
+<script src="modules/config.js"></script>
+<!-- 文案工具 -->
+<script src="modules/quote.js"></script>
+<!-- 日志输出 -->
+<script src="modules/log.js"></script>
+<!-- 历史记录 -->
+<script src="modules/history.js"></script>
+<!-- 心跳机制 -->
+<script src="modules/heartbeat.js"></script>
+<!-- 文件树 -->
+<script src="modules/tree.js"></script>
+<!-- 归档/创建/上传 -->
+<script src="modules/archive.js"></script>
+<!-- 打开文件夹 -->
+<script src="modules/openFolder.js"></script>
+<!-- SSE 流式请求 -->
+<script src="modules/sse.js"></script>
+<!-- 配置管理 -->
+<script src="modules/settings.js"></script>  <!-- ✅ 新增 -->
+<!-- 侧边栏切换 -->
+<script src="modules/sidebar.js"></script>
+<!-- 事件绑定 & 初始化（最后加载） -->
+<script src="modules/events.js"></script>
 </body>
 </html>

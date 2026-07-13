@@ -49,7 +49,7 @@
                     <archive>
                         <manifest>
                             <!-- 【关键】入口类要改成和包名一致 -->
-                            <mainClass>com.myagent.workflow.HttpServerMain</mainClass>
+                            <mainClass>com.myagent.workflow.http.HttpServerMain</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

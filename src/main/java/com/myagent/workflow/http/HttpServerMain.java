@@ -1,7 +1,10 @@
-package com.myagent.workflow;
+package com.myagent.workflow.http;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.core.ConfigEditor;
+import com.myagent.workflow.core.Main;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpExchange;
@@ -37,9 +40,22 @@ public class HttpServerMain {
     private static volatile Main currentAgent = null;
     private static final Object lock = new Object();
 
+    // @anchor: httpserver_exitCodes
+    /** 用户主动清除 API Key，需要删除环境变量并重启 */
+    public static final int EXIT_CODE_CLEAR_API_KEY = 42;
+
+    /** 用户修改了配置，需要重启（不删除环境变量） */
+    public static final int EXIT_CODE_RESTART = 43;
+
+    // 在 HttpServerMain 类中
+    private static volatile boolean apiKeyClearedByUser = false;
+    public static boolean isApiKeyCleared() {
+
+        return apiKeyClearedByUser;
+    }
+
     // @anchor: httpserver_entry
     public static void main(String[] args) throws IOException {
-
         // ===== 1. 校验 API Key =====
         String apiKey = System.getenv("DEEPSEEK_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {
@@ -76,6 +92,8 @@ public class HttpServerMain {
         // 替换原来的 /openSandbox 为 /openFolder
         server.createContext("/openFolder", new Handlers.OpenFolderHandler());
         server.createContext("/config", new Handlers.ConfigHandler());
+        server.createContext("/clear-api-key", new ClearApiKeyHandler());
+        server.createContext("/restart", new RestartHandler());
 
         // 静态资源
         server.createContext("/", new Handlers.StaticHandler());
@@ -85,7 +103,7 @@ public class HttpServerMain {
         server.createContext("/TestProjects", new Handlers.ExternalFileHandler(testProjectsDir, "/TestProjects"));
         System.out.println("📁 已挂载外部目录: ./TestProjects -> http://localhost:" + PORT + "/TestProjects");
 
-// 沙箱目录挂载
+        // 沙箱目录挂载
         Path sandboxDir = Paths.get("./sandbox");
         server.createContext("/sandbox", new Handlers.ExternalFileHandler(sandboxDir, "/sandbox"));
         System.out.println("📁 已挂载沙箱目录: ./sandbox -> http://localhost:" + PORT + "/sandbox");
@@ -114,10 +132,81 @@ public class HttpServerMain {
 
     // ===================== 内部 Handler 类 =====================
 
+    static class RestartHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+
+            String response = "{\"status\":\"success\", \"message\":\"配置已保存，程序即将重启...\"}";
+            byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+            exchange.close();
+
+            new Thread(() -> {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ignored) {}
+                System.out.println("🔄 配置已更新，正在重启...");
+                System.exit(HttpServerMain.EXIT_CODE_RESTART);
+            }).start();
+        }
+    }
+
+    static class ClearApiKeyHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+
+            String response = "{\"status\":\"success\", \"message\":\"API Key 已清除，程序即将重启...\"}";
+            byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+            exchange.close();
+
+            // 延迟退出，确保响应已发送
+            new Thread(() -> {
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException ignored) {}
+                System.out.println("🔑 API Key 已清除，正在重启...");
+                System.exit(HttpServerMain.EXIT_CODE_CLEAR_API_KEY);
+            }).start();
+        }
+    }
     // @anchor: httpserver_runHandler
     static class RunHandler implements HttpHandler {
         @Override
         public void handle(HttpExchange exchange) throws IOException {
+            // ===== 0. 提前检查 API Key 是否已被清除 =====
+            if (HttpServerMain.isApiKeyCleared()) {
+                String error = "{\"status\":\"error\", \"message\":\"API Key 已被清除，请设置环境变量 DEEPSEEK_API_KEY 后重启程序\"}";
+                byte[] bytes = error.getBytes(StandardCharsets.UTF_8);
+                exchange.getResponseHeaders().set("Content-Type", "application/json");
+                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+                exchange.sendResponseHeaders(403, bytes.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(bytes);
+                }
+                exchange.close();
+                return;
+            }
+
+            // 处理 OPTIONS 请求（CORS）
             if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
                 exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
                 exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -131,22 +220,25 @@ public class HttpServerMain {
                 return;
             }
 
+            // ===== 1. 解析请求体（此时 API Key 未被清除，可以安全解析） =====
             String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
             String userRequest;
-
-            int maxIterations = AgentConfig.MAX_ITERATIONS;
+            AgentConfig runConfig;
+            int maxIterations;
 
             try {
                 ObjectMapper mapper = new ObjectMapper();
                 JsonNode root = mapper.readTree(body);
                 userRequest = root.get("prompt").asText();
 
-                // 新增：读取 maxIterations，若无则使用默认值
+                runConfig = ConfigEditor.buildFromRequest(root);
+
+                maxIterations = AgentConfig.getDefaultMaxIterations();
                 if (root.has("maxIterations")) {
-                    maxIterations = root.get("maxIterations").asInt();
-                    // 安全限制：1~50
-                    if (maxIterations < 3) maxIterations = 3;
-                    if (maxIterations > 50) maxIterations = 50;
+                    int raw = root.get("maxIterations").asInt();
+                    if (raw >= 3 && raw <= 50) {
+                        maxIterations = raw;
+                    }
                 }
 
                 appendHistory(userRequest);
@@ -169,6 +261,7 @@ public class HttpServerMain {
 
             OutputStream out = exchange.getResponseBody();
 
+            // ===== 2. 校验 API Key（直接从环境变量读取） =====
             String apiKey = System.getenv("DEEPSEEK_API_KEY");
             if (apiKey == null || apiKey.isEmpty()) {
                 sendEvent(out, "[错误] 请设置环境变量 DEEPSEEK_API_KEY");
@@ -177,16 +270,17 @@ public class HttpServerMain {
                 return;
             }
 
-            // 新增：日志文件写入器
+            // 日志文件写入器
             LogFileWriter logWriter = null;
             try {
                 logWriter = new LogFileWriter(userRequest);
             } catch (IOException e) {
-                // 日志文件创建失败不影响主流程
                 System.err.println("⚠️ 无法创建日志文件: " + e.getMessage());
             }
 
-            Main agent = new Main(apiKey);
+            // 创建 Agent 实例，传入配置
+            Main agent = new Main(runConfig);
+
             synchronized (lock) {
                 if (currentAgent != null) {
                     currentAgent.stop();
@@ -195,13 +289,10 @@ public class HttpServerMain {
                 lastHeartbeatTime = System.currentTimeMillis();
             }
 
-
             final LogFileWriter finalLogWriter = logWriter;
             agent.setLogConsumer(msg -> {
                 try {
-                    // 1. 发送到前端（原有逻辑）
                     sendEvent(out, msg);
-                    // 2. 写入日志文件
                     if (finalLogWriter != null) {
                         try {
                             finalLogWriter.write(msg);
@@ -214,7 +305,7 @@ public class HttpServerMain {
                 }
             });
 
-            int finalMaxIterations = maxIterations;
+            final int finalMaxIterations = maxIterations;
             new Thread(() -> {
                 try {
                     String result = agent.run(userRequest, finalMaxIterations);
@@ -229,7 +320,6 @@ public class HttpServerMain {
                         ex.printStackTrace();
                     }
                 } finally {
-                    // 关闭日志文件
                     if (finalLogWriter != null) {
                         try {
                             finalLogWriter.close();
@@ -238,7 +328,6 @@ public class HttpServerMain {
                             System.err.println("⚠️ 关闭日志文件失败: " + e.getMessage());
                         }
                     }
-
                     synchronized (lock) {
                         if (currentAgent == agent) {
                             currentAgent = null;

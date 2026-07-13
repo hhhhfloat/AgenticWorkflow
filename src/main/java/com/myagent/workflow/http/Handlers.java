@@ -1,7 +1,9 @@
-package com.myagent.workflow;
+package com.myagent.workflow.http;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.core.ConfigEditor;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
@@ -323,7 +325,7 @@ public final class Handlers {
             }
 
             // 目标路径：TestProjects/目前版本/{projectName}
-            Path destDir = Paths.get("./TestProjects",AgentConfig.ARCHIVE_VERSION);
+            Path destDir = Paths.get("./TestProjects", AgentConfig.getArchiveVersion());
             if (!Files.exists(destDir)) {
                 Files.createDirectories(destDir);
             }
@@ -349,7 +351,7 @@ public final class Handlers {
                 }
                 // 递归复制
                 copyDirectory(src, dest);
-                sendResponse(exchange, 200, "{\"status\":\"success\", \"path\":\"TestProjects/" + AgentConfig.ARCHIVE_VERSION + "/" + projectName + "\"}");
+                sendResponse(exchange, 200, "{\"status\":\"success\", \"path\":\"TestProjects/" + AgentConfig.getArchiveVersion() + "/" + projectName + "\"}");
             } catch (IOException e) {
                 sendResponse(exchange, 500, "{\"status\":\"error\", \"message\":\"复制失败: " + e.getMessage() + "\"}");
             }
@@ -406,7 +408,7 @@ public final class Handlers {
     // ===================== 新增：文件上传处理器 =====================
     public static class UploadHandler implements HttpHandler {
         private static final int MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-        private static final Pattern SAFE_NAME = Pattern.compile("^[a-zA-Z0-9\\-_.]+$");
+        private static final Pattern SAFE_NAME = Pattern.compile("^(?!.*\\.\\.)[^\\\\/:*?\"<>|]+$");
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -545,27 +547,17 @@ public final class Handlers {
 
             String boundaryLine = "--" + boundary;
             String endBoundary = "--" + boundary + "--";
-            byte[] boundaryBytes = boundaryLine.getBytes(StandardCharsets.US_ASCII);
-            byte[] endBoundaryBytes = endBoundary.getBytes(StandardCharsets.US_ASCII);
 
             ByteArrayOutputStream buffer = new ByteArrayOutputStream();
             byte[] chunk = new byte[8192];
-            boolean readingHeader = true;
-            StringBuilder header = new StringBuilder();
-            boolean inFileContent = false;
-            String currentName = null;
-            String currentFilename = null;
-            ByteArrayOutputStream currentData = null;
-
             while (true) {
                 int read = inputStream.read(chunk);
                 if (read == -1) break;
-
-                // 简化实现：将整个请求读入内存处理
                 buffer.write(chunk, 0, read);
             }
 
             byte[] data = buffer.toByteArray();
+            // 使用 ISO-8859-1 解码整个请求体，因为 multipart 头部是 ASCII 兼容的
             String content = new String(data, StandardCharsets.ISO_8859_1);
 
             // 按 boundary 分割
@@ -584,32 +576,50 @@ public final class Handlers {
                 String filename = null;
                 for (String line : headers.split("\r\n")) {
                     if (line.startsWith("Content-Disposition:")) {
-                        // 提取 name 和 filename
-                        java.util.regex.Matcher m = java.util.regex.Pattern.compile("name=\"([^\"]*)\"").matcher(line);
-                        if (m.find()) name = m.group(1);
-                        m = java.util.regex.Pattern.compile("filename=\"([^\"]*)\"").matcher(line);
-                        if (m.find()) filename = m.group(1);
+                        // 1. 尝试匹配 filename*= （RFC 5987 编码）
+                        java.util.regex.Matcher m = java.util.regex.Pattern.compile("filename\\*=(?:UTF-8'')([^;]+)").matcher(line);
+                        if (m.find()) {
+                            String encoded = m.group(1);
+                            try {
+                                filename = java.net.URLDecoder.decode(encoded, StandardCharsets.UTF_8.name());
+                            } catch (Exception e) {
+                                // 解码失败，回退
+                                filename = encoded;
+                            }
+                        } else {
+                            // 2. 回退到 filename= （旧式，ISO-8859-1 编码）
+                            m = java.util.regex.Pattern.compile("filename=\"([^\"]*)\"").matcher(line);
+                            if (m.find()) {
+                                String raw = m.group(1);
+                                // 将 ISO-8859-1 字符串转回字节，再用 UTF-8 解码
+                                filename = new String(raw.getBytes(StandardCharsets.ISO_8859_1), StandardCharsets.UTF_8);
+                            }
+                        }
+
+                        // 提取 name
+                        m = java.util.regex.Pattern.compile("name=\"([^\"]*)\"").matcher(line);
+                        if (m.find()) {
+                            name = m.group(1);
+                        }
+                        break; // 已处理 Content-Disposition，跳出循环
                     }
                 }
 
                 if ("projectName".equals(name)) {
                     result.projectName = body.trim();
                 } else if (name != null && name.startsWith("files") && filename != null && !filename.isEmpty()) {
+                    // 处理文件内容（保持二进制数据）
+                    // 注意：body 是从 ISO-8859-1 字符串中截取的子串，需要转回字节
+                    byte[] fileBytes = body.getBytes(StandardCharsets.ISO_8859_1);
                     // 去掉末尾的 \r\n
-                    String fileContent = body;
-                    if (fileContent.endsWith("\r\n")) {
-                        fileContent = fileContent.substring(0, fileContent.length() - 2);
-                    }
-                    if (fileContent.endsWith("\n")) {
-                        fileContent = fileContent.substring(0, fileContent.length() - 1);
-                    }
-                    // 去掉可能的 trailing whitespace
-                    byte[] fileBytes = fileContent.getBytes(StandardCharsets.ISO_8859_1);
-                    // 去掉最后一个 \r\n（如果有）
                     int trimLen = fileBytes.length;
-                    while (trimLen > 0 && (fileBytes[trimLen-1] == '\r' || fileBytes[trimLen-1] == '\n')) {
+                    while (trimLen > 0 && (fileBytes[trimLen - 1] == '\r' || fileBytes[trimLen - 1] == '\n')) {
                         trimLen--;
                     }
+                    // 还需要去掉开头的 \r\n？通常 body 开头就是文件内容，没有多余换行，但为了安全，可以跳过
+                    // 如果 body 以 \r\n 开头，可能是因为前面有额外的换行，但一般不会
+                    // 这里保持原样
+
                     MultipartFile mf = new MultipartFile();
                     mf.fileName = filename;
                     mf.data = new ByteArrayInputStream(fileBytes, 0, trimLen);
@@ -619,7 +629,6 @@ public final class Handlers {
 
             return result;
         }
-
         private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
             byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json");
@@ -644,7 +653,7 @@ public final class Handlers {
 
     // ===================== 新增：创建项目文件夹处理器 =====================
     public static class CreateProjectHandler implements HttpHandler {
-        private static final Pattern SAFE_NAME = Pattern.compile("^[a-zA-Z0-9\\-_.]+$");
+        private static final Pattern SAFE_NAME = Pattern.compile("^(?!.*\\.\\.)[^\\\\/:*?\"<>|]+$");
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -787,7 +796,7 @@ public final class Handlers {
 
             // 构建配置 JSON
             Map<String, Object> config = new LinkedHashMap<>();
-            config.put("maxIterations", AgentConfig.MAX_ITERATIONS);
+            config.put("maxIterations", AgentConfig.getDefaultMaxIterations());
 
             String json = new ObjectMapper().writeValueAsString(config);
 
