@@ -39,8 +39,9 @@ public final class SystemPrompt {
         ## 操作流程
         1. 动手前：list_directory + read_file 了解现状。
         2. 动手后：compile_and_run 验证。
-        3. 出错：分析 → 修改 → 重验，直至成功。
-        4. 完成后：输出清晰文档。
+        3. 需要数据输入的程序：书写时代码层面重定向，用锚点包裹临时重定向代码（如重定向输入）→ 验证通过后 delete_between_anchors 移除，恢复干净版本。此时要相信自己，不得再调用compile_and_run
+        4. 出错：分析 → 修改 → 重验，直至成功。
+        5. 完成后：输出清晰文档。
 
         ## 主要工具速查
         - list_directory / read_file / write_java_file / delete_file

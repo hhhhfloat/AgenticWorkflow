@@ -41,12 +41,21 @@ public class AnchorManager {
             }
             index.remove(projectPath);
 
-            List<String> textExtensions = Arrays.asList(".java", ".html", ".htm", ".css", ".js", ".jsx", ".ts", ".tsx",
-                    ".txt", ".xml", ".json", ".md", ".properties", ".yml", ".yaml", ".sh", ".bat", ".gradle", ".sql");
+            List<String> textExtensions = Arrays.asList(
+                    ".java", ".html", ".htm", ".css", ".js", ".jsx", ".ts", ".tsx",
+                    ".txt", ".xml", ".json", ".md", ".properties", ".yml", ".yaml",
+                    ".sh", ".bat", ".gradle", ".sql",
+                    // 新增 C++ 和 Python
+                    ".cpp", ".cc", ".cxx", ".h", ".hpp", ".py", ".pyw"
+            );
             Map<String, List<Map<String, Object>>> projectAnchors = new HashMap<>();
 
             Pattern anchorPattern = Pattern.compile(
-                    "//\\s*@anchor:\\s*(\\w+)|/\\*\\s*@anchor:\\s*(\\w+)\\s*\\*/|<!--\\s*@anchor:\\s*(\\w+)\\s*-->");
+                    "//\\s*@anchor:\\s*(\\w+)|" +           // C++/Java/JS 单行
+                            "/\\*\\s*@anchor:\\s*(\\w+)\\s*\\*/|" + // C 风格多行
+                            "<!--\\s*@anchor:\\s*(\\w+)\\s*-->|" +  // HTML 注释
+                            "#\\s*@anchor:\\s*(\\w+)"               // Python 单行
+            );
 
             Files.walk(projectDir)
                     .filter(Files::isRegularFile)
@@ -65,9 +74,14 @@ public class AnchorManager {
                             for (int i = 0; i < lines.size(); i++) {
                                 java.util.regex.Matcher matcher = anchorPattern.matcher(lines.get(i));
                                 if (matcher.find()) {
-                                    String id = matcher.group(1);
-                                    if (id == null) id = matcher.group(2);
-                                    if (id == null) id = matcher.group(3);
+                                    String id = null;
+                                    for (int j = 1; j <= matcher.groupCount(); j++) {
+                                        String candidate = matcher.group(j);
+                                        if (candidate != null) {
+                                            id = candidate;
+                                            break;
+                                        }
+                                    }
                                     if (id != null) {
                                         Map<String, Object> anchor = new HashMap<>();
                                         anchor.put("id", id);

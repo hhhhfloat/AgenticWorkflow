@@ -386,7 +386,8 @@ public class HttpServerMain {
                 if (currentAgent != null) {
                     currentAgent.stop();
                     currentAgent = null;
-                    lastHeartbeatTime = System.currentTimeMillis();
+                    // 关键：将心跳时间置为 0，让监控线程立即判定超时
+                    lastHeartbeatTime = 0;
                     response = "{\"status\":\"stopped\", \"message\":\"已发送停止信号\"}";
                 } else {
                     response = "{\"status\":\"idle\", \"message\":\"没有正在运行的任务\"}";

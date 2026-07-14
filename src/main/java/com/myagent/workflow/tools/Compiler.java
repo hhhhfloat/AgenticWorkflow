@@ -36,7 +36,7 @@ public class Compiler {
     }
 
     // ==================== 自动检测调度器 ====================
-    public String compileAuto(Path filePath, String filename) {
+    public String compileAuto(Path filePath, String filename, boolean run) {
         try {
             if (filename.endsWith(".html") || filename.endsWith(".htm")) {
                 return previewHtml(filePath, filename);
@@ -46,22 +46,22 @@ public class Compiler {
             boolean isMavenProject = Files.exists(projectDir.resolve("pom.xml"));
 
             if (isMavenProject) {
-                return compileMaven(filePath);
+                return compileMaven(filePath, run);
             }
 
             if (filename.endsWith(".cpp") || filename.endsWith(".cc") || filename.endsWith(".cxx")) {
-                return compileAndRunCpp(filePath, filename);
+                return compileAndRunCpp(filePath, filename, run);
             }
 
             if (filename.endsWith(".py")) {
-                return runPython(filePath, filename);
+                return runPython(filePath, filename, run);
             }
 
             if (filename.endsWith(".js") && !filename.endsWith(".json")) {
-                return runNode(filePath, filename);
+                return runNode(filePath, filename, run);
             }
 
-            return compileJava(filePath, filename);
+            return compileJava(filePath, filename, run);
 
         } catch (IOException e) {
             logger.error("编译/运行过程异常", e);
@@ -93,8 +93,7 @@ public class Compiler {
     }
 
     // ==================== 单文件 Java 编译运行 ====================
-    // ==================== 单文件 Java 编译运行 ====================
-    public String compileJava(Path filePath, String filename) {
+    public String compileJava(Path filePath, String filename, boolean run) {
         try {
             // 1. 获取项目目录（源文件所在目录）
             Path projectDir = filePath.getParent();
@@ -117,6 +116,11 @@ public class Compiler {
 
             if (compileExit != 0) {
                 return "编译失败 (退出码 " + compileExit + "):\n" + compileOutput;
+            }
+
+            // 如果 run 为 false，只编译不运行
+            if (!run) {
+                return "✅ 编译成功（未运行）！\n输出:\n" + compileOutput;
             }
 
             // 4. 运行：从 classes 目录加载类
@@ -146,9 +150,8 @@ public class Compiler {
             return "单文件 Java 执行异常: " + e.getMessage();
         }
     }
-
     // ==================== Maven 编译（只编译，不运行）====================
-    public String compileMaven(Path filePath) throws IOException {
+    public String compileMaven(Path filePath, boolean run) throws IOException {
         Path projectDir = filePath.toAbsolutePath().normalize();
         if (!Files.isDirectory(projectDir)) {
             projectDir = projectDir.getParent();
@@ -160,9 +163,9 @@ public class Compiler {
         }
 
         try {
+            // 编译阶段
             ProcessBuilder compilePb = new ProcessBuilder(config.mavenCommand(), "clean", "compile");
             compilePb.environment().put("JAVA_HOME", config.javaHome());
-
             compilePb.directory(projectDir.toFile());
             compilePb.redirectErrorStream(true);
 
@@ -180,15 +183,45 @@ public class Compiler {
                 return "❌ Maven 编译失败 (退出码 " + compileExit + "):\n" + compileOutput;
             }
 
-            // 编译成功后，尝试自动运行
-            String mainClass = findMainClass(projectDir);
-            if (mainClass == null) {
-                return "✅ Maven 编译成功！但未找到包含 main 方法的类，无法运行。\n输出:\n" + compileOutput;
+            // 如果 run 为 false，只编译不运行
+            if (!run) {
+                return "✅ Maven 编译成功（未运行）！\n输出:\n" + compileOutput;
             }
 
+            // ===== 运行阶段 =====
+            // 检查是否为 JavaFX 项目
+            String pomContent = Files.readString(pomFile);
+            boolean isJavaFX = pomContent.contains("javafx-maven-plugin");
 
-            // 用 java -cp target/classes 运行
-            try {
+            if (isJavaFX) {
+                // JavaFX 项目：使用 mvn javafx:run
+                ProcessBuilder runPb = new ProcessBuilder(config.mavenCommand(), "javafx:run");
+                runPb.directory(projectDir.toFile());
+                runPb.redirectErrorStream(true);
+                runPb.environment().put("JAVA_HOME", config.javaHome());
+
+                Process runProc = runPb.start();
+                // 等待最多 5 秒检测是否启动成功（GUI 程序不会退出，所以超时即认为启动成功）
+                boolean started = runProc.waitFor(5, TimeUnit.SECONDS);
+                if (!started) {
+                    // 程序还在运行，视为启动成功
+                    // 注意：进程仍在后台运行，我们无法自动关闭它，但可以返回提示
+                    return "✅ JavaFX 应用已启动！\n" +
+                            "编译输出:\n" + compileOutput + "\n" +
+                            "窗口应该已弹出，请查看。\n" +
+                            "注意：该进程仍在后台运行，如需关闭请手动终止（Ctrl+C 或任务管理器）。";
+                } else {
+                    // 异常情况：程序退出了，可能有问题
+                    String runOutput = new String(runProc.getInputStream().readAllBytes());
+                    return "⚠️ JavaFX 应用启动后立即退出，可能有错误。\n输出:\n" + runOutput;
+                }
+            } else {
+                // 普通 Maven 项目：用 java -cp target/classes 运行
+                String mainClass = findMainClass(projectDir);
+                if (mainClass == null) {
+                    return "✅ Maven 编译成功！但未找到包含 main 方法的类，无法运行。\n输出:\n" + compileOutput;
+                }
+
                 Path classpath = projectDir.resolve("target/classes");
                 ProcessBuilder runPb = new ProcessBuilder(
                         "java", "-cp", classpath.toString(), mainClass
@@ -207,10 +240,8 @@ public class Compiler {
                 }
 
                 return "✅ Maven 编译运行成功！\n编译输出:\n" + compileOutput + "\n运行输出:\n" + runOutput;
-
-            } catch (IOException | InterruptedException e) {
-                return "✅ Maven 编译成功！但运行失败: " + e.getMessage();
             }
+
         } catch (IOException e) {
             return "❌ 执行 Maven 失败，请确认已安装 Maven 并配置 PATH 环境变量。\n" + e.getMessage();
         } catch (InterruptedException e) {
@@ -263,7 +294,7 @@ public class Compiler {
 
     // ==================== C++ 编译运行（MSVC）====================
     @SuppressWarnings("ConstantConditions")
-    public String compileAndRunCpp(Path filePath, String filename) {
+    public String compileAndRunCpp(Path filePath, String filename, boolean run) {
         try {
             String fileNameStr = filePath.getFileName().toString();
             String exeName = fileNameStr.replaceFirst("\\.(cpp|cc|cxx)$", ".exe");
@@ -305,6 +336,11 @@ public class Compiler {
                 return "❌ C++ 编译失败 (退出码 " + compileExit + "):\n" + compileOutput;
             }
 
+            // 如果 run 为 false，只编译不运行
+            if (!run) {
+                return "✅ C++ 编译成功（未运行）！\n输出:\n" + compileOutput;
+            }
+
             // 运行
             ProcessBuilder runPb = new ProcessBuilder(exePath.toString());
             runPb.directory(filePath.getParent().toFile());
@@ -334,10 +370,13 @@ public class Compiler {
             return "❌ C++ 执行异常: " + e.getMessage();
         }
     }
-
     // ==================== Python 解释执行 ====================
-    public String runPython(Path filePath, String filename) {
+    public String runPython(Path filePath, String filename, boolean run) {
         try {
+            if (!run) {
+                return "✅ Python 脚本已就绪（未运行）！\n文件: " + filename;
+            }
+
             ProcessBuilder pb = new ProcessBuilder(
                     config.pythonInterpreter(),
                     filePath.toString()
@@ -365,10 +404,14 @@ public class Compiler {
             return "❌ Python 执行异常: " + e.getMessage();
         }
     }
-
     // ==================== Node.js 解释执行 ====================
-    public String runNode(Path filePath, String filename) {
+
+    public String runNode(Path filePath, String filename, boolean run) {
         try {
+            if (!run) {
+                return "✅ Node.js 脚本已就绪（未运行）！\n文件: " + filename;
+            }
+
             ProcessBuilder pb = new ProcessBuilder(
                     config.nodeInterpreter(),
                     filePath.toString()
@@ -396,5 +439,4 @@ public class Compiler {
             return "❌ Node.js 执行异常: " + e.getMessage();
         }
     }
-
 }

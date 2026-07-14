@@ -49,10 +49,11 @@ public final class ToolDefinitions {
         // @anchor: toolDef_compileRun
         tools.add(defineTool(
                 "compile_and_run",
-                "验证并运行/预览沙箱目录下的文件。Agent 应根据项目结构明确指定 mode。支持模式：'html'、'java'、'maven'、'cpp'、'python'、'node'。不指定则自动检测。",
+                "编译并运行文件。Agent 可根据需要仅编译不运行。",
                 defineParams()
-                        .prop("filename", "string", "要执行的文件名或项目相对路径（例如 'Calculator.java' 或 'pom.xml' 所在的目录，如 'my-app'）")
-                        .prop("mode", "string", "编译模式：'html'（预览HTML）, 'java'（单文件Java编译运行）, 'maven'（Maven项目编译运行）, 'cpp'（C++编译运行）, 'python'（Python解释执行）, 'node'（Node.js解释执行）。默认自动检测。")
+                        .prop("filename", "string", "文件名或项目相对路径")
+                        .prop("mode", "string", "编译模式：html / java / maven / cpp / python / node，默认 auto")
+                        .prop("run", "boolean", "是否在编译后立即运行，默认 true。设为 false 可仅编译不运行")
                         .build(),
                 List.of("filename")
         ));

@@ -93,18 +93,22 @@ function stopAgent() {
     stopBtn.disabled = true;
     appendLog('[系统] 正在停止任务...');
 
+    // 立即停止心跳，防止后端时间被重置
+    stopHeartbeat();
+
     fetch(BASE_URL + '/stop', { method: 'POST' })
         .then(response => response.json())
         .then(data => {
-            appendLog('[系统] ' + data.message);
-            stopBtn.disabled = true;
-            runBtn.disabled = false;
-            isRunning = false;
-            stopHeartbeat();
-        })
+        appendLog('[系统] ' + data.message);
+        stopBtn.disabled = true;
+        runBtn.disabled = false;
+        isRunning = false;
+        // 强制刷新状态
+        finishRun();
+    })
         .catch(err => {
-            appendLog('[错误] 停止请求失败: ' + err.message);
-            stopBtn.disabled = false;
-            stopHeartbeat();
-        });
+        appendLog('[错误] 停止请求失败: ' + err.message);
+        stopBtn.disabled = false;
+        stopHeartbeat();
+    });
 }

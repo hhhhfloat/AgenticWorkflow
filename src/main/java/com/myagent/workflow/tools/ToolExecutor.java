@@ -49,7 +49,8 @@ public class ToolExecutor {
             case "compile_and_run":
                 String filename = (String) args.get("filename");
                 String mode = (String) args.getOrDefault("mode", "auto");
-                return compileAndRun(filename, mode);
+                boolean run = args.containsKey("run") ? (boolean) args.get("run") : true;
+                return compileAndRun(filename, mode, run);
             case "list_directory":
                 return fileOp.listDirectory(
                         (String) args.getOrDefault("path", "."),
@@ -104,25 +105,25 @@ public class ToolExecutor {
 
     // ==================== 工具 : compile_and_run ====================
 
-    private String compileAndRun(String filename, String mode) {
+    private String compileAndRun(String filename, String mode, boolean run) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
 
             if ("html".equalsIgnoreCase(mode)) {
                 return compiler.previewHtml(filePath, filename);
             } else if ("java".equalsIgnoreCase(mode)) {
-                return compiler.compileJava(filePath, filename);
+                return compiler.compileJava(filePath, filename, run);
             } else if ("maven".equalsIgnoreCase(mode)) {
-                return compiler.compileMaven(filePath);
+                return compiler.compileMaven(filePath, run); // 传递 run
             } else if ("cpp".equalsIgnoreCase(mode)) {
-                return compiler.compileAndRunCpp(filePath, filename);
+                return compiler.compileAndRunCpp(filePath, filename, run);
             } else if ("python".equalsIgnoreCase(mode)) {
-                return compiler.runPython(filePath, filename);
+                return compiler.runPython(filePath, filename, run);
             } else if ("node".equalsIgnoreCase(mode)) {
-                return compiler.runNode(filePath, filename);
+                return compiler.runNode(filePath, filename, run);
             } else {
-                // 默认 auto
-                return compiler.compileAuto(filePath, filename);
+                // auto 模式
+                return compiler.compileAuto(filePath, filename, run);
             }
         } catch (IOException e) {
             logger.error("编译运行异常", e);
