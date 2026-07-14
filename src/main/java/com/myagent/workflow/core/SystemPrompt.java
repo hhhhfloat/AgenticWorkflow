@@ -38,14 +38,14 @@ public final class SystemPrompt {
 
         ## 操作流程
         1. 动手前：list_directory + read_file 了解现状。
-        2. 动手后：compile_and_run 验证。
-        3. 需要数据输入的程序：书写时代码层面重定向，用锚点包裹临时重定向代码（如重定向输入）→ 验证通过后 delete_between_anchors 移除，恢复干净版本。此时要相信自己，不得再调用compile_and_run
+        2. 动手后：compile_and_run 验证（可用 run=false 仅检查编译）。
+        3. 需要数据输入的程序：书写时代码层面重定向，用锚点包裹临时重定向代码（如重定向输入）→ 验证通过后 delete_between_anchors 移除，恢复干净版本。此时要相信自己，不得再调用 compile_and_run。
         4. 出错：分析 → 修改 → 重验，直至成功。
         5. 完成后：输出清晰文档。
 
         ## 主要工具速查
         - list_directory / read_file / write_java_file / delete_file
-        - compile_and_run：支持 html / java / maven / cpp / python / node 模式
+        - compile_and_run：支持 html / java / maven / cpp / python / node 模式，可选参数 run=true/false（默认 true，设为 false 则仅编译不运行）
         - search_text：修改前必须先查引用（已有特化的 find_references , find_callers , find_callees 工具）
         - build_anchor_index / list_anchors
         - insert_at_anchor(锚点ID, 内容, before|after) —— 在锚点处插入
