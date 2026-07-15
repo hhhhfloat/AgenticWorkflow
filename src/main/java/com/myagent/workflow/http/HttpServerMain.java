@@ -5,12 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.AgentConfig;
 import com.myagent.workflow.core.ConfigEditor;
 import com.myagent.workflow.core.Main;
+import com.myagent.workflow.tools.ToolExecutor;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.*;
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedByInterruptException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -18,6 +20,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Executors;
@@ -94,6 +97,9 @@ public class HttpServerMain {
         server.createContext("/config", new Handlers.ConfigHandler());
         server.createContext("/clear-api-key", new ClearApiKeyHandler());
         server.createContext("/restart", new RestartHandler());
+        // 在 main() 方法中，其他 server.createContext 后面添加
+        server.createContext("/project-meta", new ProjectMetaHandler());
+        server.createContext("/runProject", new RunProjectHandler());
 
         // 静态资源
         server.createContext("/", new Handlers.StaticHandler());
@@ -131,6 +137,116 @@ public class HttpServerMain {
     }
 
     // ===================== 内部 Handler 类 =====================
+
+    // ===================== 项目执行处理器 =====================
+    static class RunProjectHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            ObjectMapper mapper = new ObjectMapper();
+            JsonNode root;
+            String filename, mode;
+
+            try {
+                root = mapper.readTree(body);
+                filename = root.get("filename").asText();
+                mode = root.get("mode").asText();
+            } catch (Exception e) {
+                sendJsonResponse(exchange, 400, "{\"error\":\"请求格式错误: " + e.getMessage() + "\"}");
+                return;
+            }
+
+            if (filename == null || filename.isEmpty() || mode == null || mode.isEmpty()) {
+                sendJsonResponse(exchange, 400, "{\"error\":\"缺少必要参数: filename, mode\"}");
+                return;
+            }
+
+            // 安全检查：禁止路径穿越
+            if (filename.contains("..")) {
+                sendJsonResponse(exchange, 403, "{\"error\":\"路径非法\"}");
+                return;
+            }
+
+            try {
+                AgentConfig config = ConfigEditor.buildFromRequest(root);
+                ToolExecutor executor = new ToolExecutor(config, new ObjectMapper());
+
+                // ✅ 直接使用注册表中的参数，原样调用 compile_and_run
+                Map<String, Object> args = new HashMap<>();
+                args.put("filename", filename);
+                args.put("mode", mode);
+                args.put("run", true);
+
+                String result = executor.dispatch("compile_and_run", args);
+
+                Map<String, Object> response = new LinkedHashMap<>();
+                response.put("status", "success");
+                response.put("output", result);
+                String json = mapper.writeValueAsString(response);
+                sendJsonResponse(exchange, 200, json);
+
+            } catch (Exception e) {
+                Map<String, Object> errorResponse = new LinkedHashMap<>();
+                errorResponse.put("status", "error");
+                errorResponse.put("error", e.getMessage());
+                String json = mapper.writeValueAsString(errorResponse);
+                sendJsonResponse(exchange, 500, json);
+            }
+        }
+    }
+    // ===================== 项目注册表查询处理器 =====================
+    static class ProjectMetaHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+
+            // 解析查询参数
+            String query = exchange.getRequestURI().getQuery();
+            Map<String, String> params = parseQuery(query);
+            String path = params.get("path");
+
+            if (path == null || path.isEmpty()) {
+                sendJsonResponse(exchange, 400, "{\"error\":\"缺少 path 参数\"}");
+                return;
+            }
+
+            // 安全检查：只允许 sandbox/ 和 TestProjects/
+            if (!path.startsWith("sandbox/") && !path.startsWith("TestProjects/")) {
+                sendJsonResponse(exchange, 403, "{\"error\":\"路径非法\"}");
+                return;
+            }
+
+            // 防止路径穿越
+            if (path.contains("..")) {
+                sendJsonResponse(exchange, 403, "{\"error\":\"路径非法\"}");
+                return;
+            }
+
+            Path projectDir = Paths.get(path).normalize();
+            Path metaFile = projectDir.resolve(".agent_entry.json");
+
+            if (Files.exists(metaFile) && Files.isRegularFile(metaFile)) {
+                try {
+                    String content = Files.readString(metaFile, StandardCharsets.UTF_8);
+                    // 验证是否是有效的 JSON
+                    new ObjectMapper().readTree(content);
+                    sendJsonResponse(exchange, 200, content);
+                } catch (Exception e) {
+                    sendJsonResponse(exchange, 500, "{\"error\":\"读取注册表失败: " + e.getMessage() + "\"}");
+                }
+            } else {
+                sendJsonResponse(exchange, 200, "{\"exists\":false}");
+            }
+        }
+    }
 
     static class RestartHandler implements HttpHandler {
         @Override
@@ -300,7 +416,9 @@ public class HttpServerMain {
                             System.err.println("⚠️ 写入日志失败: " + e.getMessage());
                         }
                     }
-                } catch (IOException e) {
+                } catch(ClosedByInterruptException e){
+                    System.out.println("⏹ 任务已停止，停止发送日志");
+                }catch (IOException e) {
                     e.printStackTrace();
                 }
             });
@@ -312,7 +430,15 @@ public class HttpServerMain {
                     sendEvent(out, "[完成] " + result);
                     sendEvent(out, "[结束]");
                     out.close();
-                } catch (Exception e) {
+                } catch(ClosedByInterruptException e){
+                    try {
+                        sendEvent(out, "[结束]");
+                        out.close();
+                    }catch (IOException ignored){
+
+                    }
+                }
+                catch (Exception e) {
                     try {
                         sendEvent(out, "[错误] " + e.getMessage());
                         out.close();
@@ -363,6 +489,9 @@ public class HttpServerMain {
         }
 
         private void sendEvent(OutputStream out, String data) throws IOException {
+            if(Thread.interrupted()){
+                return;
+            }
             String event = "data: " + data.replace("\n", "\\n") + "\n\n";
             out.write(event.getBytes(StandardCharsets.UTF_8));
             out.flush();
@@ -446,6 +575,38 @@ public class HttpServerMain {
             }
         }, "HeartbeatMonitor").start();
     }
+
+    // ===================== 公共辅助方法 =====================
+
+    /**
+     * 解析查询字符串为 Map
+     */
+    private static Map<String, String> parseQuery(String query) {
+        Map<String, String> params = new HashMap<>();
+        if (query == null || query.isEmpty()) {
+            return params;
+        }
+        for (String pair : query.split("&")) {
+            String[] kv = pair.split("=", 2);
+            if (kv.length == 2) {
+                params.put(kv[0], kv[1]);
+            }
+        }
+        return params;
+    }
+
+    /**
+     * 发送 JSON 响应
+     */
+    private static void sendJsonResponse(HttpExchange exchange, int statusCode, String json) throws IOException {
+        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+        exchange.getResponseHeaders().set("Content-Type", "application/json");
+        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+        exchange.sendResponseHeaders(statusCode, bytes.length);
+        try (OutputStream os = exchange.getResponseBody()) {
+            os.write(bytes);
+        }
+    }
 }
 
 /**
@@ -516,4 +677,7 @@ class LogFileWriter implements AutoCloseable {
     public Path getLogFilePath() {
         return logFile;
     }
+
+
+
 }

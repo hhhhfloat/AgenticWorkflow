@@ -37,8 +37,8 @@ public final class ToolDefinitions {
 
         // @anchor: toolDef_writeFile
         tools.add(defineTool(
-                "write_java_file",
-                "将源代码（Java 或 HTML/CSS/JS）写入沙箱目录下的指定文件。如果文件已存在则覆盖。",
+                "write_file",
+                "将源代码（Java/TML/CSS/JS/Python/C++）写入沙箱目录下的指定文件。如果文件已存在则覆盖。",
                 defineParams()
                         .prop("filename", "string", "文件名，例如 Tool.java （必须包含 .java 后缀）")
                         .prop("code", "string", "完整的 Java 源代码（包括 package 声明）")

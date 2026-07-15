@@ -172,6 +172,9 @@ html, body {
     flex-shrink: 0;
     transition: width 0.25s ease;
     overflow: hidden;
+    user-select: none;          /* 禁止选中文字 */
+    -webkit-user-select: none;  /* Safari/Chrome 兼容 */
+    -moz-user-select: none;     /* Firefox 兼容 */
 }
 
 /* 折叠状态：宽度收窄到 40px，内容隐藏 */
@@ -229,14 +232,26 @@ html, body {
 
 /* ===== 树子节点（后续步骤动态生成，先占位样式） ===== */
 .tree-item {
-    padding: 2px 8px 2px 20px;
-    cursor: pointer;
-    font-size: 13px;
-    color: #d4d4d4;
-    line-height: 1.8;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 4px;                /* 元素间距 */
+    padding: 2px 4px;
+    cursor: pointer;
+    min-width: 0;            /* 防止 flex 溢出 */
+}
+
+/* 名称区域：可收缩，超出显示省略号 */
+.tree-item .node-label {
+    flex: 1 1 auto;          /* 可伸缩 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;            /* 关键：防止文本撑开父容器 */
+}
+/* 操作按钮：不收缩 */
+.tree-action-btn {
+    flex-shrink: 0;          /* 不收缩 */
+    /* 保留原有样式 */
 }
 .tree-item:hover {
     background: #2d2d2d;

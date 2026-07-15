@@ -45,6 +45,7 @@ function renderTreeNode(path, container, isRoot = false, hasIndexHtml = false, i
     const nameSpan = document.createElement('span');
     nameSpan.className = 'node-label';
     nameSpan.textContent = displayName;
+    nameSpan.title = displayName;
     label.appendChild(nameSpan);
 
     // ---- 如果是 sandbox 根节点，添加操作按钮 ----
@@ -84,13 +85,46 @@ function renderTreeNode(path, container, isRoot = false, hasIndexHtml = false, i
         label.appendChild(badge);
     }
 
-    // ---- 如果是 sandbox 下的一级子目录，添加归档按钮和上传按钮 ----
+    // ---- 如果是 sandbox 下的一级子目录，添加归档、上传和运行按钮 ----
     const parts = path.split('/');
     const isSandboxProject = parts.length === 2 && parts[0] === 'sandbox';
     if (isSandboxProject) {
         const projectName = parts[1];
 
-        // 归档按钮
+        // ===== 1. 查询注册表，决定是否显示运行按钮 =====
+        // 使用一个立即执行的异步函数，不影响渲染
+        (async () => {
+            try {
+                const metaRes = await fetch(`/project-meta?path=sandbox/${projectName}`);
+                const meta = await metaRes.json();
+
+                // 如果存在注册信息，添加运行按钮
+                if (meta.exists !== false) {
+                    const runBtn = document.createElement('button');
+                    runBtn.className = 'tree-action-btn';
+                    runBtn.title = `▶ 运行 ${projectName}`;
+                    runBtn.textContent = '▶';
+                    runBtn.dataset.project = projectName;
+                    runBtn.dataset.entryFile = meta.filename;
+                    runBtn.dataset.mode = meta.mode;
+                    runBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        // 调用 runner.js 中的函数
+                        if (typeof runRegisteredProject === 'function') {
+                            await runRegisteredProject(projectName, meta.filename, meta.mode, 'TestProjects');
+                        } else {
+                            appendLog('[系统] ❌ runner.js 未加载，无法运行项目');
+                        }
+                    });
+                    label.appendChild(runBtn);
+                }
+            } catch (err) {
+                // 静默失败，不显示运行按钮
+                console.warn('查询项目注册信息失败:', err);
+            }
+        })();
+
+        // ===== 2. 归档按钮（原有） =====
         const archiveBtn = document.createElement('button');
         archiveBtn.className = 'tree-action-btn';
         archiveBtn.title = '📦 归档此项目到 TestProjects';
@@ -102,7 +136,7 @@ function renderTreeNode(path, container, isRoot = false, hasIndexHtml = false, i
         });
         label.appendChild(archiveBtn);
 
-        // 上传文件按钮
+        // ===== 3. 上传按钮（原有） =====
         const uploadBtn = document.createElement('button');
         uploadBtn.className = 'tree-action-btn';
         uploadBtn.title = '📤 上传文件到此项目';
@@ -147,17 +181,43 @@ function renderTreeNode(path, container, isRoot = false, hasIndexHtml = false, i
     childrenContainer.style.display = 'none';
     wrapper.appendChild(childrenContainer);
 
-    // ---- 判断是否为项目入口（TestProjects + 含 index.html） ----
-    const isProjectEntry = !isRoot && isTestProjects && hasIndexHtml;
+    // ---- 如果是 TestProjects 下的一级子目录，添加运行按钮 ----
+    const isTestProjectsProject = parts.length === 3 && parts[0] === 'TestProjects';
+    if (isTestProjectsProject) {
+        const projectName = parts[2]; // 项目名
 
-    // ---- 点击事件：项目入口 → 打开预览，否则 → 展开/折叠 ----
+        (async () => {
+            try {
+                const metaRes = await fetch(`/project-meta?path=${encodeURIComponent(path)}`);
+                const meta = await metaRes.json();
+                if (meta.exists !== false) {
+                    const runBtn = document.createElement('button');
+                    runBtn.className = 'tree-action-btn';
+                    runBtn.title = `▶ 运行 ${projectName}`;
+                    runBtn.textContent = '▶';
+                    runBtn.dataset.project = projectName;
+                    runBtn.dataset.entryFile = meta.filename;
+                    runBtn.dataset.mode = meta.mode;
+                    runBtn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        if (typeof runRegisteredProject === 'function') {
+                            // 传入完整的路径作为 displayPath
+                            await runRegisteredProject(projectName, meta.filename, meta.mode, path);
+                        } else {
+                            appendLog('[系统] ❌ runner.js 未加载，无法运行项目');
+                        }
+                    });
+                    label.appendChild(runBtn);
+                }
+            } catch (err) {
+                console.warn('查询 TestProjects 项目注册信息失败:', err);
+            }
+        })();
+    }
+
+
     label.addEventListener('click', async (e) => {
         e.stopPropagation();
-
-        if (isProjectEntry) {
-            openProjectPreview(path);
-            return;
-        }
 
         const isHidden = childrenContainer.style.display === 'none';
 
@@ -224,6 +284,7 @@ function renderFileNode(filePath, fileName, container) {
     const nameSpan = document.createElement('span');
     nameSpan.className = 'node-label';
     nameSpan.textContent = fileName;
+    nameSpan.title = fileName;
     fileDiv.appendChild(nameSpan);
 
     fileDiv.addEventListener('click', (e) => {
@@ -234,18 +295,6 @@ function renderFileNode(filePath, fileName, container) {
     container.appendChild(fileDiv);
 }
 
-/**
- * 打开项目预览（TestProjects 下含 index.html 的目录）
- */
-function openProjectPreview(projectPath) {
-    if (!projectPath.startsWith('TestProjects/')) {
-        appendLog('[系统] 非 TestProjects 项目，无法预览');
-        return;
-    }
-    const url = '/' + projectPath + '/index.html';
-    appendLog(`[系统] 打开项目预览: ${url}`);
-    window.open(url, '_blank');
-}
 
 /**
  * 处理文件点击

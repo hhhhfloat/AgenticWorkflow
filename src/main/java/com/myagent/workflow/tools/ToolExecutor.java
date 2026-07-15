@@ -6,7 +6,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -44,12 +48,12 @@ public class ToolExecutor {
      */
     public String dispatch(String functionName, Map<String, Object> args) throws IOException {
         switch (functionName) {
-            case "write_java_file":
+            case "write_file":
                 return fileOp.writeFile((String) args.get("filename"), (String) args.get("code"));
             case "compile_and_run":
                 String filename = (String) args.get("filename");
                 String mode = (String) args.getOrDefault("mode", "auto");
-                boolean run = args.containsKey("run") ? (boolean) args.get("run") : true;
+                boolean run = !args.containsKey("run") || (boolean) args.get("run");
                 return compileAndRun(filename, mode, run);
             case "list_directory":
                 return fileOp.listDirectory(
@@ -108,26 +112,82 @@ public class ToolExecutor {
     private String compileAndRun(String filename, String mode, boolean run) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
+            String result;
 
             if ("html".equalsIgnoreCase(mode)) {
-                return compiler.previewHtml(filePath, filename);
+                result = compiler.previewHtml(filePath, filename);
             } else if ("java".equalsIgnoreCase(mode)) {
-                return compiler.compileJava(filePath, filename, run);
+                result = compiler.compileJava(filePath, filename, run);
             } else if ("maven".equalsIgnoreCase(mode)) {
-                return compiler.compileMaven(filePath, run); // 传递 run
+                result = compiler.compileMaven(filePath, run);
             } else if ("cpp".equalsIgnoreCase(mode)) {
-                return compiler.compileAndRunCpp(filePath, filename, run);
+                result = compiler.compileAndRunCpp(filePath, filename, run);
             } else if ("python".equalsIgnoreCase(mode)) {
-                return compiler.runPython(filePath, filename, run);
+                result = compiler.runPython(filePath, filename, run);
             } else if ("node".equalsIgnoreCase(mode)) {
-                return compiler.runNode(filePath, filename, run);
+                result = compiler.runNode(filePath, filename, run);
             } else {
-                // auto 模式
-                return compiler.compileAuto(filePath, filename, run);
+                result = compiler.compileAuto(filePath, filename, run);
             }
+
+            // ✨ 调试输出：打印 result 开头
+            System.out.println("🔍 compileAndRun 返回结果开头: " + result.substring(0, Math.min(50, result.length())));
+
+            if (!isErrorResult(result)) {
+                System.out.println("✅ 编译/运行成功，准备写入注册表");
+                Path projectDir = filePath.getParent();
+                if (Files.isDirectory(filePath)) {
+                    projectDir = filePath;
+                }
+                Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();  // ← 加 toAbsolutePath()
+
+                System.out.println("🔍 路径信息:");
+                System.out.println("  projectDir = " + projectDir);
+                System.out.println("  sandboxRoot = " + sandboxRoot);
+                System.out.println("  startsWith? = " + (projectDir != null && projectDir.startsWith(sandboxRoot)));
+
+                if (projectDir != null && projectDir.startsWith(sandboxRoot)) {
+                    writeEntryFile(projectDir, filename, mode);
+                } else {
+                    System.out.println("⚠️ 路径检查未通过，跳过写入");
+                }
+            }
+
+            return result;
+
         } catch (IOException e) {
             logger.error("编译运行异常", e);
             return "编译运行异常: " + e.getMessage();
+        }
+    }
+
+    // 辅助判断：检查结果是否包含错误标识
+    private boolean isErrorResult(String result) {
+        if (result == null) return true;
+        // 不再检查 "error"，因为编译输出可能包含它但编译是成功的
+        return result.startsWith("❌") ||
+                result.contains("失败") ||
+                result.contains("超时") ||
+                result.contains("未找到") ||
+                result.contains("exception");
+    }
+
+    // 写入注册表
+    private void writeEntryFile(Path projectDir, String filename, String mode) {
+        try {
+            Path entryFile = projectDir.resolve(".agent_entry.json");
+            System.out.println("📝 正在写入注册表: " + entryFile);
+
+            Map<String, String> meta = new LinkedHashMap<>();
+            meta.put("filename", filename);
+            meta.put("mode", mode);
+            String json = new ObjectMapper().writeValueAsString(meta);
+            Files.writeString(entryFile, json, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+            System.out.println("✅ 注册表写入成功");
+        } catch (IOException e) {
+            System.err.println("❌ 注册表写入失败: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
