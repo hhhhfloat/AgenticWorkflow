@@ -206,10 +206,6 @@ public class Main {
 
                     String result = toolExecutor.dispatch(functionName, args);
 
-                    if (result != null && result.contains("用户已停止任务")) {
-                        throw new IOException("用户手动停止了任务");
-                    }
-
                     // 将工具结果添加到对话
                     Map<String, Object> toolMsg = new HashMap<>();
                     toolMsg.put("role", "tool");
