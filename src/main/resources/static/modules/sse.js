@@ -6,7 +6,6 @@ function runAgent(prompt, maxIterations) {
     isRunning = true;
     runBtn.disabled = true;
     stopBtn.disabled = false;
-    startHeartbeat();
 
     // 获取完整配置
     const settings = getEffectiveSettings ? getEffectiveSettings() : {};
@@ -82,7 +81,6 @@ function finishRun() {
     runBtn.disabled = false;
     stopBtn.disabled = true;
     isRunning = false;
-    stopHeartbeat();
     refreshSandbox();
 }
 

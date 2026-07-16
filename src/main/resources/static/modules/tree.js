@@ -6,7 +6,7 @@
  */
 async function fetchDir(path) {
     const url = `/browse?path=${encodeURIComponent(path)}`;
-    const res = await fetch(url);
+    const res = await fetch(url, {cache : 'no-cache'});
     if (!res.ok) {
         throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     }
@@ -368,4 +368,61 @@ function clearCacheRecursively(container) {
             clearCacheRecursively(childContainer);
         }
     });
+}
+
+// @anchor: modules_tree_helpers
+// ===== 树刷新状态保持辅助函数 =====
+
+/**
+ * 收集容器中所有已展开的目录路径
+ * @param {HTMLElement} container - 搜索的根容器
+ * @returns {string[]} 已展开的路径数组
+ */
+function getExpandedPaths(container) {
+    const paths = [];
+    const nodes = container.querySelectorAll('.tree-node');
+    nodes.forEach(node => {
+        const cc = node.querySelector('.tree-children');
+        if (cc && cc.style.display === 'block') {
+            paths.push(node.dataset.path);
+        }
+    });
+    return paths;
+}
+
+/**
+ * 异步逐级展开指定路径的树节点
+ * 例如传入 "sandbox/project1/src"，会依次展开 sandbox、sandbox/project1、sandbox/project1/src
+ * @param {string} path - 要展开的完整路径
+ * @param {HTMLElement} container - 查找的根容器
+ * @returns {Promise<boolean>} 是否成功展开
+ */
+async function expandPath(path, container) {
+    const parts = path.split('/');
+    let currentPath = '';
+
+    for (const part of parts) {
+        currentPath = currentPath ? currentPath + '/' + part : part;
+
+        const node = container.querySelector(`.tree-node[data-path="${currentPath}"]`);
+        if (!node) return false;
+
+        const childrenContainer = node.querySelector('.tree-children');
+        if (!childrenContainer) continue; // 文件节点，无子节点，跳过
+
+        // 已经展开则跳过点击
+        if (childrenContainer.style.display === 'block') continue;
+
+        const label = node.querySelector('.tree-item');
+        if (!label) return false;
+
+        label.click();
+
+        // 等待异步加载完成（最多等待 5 秒）
+        for (let i = 0; i < 50; i++) {
+            await new Promise(r => setTimeout(r, 100));
+            if (childrenContainer.dataset.loaded === 'true') break;
+        }
+    }
+    return true;
 }

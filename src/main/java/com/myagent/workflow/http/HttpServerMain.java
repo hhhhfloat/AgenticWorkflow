@@ -20,9 +20,7 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
 
@@ -45,6 +43,8 @@ public class HttpServerMain {
 
     // @anchor: httpserver_exitCodes
     /** 用户主动清除 API Key，需要删除环境变量并重启 */
+    public static final int EXIT_CODE_NO_API = 10;
+
     public static final int EXIT_CODE_CLEAR_API_KEY = 42;
 
     /** 用户修改了配置，需要重启（不删除环境变量） */
@@ -63,11 +63,11 @@ public class HttpServerMain {
         String apiKey = System.getenv("DEEPSEEK_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {
             System.err.println("❌ 未设置 DEEPSEEK_API_KEY 环境变量");
-            System.exit(10);
+            System.exit(EXIT_CODE_NO_API);
         }
         if (!Main.checkApiKey(apiKey)) {
             System.err.println("❌ API Key 无效，请检查是否正确");
-            System.exit(10);
+            System.exit(EXIT_CODE_NO_API);
         }
 
 
@@ -100,6 +100,7 @@ public class HttpServerMain {
         // 在 main() 方法中，其他 server.createContext 后面添加
         server.createContext("/project-meta", new ProjectMetaHandler());
         server.createContext("/runProject", new RunProjectHandler());
+
 
         // 静态资源
         server.createContext("/", new Handlers.StaticHandler());
@@ -418,7 +419,7 @@ public class HttpServerMain {
                     }
                 } catch(ClosedByInterruptException e){
                     System.out.println("⏹ 任务已停止，停止发送日志");
-                }catch (IOException e) {
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
             });
@@ -437,8 +438,7 @@ public class HttpServerMain {
                     }catch (IOException ignored){
 
                     }
-                }
-                catch (Exception e) {
+                } catch (Exception e) {
                     try {
                         sendEvent(out, "[错误] " + e.getMessage());
                         out.close();
@@ -532,18 +532,76 @@ public class HttpServerMain {
 
     // @anchor: httpserver_heartbeatHandler
     static class HeartbeatHandler implements HttpHandler {
+        // 存储上次的哈希值（静态，跨请求保持）
+        private static String lastSandboxHash = null;
+        private static String lastTestProjectsHash = null;
+
         @Override
         public void handle(HttpExchange exchange) throws IOException {
             if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
                 exchange.sendResponseHeaders(405, -1);
                 return;
             }
+
+            // 更新心跳时间（保持原有功能）
             synchronized (lock) {
                 lastHeartbeatTime = System.currentTimeMillis();
             }
+
+            // 检查目录变化
+            String sbHash = computeHash("sandbox");
+            String tpHash = computeHash("TestProjects");
+            Main.logIf(sbHash + '\n'+ tpHash);
+            boolean needRefresh = false;
+
+            // 只有两个目录都扫描完成才比较（避免空值误判）
+            if (sbHash != null && tpHash != null) {
+                if (!Objects.equals(sbHash, lastSandboxHash) || !Objects.equals(tpHash, lastTestProjectsHash)) {
+                    needRefresh = true;
+                    lastSandboxHash = sbHash;
+                    lastTestProjectsHash = tpHash;
+                    System.out.println("🔄 心跳检测到目录变化，通知前端刷新");
+                }
+            } else {
+                // 首次运行，只记录哈希，不触发刷新
+                if (sbHash != null) lastSandboxHash = sbHash;
+                if (tpHash != null) lastTestProjectsHash = tpHash;
+            }
+
+            // 返回 JSON 响应
+            String response = "{\"refresh\":" + needRefresh + "}";
+            byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
             exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-            exchange.sendResponseHeaders(200, -1);
-            exchange.close();
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        }
+
+        private String computeHash(String dir) {
+            Path target = Paths.get("./" + dir);
+            if (!Files.exists(target) || !Files.isDirectory(target)) {
+                return null;
+            }
+            try (Stream<Path> stream = Files.list(target)) {
+                StringBuilder sb = new StringBuilder();
+                stream.sorted(Comparator.comparing(p -> p.getFileName().toString()))
+                        .forEach(p -> {
+                            try {
+                                sb.append(p.getFileName().toString());
+                                sb.append("|");
+                                sb.append(Files.getLastModifiedTime(p).toMillis());
+                                sb.append(";");
+                            } catch (IOException ignored) {}
+                        });
+                if (sb.length() == 0) {
+                    return "";
+                }
+                return Integer.toHexString(sb.toString().hashCode());
+            } catch (IOException e) {
+                return null;
+            }
         }
     }
 
@@ -677,7 +735,5 @@ class LogFileWriter implements AutoCloseable {
     public Path getLogFilePath() {
         return logFile;
     }
-
-
 
 }

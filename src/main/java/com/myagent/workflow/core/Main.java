@@ -29,7 +29,7 @@ public class Main {
     private final String apiKey;
     private final ToolExecutor toolExecutor;
 
-    private Consumer<String> logConsumer = null;
+    private static Consumer<String> logConsumer = null;
     private volatile boolean stopRequested = false;
 
     private final AgentConfig runConfig;
@@ -261,8 +261,9 @@ public class Main {
     }
 
     // @anchor: main_logIf
-    private void logIf(String message) {
+    public static void logIf(String message) {
         if (logConsumer != null) {
+            System.out.println("consumed");
             logConsumer.accept(message);
         } else {
             logger.info(message);

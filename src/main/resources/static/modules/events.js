@@ -35,7 +35,7 @@ window.addEventListener('beforeunload', () => {
 document.addEventListener('visibilitychange', function() {
     if (!document.hidden) {
         console.log('🔄 页面回到前台，立即发送心跳续命...');
-        fetch(BASE_URL + '/heartbeat', { method: 'POST' }).catch(() => {});
+        sendHeartbeat();
     }
 });
 
@@ -74,4 +74,5 @@ document.addEventListener('DOMContentLoaded', function() {
         if (val > 50) val = 50;
         this.value = val;
     });
+    startHeartbeat();
 });
