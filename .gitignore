@@ -46,4 +46,5 @@ HttpServer.xml
 Main.xml
 start.bat
 
-!TestProjects/
+TestProjects/
+HistoryOutput/
