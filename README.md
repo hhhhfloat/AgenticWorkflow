@@ -39,6 +39,7 @@
 
 **v2.2** — 原子工具链完善（`find_references`、`delete_between_anchors`）
 **v3.3** — 多语言编译支持，前端优化
+**v3.4** — 忘记了更新了啥
 
 ## 技术栈
 

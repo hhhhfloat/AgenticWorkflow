@@ -16,7 +16,7 @@ public record AgentConfig(
         String mingwCompiler
 ) {
     // ===== 系统级常量（静态） =====
-    private static final String ARCHIVE_VERSION = "v3_0";
+    private static final String ARCHIVE_VERSION = "v3_4";
     private static final String SANDBOX_DIR = "./sandbox";
     private static final String ANCHOR_INDEX_FILE = "./sandbox/.anchor_index.json";
     private static final String API_URL = "https://api.deepseek.com/chat/completions";
