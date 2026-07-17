@@ -42,6 +42,8 @@ public class HttpServerMain {
     private static final Object lock = new Object();
 
     // @anchor: httpserver_exitCodes
+
+
     /** 用户主动清除 API Key，需要删除环境变量并重启 */
     public static final int EXIT_CODE_NO_API = 10;
 
@@ -49,6 +51,9 @@ public class HttpServerMain {
 
     /** 用户修改了配置，需要重启（不删除环境变量） */
     public static final int EXIT_CODE_RESTART = 43;
+
+    // 检测到有其他进程
+    public static final int EXIT_CODE_EXISTED_THREAD = 12;
 
     // 在 HttpServerMain 类中
     private static volatile boolean apiKeyClearedByUser = false;
@@ -81,60 +86,67 @@ public class HttpServerMain {
             }
         }
 
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
+        HttpServer server;
 
-        // 业务接口
-        server.createContext("/run", new RunHandler());
-        server.createContext("/stop", new StopHandler());
-        server.createContext("/heartbeat", new HeartbeatHandler());
-        server.createContext("/projects", new Handlers.ProjectsHandler());
-        server.createContext("/browse", new Handlers.BrowseHandler());
-        server.createContext("/archive", new Handlers.ArchiveHandler());
-        server.createContext("/upload", new Handlers.UploadHandler());
-        server.createContext("/createProject", new Handlers.CreateProjectHandler());
-        // 替换原来的 /openSandbox 为 /openFolder
-        server.createContext("/openFolder", new Handlers.OpenFolderHandler());
-        server.createContext("/config", new Handlers.ConfigHandler());
-        server.createContext("/clear-api-key", new ClearApiKeyHandler());
-        server.createContext("/restart", new RestartHandler());
-        // 在 main() 方法中，其他 server.createContext 后面添加
-        server.createContext("/project-meta", new ProjectMetaHandler());
-        server.createContext("/runProject", new RunProjectHandler());
-
-
-        // 静态资源
-        server.createContext("/", new Handlers.StaticHandler());
-
-        // 外部项目目录挂载
-        Path testProjectsDir = Paths.get("./TestProjects");
-        server.createContext("/TestProjects", new Handlers.ExternalFileHandler(testProjectsDir, "/TestProjects"));
-        System.out.println("📁 已挂载外部目录: ./TestProjects -> http://localhost:" + PORT + "/TestProjects");
-
-        // 沙箱目录挂载
-        Path sandboxDir = Paths.get("./sandbox");
-        server.createContext("/sandbox", new Handlers.ExternalFileHandler(sandboxDir, "/sandbox"));
-        System.out.println("📁 已挂载沙箱目录: ./sandbox -> http://localhost:" + PORT + "/sandbox");
-
-        server.setExecutor(Executors.newCachedThreadPool());
-        server.start();
-
-        // 自动打开浏览器
         try {
-            String url = "http://localhost:" + PORT;
-            if (java.awt.Desktop.isDesktopSupported()) {
-                java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
-                System.out.println("🌐 已自动打开浏览器: " + url);
-            } else {
-                System.out.println("请手动打开浏览器访问: " + url);
-            }
-        } catch (Exception e) {
-            System.out.println("⚠️ 自动打开浏览器失败，请手动访问 http://localhost:" + PORT);
-        }
+            server = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
 
-        System.out.println("🚀 Agent 服务已启动（按 Enter 停止...）");
-        startHeartbeatMonitor();
-        System.in.read();
-        server.stop(0);
+            // 业务接口
+            server.createContext("/run", new RunHandler());
+            server.createContext("/stop", new StopHandler());
+            server.createContext("/heartbeat", new HeartbeatHandler());
+            server.createContext("/projects", new Handlers.ProjectsHandler());
+            server.createContext("/browse", new Handlers.BrowseHandler());
+            server.createContext("/archive", new Handlers.ArchiveHandler());
+            server.createContext("/upload", new Handlers.UploadHandler());
+            server.createContext("/createProject", new Handlers.CreateProjectHandler());
+            // 替换原来的 /openSandbox 为 /openFolder
+            server.createContext("/openFolder", new Handlers.OpenFolderHandler());
+            server.createContext("/config", new Handlers.ConfigHandler());
+            server.createContext("/clear-api-key", new ClearApiKeyHandler());
+            server.createContext("/restart", new RestartHandler());
+            // 在 main() 方法中，其他 server.createContext 后面添加
+            server.createContext("/project-meta", new ProjectMetaHandler());
+            server.createContext("/runProject", new RunProjectHandler());
+
+
+            // 静态资源
+            server.createContext("/", new Handlers.StaticHandler());
+
+            // 外部项目目录挂载
+            Path testProjectsDir = Paths.get("./TestProjects");
+            server.createContext("/TestProjects", new Handlers.ExternalFileHandler(testProjectsDir, "/TestProjects"));
+            System.out.println("📁 已挂载外部目录: ./TestProjects -> http://localhost:" + PORT + "/TestProjects");
+
+            // 沙箱目录挂载
+            Path sandboxDir = Paths.get("./sandbox");
+            server.createContext("/sandbox", new Handlers.ExternalFileHandler(sandboxDir, "/sandbox"));
+            System.out.println("📁 已挂载沙箱目录: ./sandbox -> http://localhost:" + PORT + "/sandbox");
+
+            server.setExecutor(Executors.newCachedThreadPool());
+            server.start();
+
+            // 自动打开浏览器
+            try {
+                String url = "http://localhost:" + PORT;
+                if (java.awt.Desktop.isDesktopSupported()) {
+                    java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
+                    System.out.println("🌐 已自动打开浏览器: " + url);
+                } else {
+                    System.out.println("请手动打开浏览器访问: " + url);
+                }
+            } catch (Exception e) {
+                System.out.println("⚠️ 自动打开浏览器失败，请手动访问 http://localhost:" + PORT);
+            }
+
+            System.out.println("🚀 Agent 服务已启动（按 Enter 停止...）");
+            startHeartbeatMonitor();
+            System.in.read();
+            server.stop(0);
+            System.out.println("服务已停止，重新启动以重新启动");
+        } catch (Exception e) {
+            System.exit(EXIT_CODE_EXISTED_THREAD);
+        }
     }
 
     // ===================== 内部 Handler 类 =====================
@@ -535,6 +547,7 @@ public class HttpServerMain {
         // 存储上次的哈希值（静态，跨请求保持）
         private static String lastSandboxHash = null;
         private static String lastTestProjectsHash = null;
+        private int heartBeatCount = 0;
 
         @Override
         public void handle(HttpExchange exchange) throws IOException {
@@ -551,22 +564,23 @@ public class HttpServerMain {
             // 检查目录变化
             String sbHash = computeHash("sandbox");
             String tpHash = computeHash("TestProjects");
-            Main.logIf(sbHash + '\n'+ tpHash);
             boolean needRefresh = false;
 
             // 只有两个目录都扫描完成才比较（避免空值误判）
-            if (sbHash != null && tpHash != null) {
-                if (!Objects.equals(sbHash, lastSandboxHash) || !Objects.equals(tpHash, lastTestProjectsHash)) {
-                    needRefresh = true;
-                    lastSandboxHash = sbHash;
-                    lastTestProjectsHash = tpHash;
-                    System.out.println("🔄 心跳检测到目录变化，通知前端刷新");
+            if (heartBeatCount++ % 4 == 0) {
+                if (sbHash != null && tpHash != null) {
+                    if (!Objects.equals(sbHash, lastSandboxHash) || !Objects.equals(tpHash, lastTestProjectsHash)) {
+                        needRefresh = true;
+                        lastSandboxHash = sbHash;
+                        lastTestProjectsHash = tpHash;
+                    }
+                } else {
+                    // 首次运行，只记录哈希，不触发刷新
+                    if (sbHash != null) lastSandboxHash = sbHash;
+                    if (tpHash != null) lastTestProjectsHash = tpHash;
                 }
-            } else {
-                // 首次运行，只记录哈希，不触发刷新
-                if (sbHash != null) lastSandboxHash = sbHash;
-                if (tpHash != null) lastTestProjectsHash = tpHash;
             }
+            if(heartBeatCount == 1000000)heartBeatCount = 0;
 
             // 返回 JSON 响应
             String response = "{\"refresh\":" + needRefresh + "}";

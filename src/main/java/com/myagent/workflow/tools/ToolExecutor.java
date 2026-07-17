@@ -130,26 +130,19 @@ public class ToolExecutor {
                 result = compiler.compileAuto(filePath, filename, run);
             }
 
-            // ✨ 调试输出：打印 result 开头
-            System.out.println("🔍 compileAndRun 返回结果开头: " + result.substring(0, Math.min(50, result.length())));
 
             if (!isErrorResult(result)) {
-                System.out.println("✅ 编译/运行成功，准备写入注册表");
                 Path projectDir = filePath.getParent();
                 if (Files.isDirectory(filePath)) {
                     projectDir = filePath;
                 }
                 Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();  // ← 加 toAbsolutePath()
 
-                System.out.println("🔍 路径信息:");
-                System.out.println("  projectDir = " + projectDir);
-                System.out.println("  sandboxRoot = " + sandboxRoot);
-                System.out.println("  startsWith? = " + (projectDir != null && projectDir.startsWith(sandboxRoot)));
 
                 if (projectDir != null && projectDir.startsWith(sandboxRoot)) {
                     writeEntryFile(projectDir, filename, mode);
                 } else {
-                    System.out.println("⚠️ 路径检查未通过，跳过写入");
+                    logger.warn("⚠️ 路径检查未通过，跳过写入");
                 }
             }
 
@@ -176,7 +169,7 @@ public class ToolExecutor {
     private void writeEntryFile(Path projectDir, String filename, String mode) {
         try {
             Path entryFile = projectDir.resolve(".agent_entry.json");
-            System.out.println("📝 正在写入注册表: " + entryFile);
+            logger.info("📝 正在写入注册表: " + entryFile);
 
             Map<String, String> meta = new LinkedHashMap<>();
             meta.put("filename", filename);
@@ -184,9 +177,9 @@ public class ToolExecutor {
             String json = new ObjectMapper().writeValueAsString(meta);
             Files.writeString(entryFile, json, StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-            System.out.println("✅ 注册表写入成功");
+            logger.info("✅ 注册表写入成功");
         } catch (IOException e) {
-            System.err.println("❌ 注册表写入失败: " + e.getMessage());
+            logger.warn("❌ 注册表写入失败: {}", e.getMessage());
             e.printStackTrace();
         }
     }

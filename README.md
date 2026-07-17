@@ -9,7 +9,7 @@
 - 自然语言驱动：描述需求，Agent 自动拆解并执行
 - 锚点系统：精准定位、插入、删除代码块，支持结构化重构
 - 语义级工具：`find_references`、`find_callers`、`find_callees` 辅助调用链分析
-- HTML/CSS/JS 强制分离，符合工程规范
+- 在配置后支持编译：Maven / C++ / Python / Node.js，图形库支持 JavaFX 和 Pygame
 - 侧边栏文件树：浏览 `sandbox/` 与 `TestProjects/`，支持项目归档、文件上传、新建项目
 - 运行日志持久化至 `HistoryOutput/`，自动保留 30 天
 - 可调最大迭代次数（默认 30），缓存命中率常驻 93%+
@@ -22,22 +22,23 @@
 
 ## 工具集
 
-| 工具 | 用途 |
-|------|------|
-| `list_directory` / `read_file` / `write_java_file` | 文件操作 |
-| `compile_and_run` | 编译运行 / 浏览器预览 |
-| `search_text` / `find_references` / `find_callers` / `find_callees` | 代码搜索与调用分析 |
+| Agent工具                                                                               | 用途 |
+|---------------------------------------------------------------------------------------|------|
+| `list_directory` / `read_file` / `write_java_file`                                    | 文件操作 |
+| `compile_and_run`                                                                     | 编译运行 / 浏览器预览 |
+| `search_text` / `find_references` / `find_callers` / `find_callees`                   | 代码搜索与调用分析 |
 | `build_anchor_index` / `list_anchors` / `insert_at_anchor` / `delete_between_anchors` | 锚点索引与精准编辑 |
-| `archiveProject` / `uploadFiles` / `createProject` / `openFolder` | 项目管理（侧边栏操作） |
+
 
 ## 成本表现
 
-- 实测 1000 万 Token 约 3 元（DeepSeek V4-Pro）
+- 单项目多次修改，实测 1000 万 Token 约 3 元（DeepSeek V4-Pro）
 - 缓存命中率 > 93%，输出占比 < 3%
 
 ## 版本
 
-**v2.2** — 原子工具链完善（`find_references`、`delete_between_anchors`），计划表项目完整落地，缓存与输出效率达最优。
+**v2.2** — 原子工具链完善（`find_references`、`delete_between_anchors`）
+**v3.3** — 多语言编译支持，前端优化
 
 ## 技术栈
 

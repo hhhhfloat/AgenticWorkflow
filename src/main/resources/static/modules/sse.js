@@ -91,8 +91,6 @@ function stopAgent() {
     stopBtn.disabled = true;
     appendLog('[系统] 正在停止任务...');
 
-    // 立即停止心跳，防止后端时间被重置
-    stopHeartbeat();
 
     fetch(BASE_URL + '/stop', { method: 'POST' })
         .then(response => response.json())
@@ -107,6 +105,5 @@ function stopAgent() {
         .catch(err => {
         appendLog('[错误] 停止请求失败: ' + err.message);
         stopBtn.disabled = false;
-        stopHeartbeat();
     });
 }

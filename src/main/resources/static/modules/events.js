@@ -22,10 +22,10 @@ runBtn.addEventListener('click', () => {
 // 停止按钮
 stopBtn.addEventListener('click', stopAgent);
 
-// 页面关闭时尝试停止
 window.addEventListener('beforeunload', () => {
     if (isRunning) {
-        stopHeartbeat();
+        // 页面即将关闭，主动通知后端停止 Agent，避免等待心跳超时
+        stopHeartbeat();  // 停止向前端发送心跳（前端都不在了）
         fetch(BASE_URL + '/stop', { method: 'POST' }).catch(() => {});
     }
 });
