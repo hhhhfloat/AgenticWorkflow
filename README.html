@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic Workflow v3.0 · 使用说明</title>
+    <style>
+        /* 样式保持不变，与之前完全一致 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f6f8fa;
+            color: #1e1e1e;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            max-width: 820px;
+            width: 100%;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 48px 52px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+            border: 1px solid #e9edf2;
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.3px;
+            color: #0d1117;
+            margin-bottom: 6px;
+        }
+
+        .subtitle {
+            font-size: 16px;
+            color: #57606a;
+            margin-bottom: 28px;
+            border-bottom: 1px solid #e9edf2;
+            padding-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0d1117;
+            margin-top: 32px;
+            margin-bottom: 10px;
+        }
+
+        p, li {
+            font-size: 15px;
+            line-height: 1.7;
+            color: #24292f;
+        }
+
+        ul, ol {
+            padding-left: 22px;
+            margin-top: 4px;
+            margin-bottom: 12px;
+        }
+
+        li {
+            margin-bottom: 4px;
+        }
+
+        .step-list {
+            list-style: none;
+            padding-left: 0;
+            counter-reset: step;
+        }
+
+        .step-list li {
+            counter-increment: step;
+            padding-left: 32px;
+            position: relative;
+            margin-bottom: 6px;
+        }
+
+        .step-list li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 22px;
+            height: 22px;
+            background: #0e639c;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .note {
+            background: #f1f6fa;
+            border-left: 4px solid #0e639c;
+            padding: 14px 18px;
+            border-radius: 6px;
+            margin: 18px 0 10px 0;
+            font-size: 14px;
+            color: #1e1e1e;
+        }
+
+        .note strong {
+            color: #0d1117;
+        }
+
+        code {
+            background: #e9ecf0;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: "SF Mono", "Cascadia Code", "Consolas", monospace;
+            color: #0d1117;
+        }
+
+        hr {
+            border: 0;
+            border-top: 1px solid #e1e4e8;
+            margin: 32px 0 20px 0;
+        }
+
+        .footer-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            font-size: 14px;
+            color: #57606a;
+            margin-top: 6px;
+        }
+
+        .version-tag {
+            background: #0d1117;
+            color: #fff;
+            font-weight: 600;
+            padding: 2px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            letter-spacing: 0.3px;
+        }
+
+        .qq-link {
+            background: #e7f3ff;
+            padding: 2px 12px;
+            border-radius: 20px;
+            color: #0550ae;
+            font-weight: 500;
+            font-size: 14px;
+            text-decoration: none;
+        }
+        .qq-link:hover {
+            background: #ddf4ff;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 28px 20px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+            .footer-meta {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚙️ Agentic Workflow</h1>
+        <div class="subtitle">
+            基于 DeepSeek API 的本地 AI 编程助手<br>
+            用自然语言描述需求，Agent 自动生成或修改代码
+        </div>
+		
+		<h2>📌 环境要求</h2>
+		<ul>
+			<li>Windows系统</li>
+			<li>需要安装 <strong>Java 21 或更高版本</strong></li>
+			<li>可下载：
+				<a href="https://www.oracle.com/java/technologies/downloads/" target="_blank">Oracle JDK</a>
+			</li>
+			<li>安装后，在命令行输入 <code>java -version</code> 能正常输出版本信息即可</li>
+		</ul>
+
+        <h2>🚀 如何使用？</h2>
+        <ol class="step-list">
+            <li>双击 <code>start.bat</code></li>
+            <li>输入你的 DeepSeek API Key（首次运行会提示）</li>
+            <li>浏览器自动打开前端页面（本地运行，无服务器）</li>
+            <li>在文本框中输入需求，点击 <strong>“运行”</strong></li>
+        </ol>
+		
+		<!-- ===== 新增 ===== -->
+		<h2>📝 v3.0 更新说明</h2>
+		<ul>
+			<li><strong>多语言支持</strong>：Java（单文件/Maven）、Python、Node.js、C++（MSVC/MinGW）</li>
+			<li><strong>前端配置面板</strong>：无需修改代码，直接在界面中调整 API Key、模型、路径等配置</li>
+			<li><strong>API Key 管理</strong>：一键清除 API Key，自动删除环境变量并重启服务</li>
+		</ul>
+		
+		<h2>📝 v3.2 更新说明</h2>
+		<ul>
+			<li><strong>前端编译支持</strong>：Agent 编译成功过的项目，会在前端项目文件夹直接生成一个按钮，一键编译运行</li>
+			<li><strong>停止功能优化</strong>：按下停止后，立刻断连，之后可直接再次运行，无需重启</li>
+			<li><strong>提示词优化</strong>：当创建需要输入的脚本时，agent会自主重定向 - 创建测试文件 - 编译运行测试程序 - 清理重定向代码与测试文件 - 重新编译（但有的时候可能不是那么听话）</li>
+			<li>注：手动编译运行非图形化项目时，不能通过输入流传入数据，因此对应项目会判断为超时退出。（不过一般agent已经自行测试过了）
+		</ul>
+		
+		<h2>📝 v3.2 更新说明</h2>
+		<ul>
+			<li><strong>修复了字符串注入问题</strong>：原来的用户停止检测使用字符串检测，导致读取的文件中包含对应字符串则会立即停止工作</li>
+		</ul>
+
+        <h2>📂 文件目录说明</h2>
+        <ul>
+            <li><code>sandbox/</code> → Agent 生成的所有代码都在这里</li>
+            <li><code>TestProjects/</code> → 归档的完整项目</li>
+            <li><code>HistoryOutput/</code> → 每次运行的日志文件</li>
+            <li>以上几个文件夹会在 <code>.jar</code> 文件同级自动生成</li>
+        </ul>
+
+        <h2>⚠️ 注意事项</h2>
+        <ul>
+            <li>需要联网（调用 DeepSeek API）</li>
+            <li>API Key 请从 <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 官网获取（一点小钱够用挺久了）</li>
+            <li>建议迭代次数设为 20+</li>
+			<li>刷新页面会导致断连</li>
+            <li>关闭命令行窗口即可停止服务</li>
+        </ul>
+
+        <h2>📊 成本参考</h2>
+        <ul>
+            <li>开发全程生成与修改若干工具，用了 45,946,784 个 token（共 1,387 次 API 请求），总花费 22.22 CNY</li>
+            <li>项目开发时，可稳定在 <strong>93% 缓存命中率</strong>。增量开发修改一个项目，token 平均价格能降低至 <strong>300 万 token / 元</strong></li>
+        </ul>
+
+        <h2>🐛 遇到问题？</h2>
+        <ul>
+            <li>无法连接 DeepSeek？网络问题或未配置 API</li>
+            <li>中途断连？可能是刷新了前端网页或网络非常不稳定</li>
+            <li><strong>其他问题 —— 请联系 QQ 2959754375 反馈</strong></li>
+        </ul>
+
+        <hr>
+
+        <div class="footer-meta">
+			<span>📌 版本 <span class="version-tag">v3.0</span></span>
+			<span style="color:#8b949e;">Made with DeepSeek 你看的出来这个文件基本是AI生成的 <span title="其实整个项目都是人为架构、用AI逐步实现的"><code>对吧</code></span></span>
+		</div>
+    </div>
+</body>
+</html>
