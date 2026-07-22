@@ -491,6 +491,30 @@ public class Compiler {
      * @return 执行结果
      */
     private ProcessResult executeProcess(ProcessBuilder pb, long timeoutSeconds, boolean detectStdinStall) {
+        // ========== 新增：安全加固 ==========
+        try {
+            // 1. 设置安全环境变量
+            secureEnvironment(pb);
+
+            // 2. 校验工作目录是否在沙箱内
+            File dir = pb.directory();
+            if (dir != null) {
+                Path workDir = dir.toPath().toAbsolutePath().normalize();
+                Path sandboxRoot = Paths.get(sandboxDir).toAbsolutePath().normalize();
+                if (!workDir.startsWith(sandboxRoot)) {
+                    logger.error("❌ 工作目录 {} 不在沙箱内，拒绝启动", workDir);
+                    return new ProcessResult("安全拒绝：工作目录 " + workDir + " 不在沙箱内", -1, false, false);
+                }
+            } else {
+                // 如果未设置工作目录，强制设为沙箱根目录（防止默认使用系统目录）
+                pb.directory(Paths.get(sandboxDir).toFile());
+            }
+        } catch (IOException e) {
+            logger.error("❌ 安全加固设置失败: {}", e.getMessage(), e);
+            return new ProcessResult("安全加固异常: " + e.getMessage(), -1, false, false);
+        }
+
+        // ========== 安全加固结束 ==========
         logger.info("🚀 启动进程: command={}, directory={}", pb.command(), pb.directory());
         StringBuilder output = new StringBuilder();
         long startTime = System.currentTimeMillis();
@@ -584,6 +608,33 @@ public class Compiler {
             Thread.currentThread().interrupt();
             logger.error("❌ 监控线程中断");
             return new ProcessResult("执行被中断", -1, false, false);
+        }
+    }
+
+    /**
+     * 为子进程设置安全的环境变量，将临时目录和用户主目录重定向到沙箱内。
+     */
+    private void secureEnvironment(ProcessBuilder pb) throws IOException {
+        Map<String, String> env = pb.environment();
+        Path sandboxRoot = Paths.get(sandboxDir).toAbsolutePath().normalize();
+
+        // 创建沙箱内的临时目录
+        Path sandboxTmp = sandboxRoot.resolve("tmp");
+        Files.createDirectories(sandboxTmp);
+        String tmpPath = sandboxTmp.toString();
+
+        // Unix/Linux/macOS
+        env.put("TMPDIR", tmpPath);
+        // Windows
+        env.put("TEMP", tmpPath);
+        env.put("TMP", tmpPath);
+
+        // 重定向用户主目录，防止程序读取 ~/.ssh, ~/.bashrc 等
+        String os = System.getProperty("os.name").toLowerCase();
+        if (os.contains("win")) {
+            env.put("USERPROFILE", sandboxRoot.toString());
+        } else {
+            env.put("HOME", sandboxRoot.toString());
         }
     }
 }

@@ -23,7 +23,7 @@ public record AgentConfig(
 
     private static final boolean IS_AUTO_OPEN_BROWSERS = false;
 
-    private static final String MODEL_NAME = "deepseek-v4-pro";
+    private static final String MODEL_NAME = "deepseek-v4-flash";
 
     private static final int DEFAULT_MAX_ITERATIONS = 30;
 

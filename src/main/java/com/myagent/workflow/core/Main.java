@@ -263,7 +263,6 @@ public class Main {
     // @anchor: main_logIf
     public static void logIf(String message) {
         if (logConsumer != null) {
-            System.out.println("consume");
             logConsumer.accept(message);
         } else {
             logger.info(message);

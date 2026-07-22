@@ -2,6 +2,8 @@ package com.myagent.workflow.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.security.ScanResult;
+import com.myagent.workflow.security.SecurityScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -112,6 +114,28 @@ public class ToolExecutor {
     private String compileAndRun(String filename, String mode, boolean run) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
+
+            // ========== 🛡️ 安全检查 ==========
+            SecurityScanner scanner = SecurityScanner.getInstance();
+            ScanResult scanResult;
+
+            if (Files.isDirectory(filePath)) {
+                // 目录模式：递归扫描所有源文件
+                scanResult = scanner.scanDirectory(filePath);
+            } else if (Files.isRegularFile(filePath)) {
+                // 单文件模式
+                scanResult = scanner.scan(filePath);
+            } else {
+                return "❌ 路径不存在: " + filename;
+            }
+
+            if (!scanResult.passed()) {
+                String report = scanResult.getFormattedReport();
+                logger.warn("安全扫描未通过: {}", filename);
+                return "❌ 安全扫描拦截:\n" + report;
+            }
+            // ========== 安全检查结束 ==========
+
             String result;
 
             if ("html".equalsIgnoreCase(mode)) {
