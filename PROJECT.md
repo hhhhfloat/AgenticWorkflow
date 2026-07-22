@@ -31,9 +31,29 @@ workflow/
     │   │   │   └── Handlers.java                    # 业务处理器集合
     │   │   ├── model/                               # 数据模型
     │   │   │   └── AnchorLocation.java              # 锚点位置 POJO
+    │   │   ├── security/                            # 🔒 安全扫描模块（v1.1 新增）
+    │   │   │   ├── CodeLine.java                    # 代码行记录（内容+行号）
+    │   │   │   ├── ScanResult.java                  # 扫描结果记录（passed + violations + summary）
+    │   │   │   ├── SecurityConfig.java              # 安全配置（规则启用/禁用）
+    │   │   │   ├── SecurityScanner.java             # 安全扫描器（单例，核心扫描引擎）
+    │   │   │   ├── Severity.java                    # 严重级别枚举（ERROR / WARNING / INFO）
+    │   │   │   ├── Violation.java                   # 违规记录（文件路径+行号+规则ID+建议）
+    │   │   │   ├── filters/                         # 过滤器
+    │   │   │   │   ├── ContextAwareFilter.java      # 上下文感知过滤器（预留）
+    │   │   │   │   └── WhitelistFilter.java         # 白名单过滤器（放行 import/include 语句）
+    │   │   │   ├── parsers/                         # 语言解析器
+    │   │   │   │   ├── CodeParser.java              # 解析器接口
+    │   │   │   │   ├── CppParser.java               # C++ 解析器（继承 JavaParser）
+    │   │   │   │   ├── JavaParser.java              # Java/JS 解析器（去除注释和空行）
+    │   │   │   │   └── PythonParser.java            # Python 解析器（# 注释处理）
+    │   │   │   └── rules/                           # 安全规则
+    │   │   │       ├── Rule.java                    # 规则接口（id + pattern + suggestion + severity）
+    │   │   │       ├── RuleRegistry.java            # 规则注册中心（单例，统管所有规则）
+    │   │   │       ├── CommandExecutionRule.java    # 系统命令执行检测规则
+    │   │   │       └── FilePathRule.java            # 路径穿越检测规则
     │   │   └── tools/                               # 工具实现层
     │   │       ├── ToolDefinitions.java             # DeepSeek Function Calling 工具定义
-    │   │       ├── ToolExecutor.java                # 工具调度执行器
+    │   │       ├── ToolExecutor.java                # 工具调度执行器（集成安全扫描）
     │   │       ├── Compiler.java                    # 多语言编译运行引擎
     │   │       ├── FileOperator.java                # 文件 CRUD 操作
     │   │       ├── AnchorManager.java               # 锚点索引管理
@@ -96,7 +116,13 @@ workflow/
 │           工具执行层 (tools/)            │
 │  ToolExecutor → Compiler / FileOperator │
 │  AnchorManager / CodeSearcher /         │
-│  PathUtils                             │
+│  PathUtils                              │
+└──────────────┬──────────────────────────┘
+               │ 🛡️ 编译前拦截
+┌──────────────▼──────────────────────────┐
+│         安全扫描层 (security/)           │  ← v1.1 新增
+│  SecurityScanner → RuleRegistry         │
+│  → 规则匹配 → WhitelistFilter → 拦截   │
 └─────────────────────────────────────────┘
 ```
 
@@ -184,7 +210,7 @@ workflow/
 | `write_file` | 写入源代码文件 | FileOperator |
 | `read_file` | 读取文件内容（上限 5000 字符） | FileOperator |
 | `delete_file` | 删除文件 | FileOperator |
-| `compile_and_run` | 编译并运行（支持 html/java/maven/cpp/python/node） | Compiler |
+| `compile_and_run` | 编译并运行（支持 html/java/maven/cpp/python/node），**编译前自动触发安全扫描** | Compiler + SecurityScanner |
 | `search_text` | 正则搜索文本 | CodeSearcher |
 | `build_anchor_index` | 重建锚点索引 | AnchorManager |
 | `list_anchors` | 列出项目锚点 | AnchorManager |
@@ -216,7 +242,108 @@ workflow/
 
 ---
 
-## 八、前端模块职责
+## 八、安全扫描模块（security/）🛡️
+
+<!-- @anchor: security_overview -->
+
+### 8.1 概述
+
+安全扫描模块是 v1.1 新增的独立安全层，在 `compile_and_run` 工具执行编译前自动触发。它通过正则规则匹配 + 白名单过滤机制，拦截 Agent 生成的潜在危险代码，确保沙箱安全。
+
+**设计原则**：
+- **单例模式**：`SecurityScanner` 和 `RuleRegistry` 均采用单例，全局统一规则配置
+- **可扩展**：新增规则只需实现 `Rule` 接口并注册到 `RuleRegistry`
+- **语言感知**：解析器根据文件语言去除注释后再匹配，避免注释中的安全关键词误报
+- **白名单放行**：`import os`、`#include <cstdlib>` 等合法导入语句被白名单过滤
+- **缓存加速**：目录递归扫描时，未变更文件直接跳过（基于文件修改时间缓存）
+
+### 8.2 扫描流程
+
+```
+compile_and_run 调用
+       │
+       ▼
+SecurityScanner.scan(filePath) / scanDirectory(dirPath)
+       │
+       ├── 1. 文件存在性检查
+       ├── 2. 读取源文件内容
+       ├── 3. 根据扩展名选择解析器（JavaParser / PythonParser / CppParser）
+       ├── 4. 解析器去除注释和空行 → 提取有效代码行 List<CodeLine>
+       ├── 5. 逐行遍历：
+       │      ├── WhitelistFilter.isWhitelisted() → 放行 import/include
+       │      └── RuleRegistry.getRules() → 正则匹配 → 命中则记录 Violation
+       └── 6. 返回 ScanResult（passed=true/false + violations + summary）
+```
+
+### 8.3 安全规则清单
+
+<!-- @anchor: security_rules_table -->
+
+| 规则 ID | 严重级别 | 检测内容 | 正则模式 |
+|---------|:------:|------|------|
+| `COMMAND_EXECUTION` | ERROR | 系统命令调用 | `Runtime.exec`、`ProcessBuilder`、`os.system`、`subprocess.Popen/call/check_call`、`child_process.exec/spawn/execSync`、`system(`、`popen(`、`powershell -`、`cmd /c` |
+| `FILE_PATH_TRAVERSAL` | ERROR | 路径穿越 | `../`、`..\`、盘符如 `C:\` |
+
+### 8.4 解析器矩阵
+
+<!-- @anchor: security_parsers_table -->
+
+| 解析器 | 适用语言 | 注释处理 |
+|--------|------|------|
+| `JavaParser` | Java、JavaScript、Node.js | 去除 `//` 单行注释 + `/* */` 多行注释 |
+| `PythonParser` | Python | 去除 `#` 单行注释 |
+| `CppParser` | C++ | 继承 JavaParser（C++ 注释规则一致） |
+
+### 8.5 过滤器
+
+<!-- @anchor: security_filters -->
+
+| 过滤器 | 职责 | 状态 |
+|--------|------|:--:|
+| `WhitelistFilter` | 放行以 `import`、`from`、`#include` 开头的合法导入语句 | ✅ 活跃 |
+| `ContextAwareFilter` | 上下文感知过滤（预留扩展） | 🔜 预留 |
+
+### 8.6 数据模型
+
+<!-- @anchor: security_data_models -->
+
+| 类/记录 | 类型 | 说明 |
+|---------|------|------|
+| `CodeLine` | record | `(String content, int lineNumber)` — 有效代码行 |
+| `ScanResult` | record | `(boolean passed, List<Violation> violations, String summary)` — 扫描结果，含 `getFormattedReport()` |
+| `Violation` | record | `(String filePath, int lineNumber, String ruleId, String matchedText, Severity severity, String suggestion)` |
+| `Severity` | enum | `ERROR`（必须拦截）、`WARNING`（记录不拦截，预留）、`INFO`（仅信息） |
+| `Rule` | interface | `getId()` / `getPattern()` / `getSuggestion()` / `isEnabled()` / `getSeverity()` |
+| `SecurityConfig` | class | 规则启用/禁用配置（当前全部启用，预留外部配置加载） |
+
+### 8.7 ToolExecutor 集成点
+
+<!-- @anchor: security_integration -->
+
+`ToolExecutor.compileAndRun()` 方法中，在执行实际编译前插入了安全检查：
+
+```java
+// 获取 SecurityScanner 单例
+SecurityScanner scanner = SecurityScanner.getInstance();
+
+// 目录模式：递归扫描所有源文件
+if (Files.isDirectory(filePath)) {
+    scanResult = scanner.scanDirectory(filePath);
+} else if (Files.isRegularFile(filePath)) {
+    scanResult = scanner.scan(filePath);
+}
+
+// 未通过则返回格式化报告并拦截编译
+if (!scanResult.passed()) {
+    return "❌ 安全扫描拦截:\n" + scanResult.getFormattedReport();
+}
+```
+
+**拦截效果**：当 Agent 生成的代码包含 `Runtime.getRuntime().exec(...)`、`os.system(...)`、路径 `../` 等危险模式时，`compile_and_run` 将直接返回安全拦截报告，不会执行编译。
+
+---
+
+## 九、前端模块职责
 
 | 模块文件 | 职责 |
 |----------|------|
@@ -236,7 +363,7 @@ workflow/
 
 ---
 
-## 九、关键锚点
+## 十、关键锚点
 
 | 锚点 ID | 文件 | 说明 |
 |---------|------|------|
@@ -274,10 +401,16 @@ workflow/
 | `toolExecutor_constructor` | ToolExecutor.java | 构造函数 |
 | `toolExecutor_dispatch` | ToolExecutor.java | 调度入口 |
 | `compiler_class` | Compiler.java | 编译引擎类 |
+| `security_overview` | PROJECT.md | 安全模块概述 |
+| `security_rules_table` | PROJECT.md | 安全规则清单 |
+| `security_parsers_table` | PROJECT.md | 解析器矩阵 |
+| `security_filters` | PROJECT.md | 过滤器说明 |
+| `security_data_models` | PROJECT.md | 安全模块数据模型 |
+| `security_integration` | PROJECT.md | ToolExecutor 集成说明 |
 
 ---
 
-## 十、退出码约定
+## 十一、退出码约定
 
 | 退出码 | 含义 |
 |:------:|------|
@@ -288,7 +421,26 @@ workflow/
 
 ---
 
-## 十一、更新日志
+## 十二、更新日志
+
+### v1.1 — 安全扫描模块
+
+<!-- @anchor: update_v1_1 -->
+
+**新增 `security/` 模块**（共 16 个文件）：
+- `SecurityScanner`：核心扫描引擎（单例），支持单文件扫描和目录递归扫描，含文件修改时间缓存以加速重复扫描
+- `RuleRegistry`：规则注册中心（单例），统一管理所有安全规则
+- `CommandExecutionRule`：检测系统命令调用（`Runtime.exec`、`ProcessBuilder`、`os.system`、`subprocess`、`child_process` 等）
+- `FilePathRule`：检测路径穿越（`../`、`..\`、盘符如 `C:\`）
+- `CodeParser` 接口 + `JavaParser` / `PythonParser` / `CppParser`：按语言去除注释后提取有效代码行
+- `WhitelistFilter`：白名单放行 `import` / `from` / `#include` 等合法导入语句
+- `ContextAwareFilter`：预留的上下文感知过滤器
+- 数据模型：`CodeLine`、`ScanResult`、`Violation`、`Severity`、`SecurityConfig`、`Rule`
+
+**修改 `ToolExecutor.java`**：
+- `compileAndRun()` 方法中，在编译前插入 `SecurityScanner` 安全扫描
+- 支持单文件模式（`scanner.scan(filePath)`）和目录模式（`scanner.scanDirectory(filePath)`）
+- 扫描未通过时返回格式化拦截报告，阻止编译执行
 
 ### v1.0-SNAPSHOT（初始版本）
 - 完整的 Agent 工作流编排（多轮 Function Calling）
