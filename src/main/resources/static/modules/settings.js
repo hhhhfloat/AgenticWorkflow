@@ -5,7 +5,7 @@ const SETTINGS_STORAGE_KEY = 'agentSettings';
 
 // 默认配置（与 ConfigEditor.buildDefault() 保持一致）
 const DEFAULT_SETTINGS = {
-    model: 'deepseek-v4-pro',
+    model: 'deepseek-v4-flash',
     autoOpenBrowser: false,
     defaultMaxIterations: 30,
     mavenCommand: '',
@@ -16,7 +16,8 @@ const DEFAULT_SETTINGS = {
     msvcCompiler: '',
     msvcInclude: '',
     msvcLib: '',
-    mingwCompiler: ''
+    mingwCompiler: '',
+    enableSecurityScan: true
 };
 
 // 加载配置
@@ -51,7 +52,7 @@ function saveSettings(settings) {
 
 // 将配置渲染到表单
 function applySettingsToForm(settings) {
-    document.getElementById('setModel').value = settings.model || 'deepseek-v4-pro';
+    document.getElementById('setModel').value = settings.model || 'deepseek-v4-flash';
     document.getElementById('setAutoOpenBrowser').checked = !!settings.autoOpenBrowser;
     document.getElementById('setMavenCommand').value = settings.mavenCommand || '';
     document.getElementById('setJavaHome').value = settings.javaHome || '';
@@ -60,6 +61,7 @@ function applySettingsToForm(settings) {
     document.getElementById('setCppCompilerType').value = settings.cppCompilerType || 'msvc';
     document.getElementById('setMsvcCompiler').value = settings.msvcCompiler || '';
     document.getElementById('setMingwCompiler').value = settings.mingwCompiler || '';
+    document.getElementById('setEnableSecurityScan').checked = settings.enableSecurityScan !== false;
 }
 
 // 从表单读取配置
@@ -75,7 +77,8 @@ function readSettingsFromForm() {
         msvcCompiler: document.getElementById('setMsvcCompiler').value.trim(),
         msvcInclude: '',
         msvcLib: '',
-        mingwCompiler: document.getElementById('setMingwCompiler').value.trim()
+        mingwCompiler: document.getElementById('setMingwCompiler').value.trim(),
+    enableSecurityScan: document.getElementById('setEnableSecurityScan').checked
     };
 }
 

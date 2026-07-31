@@ -23,7 +23,7 @@ async function runProjectWithPath(projectName, filename, mode) {
 
     const settings = getEffectiveSettings ? getEffectiveSettings() : {};
     const config = {
-        model: settings.model || 'deepseek-v4-pro',
+        model: settings.model || 'deepseek-v4-flash',
         autoOpenBrowser: settings.autoOpenBrowser || false,
         mavenCommand: settings.mavenCommand || '',
         javaHome: settings.javaHome || '',

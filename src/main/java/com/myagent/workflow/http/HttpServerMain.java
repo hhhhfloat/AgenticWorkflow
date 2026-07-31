@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.AgentConfig;
 import com.myagent.workflow.core.ConfigEditor;
 import com.myagent.workflow.core.Main;
+import com.myagent.workflow.http.handlers.*;
 import com.myagent.workflow.tools.ToolExecutor;
 import com.sun.net.httpserver.HttpServer;
 import com.sun.net.httpserver.HttpHandler;
@@ -23,6 +24,9 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
+
+import static com.myagent.workflow.http.utils.HandlerUtils.parseQuery;
+import static com.myagent.workflow.http.utils.HandlerUtils.sendResponse;
 
 /**
  * @anchor: httpserver_class
@@ -77,7 +81,7 @@ public class HttpServerMain {
 
 
         // 确保运行时目录存在
-        String[] requiredDirs = {"./sandbox", "./TestProjects", "./HistoryOutput"};
+        String[] requiredDirs = {"./sandbox", "./TestProjects", "./HistoryOutput", "./temp"};
         for (String dir : requiredDirs) {
             Path p = Paths.get(dir);
             if (!Files.exists(p)) {
@@ -95,32 +99,31 @@ public class HttpServerMain {
             server.createContext("/run", new RunHandler());
             server.createContext("/stop", new StopHandler());
             server.createContext("/heartbeat", new HeartbeatHandler());
-            server.createContext("/projects", new Handlers.ProjectsHandler());
-            server.createContext("/browse", new Handlers.BrowseHandler());
-            server.createContext("/archive", new Handlers.ArchiveHandler());
-            server.createContext("/upload", new Handlers.UploadHandler());
-            server.createContext("/createProject", new Handlers.CreateProjectHandler());
-            // 替换原来的 /openSandbox 为 /openFolder
-            server.createContext("/openFolder", new Handlers.OpenFolderHandler());
-            server.createContext("/config", new Handlers.ConfigHandler());
+            server.createContext("/projects", new ProjectsHandler());
+            server.createContext("/browse", new BrowseHandler());
+            server.createContext("/archive", new ArchiveHandler());
+            server.createContext("/upload", new UploadHandler());
+            server.createContext("/createProject", new CreateProjectHandler());
+            server.createContext("/openFolder", new OpenFolderHandler());
+            server.createContext("/config", new ConfigHandler());
             server.createContext("/clear-api-key", new ClearApiKeyHandler());
             server.createContext("/restart", new RestartHandler());
-            // 在 main() 方法中，其他 server.createContext 后面添加
             server.createContext("/project-meta", new ProjectMetaHandler());
             server.createContext("/runProject", new RunProjectHandler());
+            server.createContext("/status", new StatusHandler());
 
 
             // 静态资源
-            server.createContext("/", new Handlers.StaticHandler());
+            server.createContext("/", new StaticHandler());
 
             // 外部项目目录挂载
             Path testProjectsDir = Paths.get("./TestProjects");
-            server.createContext("/TestProjects", new Handlers.ExternalFileHandler(testProjectsDir, "/TestProjects"));
+            server.createContext("/TestProjects", new ExternalFileHandler(testProjectsDir, "/TestProjects"));
             System.out.println("📁 已挂载外部目录: ./TestProjects -> http://localhost:" + PORT + "/TestProjects");
 
             // 沙箱目录挂载
             Path sandboxDir = Paths.get("./sandbox");
-            server.createContext("/sandbox", new Handlers.ExternalFileHandler(sandboxDir, "/sandbox"));
+            server.createContext("/sandbox", new ExternalFileHandler(sandboxDir, "/sandbox"));
             System.out.println("📁 已挂载沙箱目录: ./sandbox -> http://localhost:" + PORT + "/sandbox");
 
             server.setExecutor(Executors.newCachedThreadPool());
@@ -170,24 +173,24 @@ public class HttpServerMain {
                 filename = root.get("filename").asText();
                 mode = root.get("mode").asText();
             } catch (Exception e) {
-                sendJsonResponse(exchange, 400, "{\"error\":\"请求格式错误: " + e.getMessage() + "\"}");
+                sendResponse(exchange, 400, "{\"error\":\"请求格式错误: " + e.getMessage() + "\"}");
                 return;
             }
 
             if (filename == null || filename.isEmpty() || mode == null || mode.isEmpty()) {
-                sendJsonResponse(exchange, 400, "{\"error\":\"缺少必要参数: filename, mode\"}");
+                sendResponse(exchange, 400, "{\"error\":\"缺少必要参数: filename, mode\"}");
                 return;
             }
 
             // 安全检查：禁止路径穿越
             if (filename.contains("..")) {
-                sendJsonResponse(exchange, 403, "{\"error\":\"路径非法\"}");
+                sendResponse(exchange, 403, "{\"error\":\"路径非法\"}");
                 return;
             }
 
             try {
                 AgentConfig config = ConfigEditor.buildFromRequest(root);
-                ToolExecutor executor = new ToolExecutor(config, new ObjectMapper());
+                ToolExecutor executor = new ToolExecutor(config, new ObjectMapper(), null, null);
 
                 // ✅ 直接使用注册表中的参数，原样调用 compile_and_run
                 Map<String, Object> args = new HashMap<>();
@@ -201,14 +204,14 @@ public class HttpServerMain {
                 response.put("status", "success");
                 response.put("output", result);
                 String json = mapper.writeValueAsString(response);
-                sendJsonResponse(exchange, 200, json);
+                sendResponse(exchange, 200, json);
 
             } catch (Exception e) {
                 Map<String, Object> errorResponse = new LinkedHashMap<>();
                 errorResponse.put("status", "error");
                 errorResponse.put("error", e.getMessage());
                 String json = mapper.writeValueAsString(errorResponse);
-                sendJsonResponse(exchange, 500, json);
+                sendResponse(exchange, 500, json);
             }
         }
     }
@@ -227,19 +230,19 @@ public class HttpServerMain {
             String path = params.get("path");
 
             if (path == null || path.isEmpty()) {
-                sendJsonResponse(exchange, 400, "{\"error\":\"缺少 path 参数\"}");
+                sendResponse(exchange, 400, "{\"error\":\"缺少 path 参数\"}");
                 return;
             }
 
             // 安全检查：只允许 sandbox/ 和 TestProjects/
             if (!path.startsWith("sandbox/") && !path.startsWith("TestProjects/")) {
-                sendJsonResponse(exchange, 403, "{\"error\":\"路径非法\"}");
+                sendResponse(exchange, 403, "{\"error\":\"路径非法\"}");
                 return;
             }
 
             // 防止路径穿越
             if (path.contains("..")) {
-                sendJsonResponse(exchange, 403, "{\"error\":\"路径非法\"}");
+                sendResponse(exchange, 403, "{\"error\":\"路径非法\"}");
                 return;
             }
 
@@ -251,12 +254,12 @@ public class HttpServerMain {
                     String content = Files.readString(metaFile, StandardCharsets.UTF_8);
                     // 验证是否是有效的 JSON
                     new ObjectMapper().readTree(content);
-                    sendJsonResponse(exchange, 200, content);
+                    sendResponse(exchange, 200, content);
                 } catch (Exception e) {
-                    sendJsonResponse(exchange, 500, "{\"error\":\"读取注册表失败: " + e.getMessage() + "\"}");
+                    sendResponse(exchange, 500, "{\"error\":\"读取注册表失败: " + e.getMessage() + "\"}");
                 }
             } else {
-                sendJsonResponse(exchange, 200, "{\"exists\":false}");
+                sendResponse(exchange, 200, "{\"exists\":false}");
             }
         }
     }
@@ -619,6 +622,38 @@ public class HttpServerMain {
         }
     }
 
+    // ===================== 状态查询处理器 =====================
+    static class StatusHandler implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+                exchange.sendResponseHeaders(405, -1);
+                return;
+            }
+
+            boolean isRunning;
+            synchronized (lock) {
+                isRunning = currentAgent != null;
+            }
+
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("running", isRunning);
+            // 如果有 Agent 在运行，额外返回一些信息
+            if (isRunning) {
+                // 可以添加更多元数据，比如 startTime、当前迭代数等
+            }
+
+            String json = new ObjectMapper().writeValueAsString(response);
+            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "application/json");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        }
+    }
+
     // ===================== 心跳监控 =====================
 
     // @anchor: httpserver_heartbeatMonitor
@@ -646,108 +681,6 @@ public class HttpServerMain {
                 }
             }
         }, "HeartbeatMonitor").start();
-    }
-
-    // ===================== 公共辅助方法 =====================
-
-    /**
-     * 解析查询字符串为 Map
-     */
-    private static Map<String, String> parseQuery(String query) {
-        Map<String, String> params = new HashMap<>();
-        if (query == null || query.isEmpty()) {
-            return params;
-        }
-        for (String pair : query.split("&")) {
-            String[] kv = pair.split("=", 2);
-            if (kv.length == 2) {
-                params.put(kv[0], kv[1]);
-            }
-        }
-        return params;
-    }
-
-    /**
-     * 发送 JSON 响应
-     */
-    private static void sendJsonResponse(HttpExchange exchange, int statusCode, String json) throws IOException {
-        byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-        exchange.getResponseHeaders().set("Content-Type", "application/json");
-        exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-        exchange.sendResponseHeaders(statusCode, bytes.length);
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(bytes);
-        }
-    }
-}
-
-/**
- * 日志持久化工具：将 SSE 流写入本地文件
- */
-class LogFileWriter implements AutoCloseable {
-    private final Path logFile;
-    private final BufferedWriter writer;
-
-    public LogFileWriter(String prompt) throws IOException {
-        // 创建 HistoryOutput 目录
-        Path logDir = Paths.get("./HistoryOutput");
-        if (!Files.exists(logDir)) {
-            Files.createDirectories(logDir);
-        }
-
-        cleanOldLogs();
-
-        // 生成文件名：2026-07-11_14-23-45.log
-        String timestamp = LocalDateTime.now()
-                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss"));
-        logFile = logDir.resolve(timestamp + ".log");
-        writer = Files.newBufferedWriter(logFile, StandardCharsets.UTF_8);
-
-        // 写入提示词作为第一行
-        writer.write("📝 本次需求: " + prompt);
-        writer.newLine();
-        writer.write("--- 开始执行 ---");
-        writer.newLine();
-        writer.flush();
-    }
-
-    private static void cleanOldLogs() throws IOException {
-        Path logDir = Paths.get("./HistoryOutput");
-        if (!Files.exists(logDir)) return;
-
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
-        try (Stream<Path> files = Files.list(logDir)) {
-            files.filter(p -> p.toString().endsWith(".log"))
-                    .forEach(p -> {
-                        try {
-                            // 从文件名解析日期（格式：2026-07-11_14-23-45.log）
-                            String name = p.getFileName().toString();
-                            String datePart = name.substring(0, 10); // "2026-07-11"
-                            LocalDateTime fileDate = LocalDateTime.parse(datePart + "T00:00:00");
-                            if (fileDate.isBefore(cutoff)) {
-                                Files.delete(p);
-                                System.out.println("🗑️ 已删除旧日志: " + p.getFileName());
-                            }
-                        } catch (Exception ignored) {}
-                    });
-        }
-    }
-
-    public void write(String message) throws IOException {
-        writer.write(message);
-        writer.newLine();
-        writer.flush();
-    }
-
-    @Override
-    public void close() throws IOException {
-        if (writer != null) {
-            writer.close();
-        }
-    }
-
-    public Path getLogFilePath() {
-        return logFile;
     }
 
 }

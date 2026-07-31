@@ -16,6 +16,7 @@ public class ConfigEditor {
 
         JsonNode cfg = root.get("config");
 
+
         // 3. 用前端传入的值覆盖默认配置
         return new AgentConfig(
                 System.getenv("DEEPSEEK_API_KEY"),
@@ -29,7 +30,8 @@ public class ConfigEditor {
                 getString(cfg, "msvcCompiler", baseConfig.msvcCompiler()),
                 getString(cfg, "msvcInclude", baseConfig.msvcInclude()),
                 getString(cfg, "msvcLib", baseConfig.msvcLib()),
-                getString(cfg, "mingwCompiler", baseConfig.mingwCompiler())
+                getString(cfg, "mingwCompiler", baseConfig.mingwCompiler()),
+                getBool(cfg, "enableSecurityScan", baseConfig.enableSecurityScan())
         );
     }
 

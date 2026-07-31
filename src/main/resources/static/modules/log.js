@@ -36,16 +36,27 @@ function appendLog(msg) {
         }
     }
 
+    // ⭐ 核心修复 1：使用 insertAdjacentHTML 替代 innerHTML +=
     const line = `<div class="log-entry ${color}">${renderedContent}</div>`;
-    output.innerHTML += line;
+    output.insertAdjacentHTML('beforeend', line);
+
+    // ⭐ 核心修复 2：自动截断（根据你的块状场景，保留 1000 条足够）
+    const MAX_LOGS = 1000;
+    while (output.children.length > MAX_LOGS) {
+        output.removeChild(output.firstChild);
+    }
+
     output.scrollTop = output.scrollHeight;
 
-    // 如果这条日志是迭代标记，则追加一条提示
+    // 迭代提示（不变）
     if (msg.includes('--- 第') && msg.includes('次迭代 ---')) {
         const tip = getRandomQuote();
         if (tip) {
             const tipLine = `<div class="log-entry log-tip">> ${escapeHtml(tip)}</div>`;
-            output.innerHTML += tipLine;
+            output.insertAdjacentHTML('beforeend', tipLine);
+            while (output.children.length > MAX_LOGS) {
+                output.removeChild(output.firstChild);
+            }
             output.scrollTop = output.scrollHeight;
         }
     }

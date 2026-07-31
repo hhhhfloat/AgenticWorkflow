@@ -1,6 +1,9 @@
 // @anchor: modules_events
 // ===== 事件绑定 =====
 
+// ⭐ 新增：页面卸载标志，防止误报断联日志
+window._isPageUnloading = false;
+
 // 清空按钮
 clearBtn.addEventListener('click', () => {
     output.innerHTML = '';
@@ -22,11 +25,23 @@ runBtn.addEventListener('click', () => {
 // 停止按钮
 stopBtn.addEventListener('click', stopAgent);
 
+//window.addEventListener('beforeunload', () => {
+//    if (isRunning) {
+//        stopHeartbeat();
+//        // 使用 keepalive: true 确保请求在页面关闭后依然发出
+//        fetch(BASE_URL + '/stop', {
+//            method: 'POST',
+//            keepalive: true
+//        }).catch(() => {});
+//    }
+//});
+
+// ⭐ 关键修改：页面卸载时只标记，不杀 Agent，也不触发断联日志
 window.addEventListener('beforeunload', () => {
+    window._isPageUnloading = true;  // 标记正在卸载
     if (isRunning) {
-        // 页面即将关闭，主动通知后端停止 Agent，避免等待心跳超时
-        stopHeartbeat();  // 停止向前端发送心跳（前端都不在了）
-        fetch(BASE_URL + '/stop', { method: 'POST' }).catch(() => {});
+        stopHeartbeat();  // 停止发送心跳
+        // ⭐ 不发送 /stop，让后端自己超时清理
     }
 });
 
@@ -48,6 +63,10 @@ document.getElementById('logBtn').addEventListener('click', () => {
 // ===== DOMContentLoaded 初始化 =====
 document.addEventListener('DOMContentLoaded', function() {
     loadConfig();
+    // ⭐ 新增：查询后端状态，恢复 UI
+    if (typeof checkBackendStatus === 'function') {
+        checkBackendStatus();
+    }
 
     // 初始化配置弹窗
     if (typeof initSettingsModal === 'function') {

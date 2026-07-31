@@ -230,6 +230,80 @@ public class AnchorManager {
         }
     }
 
+    /**
+     * 读取两个锚点之间的内容（包含锚点所在行）
+     * @param startAnchor 起始锚点 ID
+     * @param endAnchor 结束锚点 ID
+     * @return 包含行号范围和内容的格式化字符串
+     */
+    String readBetweenAnchors(String startAnchor, String endAnchor) {
+        // 1. 查找两个锚点
+        AnchorLocation startLoc = findAnchor(startAnchor);
+        AnchorLocation endLoc = findAnchor(endAnchor);
+        if (startLoc == null) return "❌ 起始锚点不存在: " + startAnchor;
+        if (endLoc == null) return "❌ 结束锚点不存在: " + endAnchor;
+
+        // 2. 必须在同一文件中
+        if (!startLoc.filePath.equals(endLoc.filePath)) {
+            return "❌ 两个锚点不在同一个文件中\n" +
+                    "  起始锚点: " + startLoc.filePath + "\n" +
+                    "  结束锚点: " + endLoc.filePath;
+        }
+
+        // 3. 起始行必须在结束行之前
+        if (startLoc.line >= endLoc.line) {
+            return "❌ 起始锚点必须在结束锚点之前\n" +
+                    "  起始锚点: " + startLoc.filePath + " 行 " + startLoc.line + "\n" +
+                    "  结束锚点: " + endLoc.filePath + " 行 " + endLoc.line;
+        }
+
+        // 4. 读取文件，提取区间内容
+        try {
+            Path filePath = PathUtils.safeResolve(startLoc.projectPath, startLoc.filePath);
+            if (!Files.exists(filePath)) {
+                return "❌ 文件不存在: " + startLoc.filePath;
+            }
+
+            List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
+            int startLine = startLoc.line - 1;  // 转为 0-based
+            int endLine = endLoc.line - 1;      // 转为 0-based
+
+            // 提取从 startLine 到 endLine 的所有行（包含锚点行）
+            List<String> resultLines = new ArrayList<>();
+            for (int i = startLine; i <= endLine && i < lines.size(); i++) {
+                resultLines.add(lines.get(i));
+            }
+
+            if (resultLines.isEmpty()) {
+                return "⚠️ 两个锚点之间没有内容可读取（可能是空区域）";
+            }
+
+            // 5. 构建返回结果
+            StringBuilder sb = new StringBuilder();
+            sb.append("📖 读取 ").append(startLoc.filePath)
+                    .append(" 从行 ").append(startLoc.line)
+                    .append(" 到行 ").append(endLoc.line)
+                    .append("（共 ").append(resultLines.size()).append(" 行）\n");
+            sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+            // 带行号输出
+            for (int i = 0; i < resultLines.size(); i++) {
+                int lineNum = startLoc.line + i;
+                sb.append(String.format("%4d | %s", lineNum, resultLines.get(i))).append("\n");
+            }
+
+            sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+            sb.append("📌 起始锚点: ").append(startAnchor).append(" (行 ").append(startLoc.line).append(")\n");
+            sb.append("📌 结束锚点: ").append(endAnchor).append(" (行 ").append(endLoc.line).append(")");
+
+            return sb.toString();
+
+        } catch (IOException e) {
+            logger.error("读取锚点区间失败", e);
+            return "❌ 读取失败: " + e.getMessage();
+        }
+    }
+
     // ===== 辅助 =====
     AnchorLocation findAnchor(String anchorId) {
         try {

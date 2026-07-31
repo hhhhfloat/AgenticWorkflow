@@ -13,13 +13,16 @@ public record AgentConfig(
         String msvcCompiler,
         String msvcInclude,
         String msvcLib,
-        String mingwCompiler
+        String mingwCompiler,
+        boolean enableSecurityScan
 ) {
     // ===== 系统级常量（静态） =====
-    private static final String ARCHIVE_VERSION = "v3_6";
+    private static final String ARCHIVE_VERSION = "v4_0";
     private static final String SANDBOX_DIR = "./sandbox";
     private static final String ANCHOR_INDEX_FILE = "./sandbox/.anchor_index.json";
     private static final String API_URL = "https://api.deepseek.com/chat/completions";
+
+    private static final boolean ENABLE_SECURITY_SCAN = true;
 
     private static final boolean IS_AUTO_OPEN_BROWSERS = false;
 
@@ -89,7 +92,8 @@ public record AgentConfig(
                 MSVC_COMPILER,
                 MSVC_INCLUDE,
                 MSVC_LIB,
-                MINGW_COMPILER
+                MINGW_COMPILER,
+                ENABLE_SECURITY_SCAN
         );
     }
 

@@ -99,6 +99,13 @@
                         <label>MinGW 编译器路径</label>
                         <input type="text" id="setMingwCompiler" placeholder="g++.exe 路径">
                     </div>
+                    <div class="setting-row">
+                        <label>🛡️ 安全扫描</label>
+                        <div class="toggle-group">
+                            <input type="checkbox" id="setEnableSecurityScan" checked>
+                            <span class="hint-text">关闭后编译前不扫描危险代码（请自行承担风险）</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button id="saveSettingsBtn">💾 保存</button>
@@ -118,6 +125,9 @@
 
 <!-- 核心模块：DOM引用、状态、常量 -->
 <script src="modules/config.js"></script>
+
+<script src="modules/status.js"></script>
+
 <!-- 文案工具 -->
 <script src="modules/quote.js"></script>
 <!-- 日志输出 -->

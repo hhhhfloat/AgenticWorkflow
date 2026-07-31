@@ -1,13 +1,21 @@
 package com.myagent.workflow.tools;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.core.ContextManager;
+import com.myagent.workflow.core.Main;
+import com.myagent.workflow.model.FileStructure;
+import com.myagent.workflow.parser.FileStructureFormatter;
+import com.myagent.workflow.parser.StructureParser;
+import com.myagent.workflow.parser.StructureParserRegistry;
 import com.myagent.workflow.security.ScanResult;
 import com.myagent.workflow.security.SecurityScanner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -15,6 +23,8 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * @anchor: toolExecutor_class
@@ -29,13 +39,24 @@ public class ToolExecutor {
     private final Compiler compiler;
     private final AnchorManager anchorMgr;
     private Consumer<String> logConsumer;
+    private final Consumer<String> modelSwitcher;  // 新增：模型切换回调
+    // 字段
+    private final ContextManager contextManager; // 替换原来的 Main main
+    private ObjectMapper objectMapper;
+
+    private final AgentConfig config;
+
 
     // @anchor: toolExecutor_constructor
-    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper) {
+    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper, Consumer<String> modelSwitcher, ContextManager contextManager) {
+        this.config = config;
         this.compiler = new Compiler(config);
         this.fileOp = new FileOperator();
+        this.objectMapper = objectMapper;
         this.anchorMgr = new AnchorManager(objectMapper);
         this.searcher = new CodeSearcher(anchorMgr);
+        this.modelSwitcher = modelSwitcher;  // 初始化
+        this.contextManager = contextManager;
     }
 
     public void setLogConsumer(Consumer<String> consumer) {
@@ -103,6 +124,17 @@ public class ToolExecutor {
                         args.containsKey("recursive") && (boolean) args.get("recursive"),
                         args.containsKey("depth") ? (Integer) args.get("depth") : 1
                 );
+            case "switch_model":
+                return switchModel(args);
+            case "query_history":
+                return queryHistory(args);
+            case "read_between_anchors":
+                return anchorMgr.readBetweenAnchors(
+                        (String) args.get("startAnchor"),
+                        (String) args.get("endAnchor")
+                );
+            case "get_file_structure":
+                return getFileStructure((String) args.get("filename"));
             default:
                 return "未知工具: " + functionName;
         }
@@ -115,26 +147,30 @@ public class ToolExecutor {
         try {
             Path filePath = PathUtils.safeResolve(filename);
 
-            // ========== 🛡️ 安全检查 ==========
-            SecurityScanner scanner = SecurityScanner.getInstance();
-            ScanResult scanResult;
+            if(config.enableSecurityScan()){
+                logger.info("⚠\uFE0F 安全扫描已禁用，直接编译: {}", filename);
+            }else{
+                // ========== 🛡️ 安全检查 ==========
+                SecurityScanner scanner = SecurityScanner.getInstance();
+                ScanResult scanResult;
 
-            if (Files.isDirectory(filePath)) {
-                // 目录模式：递归扫描所有源文件
-                scanResult = scanner.scanDirectory(filePath);
-            } else if (Files.isRegularFile(filePath)) {
-                // 单文件模式
-                scanResult = scanner.scan(filePath);
-            } else {
-                return "❌ 路径不存在: " + filename;
-            }
+                if (Files.isDirectory(filePath)) {
+                    // 目录模式：递归扫描所有源文件
+                    scanResult = scanner.scanDirectory(filePath);
+                } else if (Files.isRegularFile(filePath)) {
+                    // 单文件模式
+                    scanResult = scanner.scan(filePath);
+                } else {
+                    return "❌ 路径不存在: " + filename;
+                }
 
-            if (!scanResult.passed()) {
-                String report = scanResult.getFormattedReport();
-                logger.warn("安全扫描未通过: {}", filename);
-                return "❌ 安全扫描拦截:\n" + report;
+                if (!scanResult.passed()) {
+                    String report = scanResult.getFormattedReport();
+                    logger.warn("安全扫描未通过: {}", filename);
+                    return "❌ 安全扫描拦截:\n" + report;
+                }
+                // ========== 安全检查结束 ==========
             }
-            // ========== 安全检查结束 ==========
 
             String result;
 
@@ -208,4 +244,89 @@ public class ToolExecutor {
         }
     }
 
+    private String switchModel(Map<String, Object> args) {
+        if (modelSwitcher == null) {
+            return "⚠️ 模型切换功能未启用（回调未设置）";
+        }
+        String target = (String) args.get("target");
+        if (target == null) {
+            return "❌ 缺少参数 'target'，请指定 'pro' 或 'flash'";
+        }
+        String modelName;
+        if ("pro".equalsIgnoreCase(target)) {
+            modelName = "deepseek-v4-pro";
+        } else if ("flash".equalsIgnoreCase(target)) {
+            modelName = "deepseek-v4-flash";
+        } else {
+            return "❌ 不支持的模型类型: " + target + "，请使用 'pro' 或 'flash'";
+        }
+        modelSwitcher.accept(modelName);
+        return "✅ 模型已切换至: " + modelName;
+    }
+
+    // queryHistory 方法
+    private String queryHistory(Map<String, Object> args) {
+        String keyword = (String) args.get("keyword");
+        int limit = args.containsKey("limit") ? (int) args.get("limit") : 10;
+        if (limit <= 0) limit = 10;
+
+        Path historyFile = contextManager.getHistoryFile();
+        if (historyFile == null || !Files.exists(historyFile)) {
+            return "[]";
+        }
+
+        List<Map<String, Object>> results = new ArrayList<>();
+        try (Stream<String> lines = Files.lines(historyFile, StandardCharsets.UTF_8)) {
+            Iterator<String> iterator = lines.iterator();
+            while (iterator.hasNext()) {
+                String line = iterator.next();
+                if (line.trim().isEmpty()) continue;
+                JsonNode node = objectMapper.readTree(line);
+                if (node.has("content")) {
+                    String content = node.get("content").asText();
+                    boolean matched = false;
+                    try {
+                        matched = Pattern.compile(keyword, Pattern.CASE_INSENSITIVE)
+                                .matcher(content).find();
+                    } catch (Exception e) {
+                        matched = content.toLowerCase().contains(keyword.toLowerCase());
+                    }
+                    if (matched) {
+                        Map<String, Object> entry = new LinkedHashMap<>();
+                        entry.put("role", node.get("role").asText());
+                        String snippet = content.length() > 200 ? content.substring(0, 200) + "..." : content;
+                        entry.put("snippet", snippet);
+                        results.add(entry);
+                        if (results.size() >= limit) break;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("⚠️ 查询历史失败: " + e.getMessage());
+            return "[]";
+        }
+        try {
+            return objectMapper.writeValueAsString(results);
+        } catch (Exception e) {
+            return "[]";
+        }
+    }
+
+    private String getFileStructure(String filename) {
+        try {
+            Path filePath = PathUtils.safeResolve(filename);
+            if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
+                return "❌ 文件不存在: " + filename;
+            }
+
+            StructureParser parser = StructureParserRegistry.getInstance().getParser(filePath);
+            FileStructure structure = parser.parse(filePath);
+
+            // 使用格式化器输出精简文本
+            return FileStructureFormatter.format(structure);
+
+        } catch (IOException e) {
+            return "❌ 解析文件结构失败: " + e.getMessage();
+        }
+    }
 }

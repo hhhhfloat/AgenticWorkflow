@@ -58,6 +58,16 @@ public final class ToolDefinitions {
                 List.of("filename")
         ));
 
+        // @anchor: toolDef_getFileStructure
+        tools.add(defineTool(
+                "get_file_structure",
+                "获取文件的代码结构信息（类、方法、字段、锚点等），帮助快速了解文件内容，而不需要读取整个文件。",
+                defineParams()
+                        .prop("filename", "string", "文件相对路径，例如 'src/Main.java'")
+                        .build(),
+                List.of("filename")
+        ));
+
         // @anchor: toolDef_readFile
         tools.add(defineTool(
                 "read_file",
@@ -66,6 +76,17 @@ public final class ToolDefinitions {
                         .prop("filename", "string", "文件名（相对路径），例如 'calculator.html' 或 'src/Tool.java'。")
                         .build(),
                 List.of("filename")
+        ));
+
+        // @anchor: toolDef_readBetweenAnchors
+        tools.add(defineTool(
+                "read_between_anchors",
+                "读取两个锚点之间的所有代码内容（包含锚点所在行）。用于精准读取特定代码块，避免读取整个文件。",
+                defineParams()
+                        .prop("startAnchor", "string", "起始锚点 ID")
+                        .prop("endAnchor", "string", "结束锚点 ID")
+                        .build(),
+                List.of("startAnchor", "endAnchor")
         ));
 
         // @anchor: toolDef_deleteFile
@@ -168,6 +189,27 @@ public final class ToolDefinitions {
                         .prop("depth", "integer", "当 recursive 为 true 时的分析深度，默认为 1")
                         .build(),
                 List.of("functionName")
+        ));
+
+        // @anchor: toolDef_switchModel
+        tools.add(defineTool(
+                "switch_model",
+                "切换 DeepSeek 模型。参数 target: 'pro' 或 'flash'。仅在当前任务确实需要更强推理能力时使用（如复杂重构、大型项目分析），一般情况保持 flash 以节省成本。",
+                defineParams()
+                        .prop("target", "string", "目标模型：'pro' 表示 deepseek-v4-pro，'flash' 表示 deepseek-v4-flash")
+                        .build(),
+                List.of("target")
+        ));
+
+        // @anchor: toolDef_queryHistory
+        tools.add(defineTool(
+                "query_history",
+                "在完整历史记录中搜索指定关键词（支持正则表达式），返回匹配的消息片段（最多 limit 条）。用于在压缩后查找被摘要覆盖的细节信息。",
+                defineParams()
+                        .prop("keyword", "string", "要搜索的关键词（支持正则表达式）")
+                        .prop("limit", "integer", "返回结果的最大条数，默认 10")
+                        .build(),
+                List.of("keyword")
         ));
 
         return tools;

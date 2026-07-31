@@ -1,7 +1,9 @@
 package com.myagent.workflow.core;
 
+import ch.qos.logback.core.joran.action.AppenderRefAction;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.myagent.workflow.tools.ToolDefinitions;
 import com.myagent.workflow.tools.ToolExecutor;
@@ -11,6 +13,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -22,6 +31,11 @@ import java.util.function.Consumer;
  */
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
+
+    private static final int MAX_MIDDLE_SIZE = 32768;
+
+    private String currentModel;  // ✅ 新增：运行时可变模型指针
+
 
     // @anchor: main_fields
     private final OkHttpClient httpClient;
@@ -36,10 +50,16 @@ public class Main {
 
     private Thread runningThread = null;  // 新增：持有工作线程引用
 
+    private final ContextManager contextManager;
+
+
     // @anchor: main_constructor
     public Main(AgentConfig runConfig) {
         this.apiKey = runConfig.apiKey();
         this.runConfig = runConfig;  // 存下来供 run 使用
+
+        this.currentModel = runConfig.model(); // ✅ 默认使用配置的模型
+
         this.httpClient = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
                 .writeTimeout(30, TimeUnit.SECONDS)
@@ -52,7 +72,26 @@ public class Main {
             sandbox.mkdirs();
         }
 
-        this.toolExecutor = new ToolExecutor(runConfig, objectMapper);
+
+        this.contextManager = new ContextManager(
+                4,  // hotSuffixSize
+                MAX_MIDDLE_SIZE, // maxMiddleSize (字符数)
+                httpClient,
+                objectMapper,
+                apiKey,
+                Main::logIf,   // 传入静态方法引用作为日志消费者
+                false
+        );
+
+        this.toolExecutor = new ToolExecutor(
+                runConfig,
+                objectMapper,
+                newModel -> {
+                    this.currentModel = newModel;
+                    logIf("🔄 [工具] Agent 主动切换模型至: " + newModel);
+                },
+                contextManager);
+
     }
 
     // ==================== API Key 校验 ====================
@@ -116,32 +155,22 @@ public class Main {
      */
     public String run(String userRequest, int maxIterations) throws IOException {
         this.runningThread = Thread.currentThread();
-        try{
-            List<Map<String, Object>> messages = new ArrayList<>();
-
-            // 系统提示
-            Map<String, Object> systemMsg = new HashMap<>();
-            systemMsg.put("role", "system");
-            systemMsg.put("content", SystemPrompt.get());
-            messages.add(systemMsg);
-
-            // 用户请求
-            Map<String, Object> userMsg = new HashMap<>();
-            userMsg.put("role", "user");
-            userMsg.put("content", userRequest);
-            messages.add(userMsg);
+        try {
+            // 初始化上下文管理器：将系统提示和用户请求放入前缀
+            contextManager.init(SystemPrompt.get(), userRequest);
 
             // 工具定义（委托给 ToolDefinitions）
             List<Map<String, Object>> tools = ToolDefinitions.build();
 
             for (int iteration = 0; iteration < maxIterations; iteration++) {
                 checkStop();
+
                 logIf("--- 第 " + (iteration + 1) + " 次迭代 ---");
 
                 // 构建 API 请求体
                 Map<String, Object> requestBody = new HashMap<>();
-                requestBody.put("model", runConfig.model());
-                requestBody.put("messages", messages);
+                requestBody.put("model", currentModel);
+                requestBody.put("messages", contextManager.buildMessages());
                 requestBody.put("tools", tools);
                 requestBody.put("tool_choice", "auto");
 
@@ -161,20 +190,20 @@ public class Main {
                     if (!response.isSuccessful()) {
                         throw new IOException("API 请求失败: " + response.code() + " " + response.message());
                     }
+                    assert response.body() != null;
                     responseBody = response.body().string();
                 }
 
                 // 解析响应
                 JsonNode root = objectMapper.readTree(responseBody);
                 JsonNode choices = root.get("choices");
-                if (choices == null || choices.size() == 0) {
+                if (choices == null || choices.isEmpty()) {
                     throw new IOException("API 返回异常: " + responseBody);
                 }
                 JsonNode messageNode = choices.get(0).get("message");
                 Map<String, Object> assistantMsg = objectMapper.convertValue(messageNode, Map.class);
-                messages.add(assistantMsg);
 
-                // ✅ 新增：记录模型返回的 content（解释性文字）
+                // 记录模型返回的 content（解释性文字）
                 if (messageNode.has("content") && !messageNode.get("content").isNull()) {
                     String content = messageNode.get("content").asText();
                     if (!content.isEmpty()) {
@@ -186,18 +215,48 @@ public class Main {
                 if (!messageNode.has("tool_calls") || messageNode.get("tool_calls").size() == 0) {
                     String content = messageNode.has("content") ? messageNode.get("content").asText() : "任务完成";
                     logIf("Agent 完成: " + content);
+
+                    // 记录本次 API 调用统计
+                    JsonNode usage = root.get("usage");
+                    if (usage != null) {
+                        long prompt = usage.get("prompt_tokens").asLong(0);
+                        long completion = usage.get("completion_tokens").asLong(0);
+                        long cached = 0;
+                        if (usage.has("prompt_tokens_details")) {
+                            JsonNode details = usage.get("prompt_tokens_details");
+                            if (details.has("cached_tokens")) {
+                                cached = details.get("cached_tokens").asLong(0);
+                            }
+                        }
+                        contextManager.recordUsage(currentModel, prompt, cached, completion);
+                    }
+
+                    // 本轮消息（仅 assistant）追加到后缀
+                    List<Map<String, Object>> finalRound = new ArrayList<>();
+                    finalRound.add(assistantMsg);
+                    contextManager.appendRoundToSuffix(finalRound);
+                    // 旋转并检查是否需要压缩（可能无压缩）
+                    contextManager.rotateAndCompress();
+
                     return content;
                 }
 
                 // 处理 tool_calls（委托给 ToolExecutor）
                 ArrayNode toolCalls = (ArrayNode) messageNode.get("tool_calls");
+                // 本轮消息收集：包括 assistant 和所有 tool
+                List<Map<String, Object>> currentRound = new ArrayList<>();
+                currentRound.add(assistantMsg); // 先加入 assistant
+
                 for (JsonNode tc : toolCalls) {
                     checkStop();
                     String toolCallId = tc.get("id").asText();
                     String functionName = tc.get("function").get("name").asText();
                     String argumentsJson = tc.get("function").get("arguments").asText();
-                    // ✨ 新增：记录工具调用参数（用于调试）
-                    String outputJson = (functionName.equals("write_file") || functionName.equals("insert_at_anchor")) ? (argumentsJson.substring(0, 30) + "...[已截断，共 " + argumentsJson.length() + " 字符]") : argumentsJson;
+
+                    // 记录工具调用参数（调试）
+                    String outputJson = (functionName.equals("write_file") || functionName.equals("insert_at_anchor"))
+                            ? (argumentsJson.substring(0, 30) + "...[已截断，共 " + argumentsJson.length() + " 字符]")
+                            : argumentsJson;
                     logIf("🤖 模型决策: 调用工具 [" + functionName + "] 参数: " + outputJson);
 
                     Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
@@ -206,12 +265,17 @@ public class Main {
 
                     String result = toolExecutor.dispatch(functionName, args);
 
+                    if (result == null) {
+                        result = "（工具返回 null）";
+                        logIf("⚠️ 工具 [" + functionName + "] 返回 null，已替换为占位符");
+                    }
+
                     // 将工具结果添加到对话
                     Map<String, Object> toolMsg = new HashMap<>();
                     toolMsg.put("role", "tool");
                     toolMsg.put("tool_call_id", toolCallId);
                     toolMsg.put("content", result);
-                    messages.add(toolMsg);
+                    currentRound.add(toolMsg); // 加入本轮
 
                     // 日志展示（对 read_file 结果做截断）
                     String displayResult;
@@ -227,12 +291,36 @@ public class Main {
                     }
                     logIf("工具 [" + functionName + "] 执行结果: " + displayResult);
                 }
+
+                // 记录本轮所有消息到上下文管理器
+                contextManager.appendRoundToSuffix(currentRound);
+
+                // 记录本次 API 调用统计（放在 append 之后或之前均可，但需在解析 usage 时完成）
+                JsonNode usage = root.get("usage");
+                if (usage != null) {
+                    long prompt = usage.get("prompt_tokens").asLong(0);
+                    long completion = usage.get("completion_tokens").asLong(0);
+                    long cached = 0;
+                    if (usage.has("prompt_tokens_details")) {
+                        JsonNode details = usage.get("prompt_tokens_details");
+                        if (details.has("cached_tokens")) {
+                            cached = details.get("cached_tokens").asLong(0);
+                        }
+                    }
+                    contextManager.recordUsage(currentModel, prompt, cached, completion);
+                }
+
+                // 旋转并触发压缩（如果需要）
+                contextManager.rotateAndCompress();
             }
 
             return "达到最大迭代次数，任务可能未完成。请检查生成的代码。";
-        } catch(IOException e){
+
+        } catch (IOException e) {
             throw e;
-        }finally{
+        } finally {
+            // 输出成本统计
+            contextManager.printStats();
             this.runningThread = null;
         }
     }
@@ -301,4 +389,5 @@ public class Main {
             e.printStackTrace();
         }
     }
+
 }
