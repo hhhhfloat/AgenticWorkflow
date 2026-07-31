@@ -87,11 +87,13 @@ public class FileOperator {
             if (!recursive) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("📁 目录 ").append(path).append(" 的内容：\n");
-                Files.list(dirPath).forEach(p -> {
-                    String name = p.getFileName().toString();
-                    String type = Files.isDirectory(p) ? "📁" : "📄";
-                    sb.append(type).append(" ").append(name).append("\n");
-                });
+                Files.list(dirPath)
+                        .filter(p -> !shouldIgnore(p))  // ← 新增过滤
+                        .forEach(p -> {
+                            String name = p.getFileName().toString();
+                            String type = Files.isDirectory(p) ? "📁" : "📄";
+                            sb.append(type).append(" ").append(name).append("\n");
+                        });
                 return sb.toString();
             }
 
@@ -110,6 +112,7 @@ public class FileOperator {
     private void buildTree(StringBuilder sb, Path dir, String indent, boolean isLast) {
         try {
             List<Path> entries = Files.list(dir)
+                    .filter(p -> !shouldIgnore(p))  // ← 新增过滤
                     .sorted((a, b) -> {
                         boolean aDir = Files.isDirectory(a);
                         boolean bDir = Files.isDirectory(b);
@@ -147,4 +150,17 @@ public class FileOperator {
         }
     }
 
+    /**
+     * 判断是否应忽略该路径（隐藏目录/IDE元数据目录/版本控制目录）
+     */
+    private boolean shouldIgnore(Path p) {
+        String name = p.getFileName().toString();
+        // 忽略以点开头的目录（Unix 隐藏目录），但保留 .gitignore 这样的文件
+        if (Files.isDirectory(p) && name.startsWith(".")) return true;
+        // 忽略常见 IDE 和版本控制目录
+        return name.equals(".idea") || name.equals(".vscode") ||
+                name.equals(".git") || name.equals("node_modules") ||
+                name.equals("target") || name.equals("__pycache__") ||
+                name.equals(".DS_Store");
+    }
 }
