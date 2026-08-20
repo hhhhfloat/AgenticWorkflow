@@ -148,8 +148,6 @@ public class ToolExecutor {
             Path filePath = PathUtils.safeResolve(filename);
 
             if(config.enableSecurityScan()){
-                logger.info("⚠\uFE0F 安全扫描已禁用，直接编译: {}", filename);
-            }else{
                 // ========== 🛡️ 安全检查 ==========
                 SecurityScanner scanner = SecurityScanner.getInstance();
                 ScanResult scanResult;
@@ -170,6 +168,8 @@ public class ToolExecutor {
                     return "❌ 安全扫描拦截:\n" + report;
                 }
                 // ========== 安全检查结束 ==========
+            }else{
+                logger.info("⚠\uFE0F 安全扫描已禁用，直接编译: {}", filename);
             }
 
             String result;
