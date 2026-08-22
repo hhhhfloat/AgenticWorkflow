@@ -169,6 +169,15 @@ public class ContextManager {
      */
     public List<Map<String, Object>> buildMessages() {
         List<Map<String, Object>> result = new ArrayList<>(immutableBase);
+
+        // 🔥 如果距离上次压缩已超过阈值（如 >= MAX_INTERVAL - 2），注入提醒
+        if (roundsSinceLastCheckpoint >= MAX_INTERVAL) {
+            String reminder = "💡 【系统提醒】你已迭代 " + roundsSinceLastCheckpoint +
+                    " 轮，达到最大压缩间隔（" + MAX_INTERVAL + " 轮）。" +
+                    "请在当前里程碑完成后调用 request_checkpoint 压缩上下文，避免token消耗。";
+            result.add(Map.of("role", "system", "content", reminder));
+        }
+
         result.addAll(volatileWorking);
         return result;
     }

@@ -90,21 +90,22 @@ public class Compressor {
         }
 
         String prompt = """
-            你是上下文状态压缩专家。请根据以下输入，生成一个结构化的项目状态摘要。
-
-            【输出要求】
-            必须严格按以下模板输出，不得增减字段：
-
-            ## PROJECT_STATE_SNAPSHOT
-            - TOTAL_GOAL: [最终目标，一句话概括]
-            - COMPLETED: [已完成的全部关键功能，用逗号分隔，不超过 300 字]
-            - NEXT_TASKS: [下一步具体行动，一句话描述]
-            - DIRTY_FILES: [本次周期内修改的核心文件列表，用逗号分隔]
-
-            【重要】只输出上述模板内容，不要添加任何额外说明、评价或分析。
-
-            【待压缩内容】
-            """ + contextBuilder.toString();
+        你是上下文状态压缩专家。请根据以下输入，生成一个结构化的项目状态摘要。
+        
+        【输出要求】
+        必须严格按以下模板输出，不得增减字段：
+    
+        ## PROJECT_STATE_SNAPSHOT
+        - TOTAL_GOAL: [最终目标，一句话概括]
+        - COMPLETED: [已完成的全部关键功能，用逗号分隔，不超过 300 字]
+        - NEXT_TASKS: [下一步具体行动，一句话描述]
+        - DIRTY_FILES: [本次周期内修改的核心文件列表，用逗号分隔]
+        - TARGET_FILES: [下一步需要操作的文件路径，用逗号分隔]
+    
+        【重要】只输出上述模板内容，不要添加任何额外说明、评价或分析。
+        
+        【待压缩内容】
+        """ + contextBuilder.toString();
 
         return callFlash(prompt);
     }

@@ -27,7 +27,7 @@ public record AgentConfig(
 
     // ===== 🚀 新增：锯齿压缩策略阈值 =====
     private static final int CHECKPOINT_MIN_INTERVAL = 5;
-    private static final int CHECKPOINT_MAX_INTERVAL = 12;
+    private static final int CHECKPOINT_MAX_INTERVAL = 15;
 
     // ===== 🚀 锚点索引文件名（项目内部） =====
     private static final String ANCHOR_INDEX_NAME = ".anchors.json";

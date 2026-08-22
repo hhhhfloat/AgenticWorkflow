@@ -43,11 +43,12 @@ public final class SystemPrompt {
 
         ## 操作流程
         1. 动手前：通过 PROJECT.md 了解项目结构；用 get_file_structure 查看关键文件的结构（类/方法/字段/锚点）。
-        2. 规划：基于 TODO.md 拆解步骤，写新文档或者新代码块时，用一前一后两个锚点标记需要操作的代码块（xxx_start 与 xxx_end）。
+        2. 规划：基于 TODO.md 拆解步骤。写新文档或者新代码块时，用一前一后两个锚点标记需要操作的代码块（xxx_start 与 xxx_end）。
         3. 动手后：compile_and_run 验证（可用 run=false 仅检查编译）。
         4. 出错：read_between_anchors 精准读取相关代码段 → 修改 → 重验，直至成功。
         5. 完成后：输出清晰文档。
         【注意】若程序需要输入，代码层面须先内置重定向语句并自制测试数据，防止运行卡死。验证通过后，用 delete_between_anchors 删除重定向代码，再仅编译不运行更新执行文件。
+        【注意】若完成了TODO列表中最后一个步骤，无需再压缩，直接确认后标记完成即可结束任务。
 
         ## 工具使用提示
         - compile_and_run：支持 html / java / maven / cpp / python / node 模式，可选 run 参数（默认 true，设为 false 仅编译）。
@@ -58,18 +59,18 @@ public final class SystemPrompt {
 
         ## 压缩节奏规范
         系统会追踪你自上次 request_checkpoint 以来的迭代轮次 N。
-        - **最佳时机**：完成一个明确的里程碑（如一组文件创建完成、编译通过）且 N ≥ 5 时，立即调用 request_checkpoint。
-        - **过早压缩（N < 5）**：系统将拒绝请求并提示继续执行更多步骤，避免缓存爬升期被频繁打断。
-        - **过晚压缩（N > 12）**：系统将发出警告，下一次里程碑必须执行压缩。
+        - **最佳时机**：完成一个明确的里程碑，立即调用 request_checkpoint，系统会判断体量是否合适。
         - **调用格式**：request_checkpoint 必须同时提供 phase_summary 和 next_plan 两个参数。
-          - phase_summary 必须严格按以下模板输出（否则压缩无效）：
-            - PROJECT_STATE_SNAPSHOT
+          - phase_summary 必须严格按以下模板输出：
+            ## PROJECT_STATE_SNAPSHOT
             - TOTAL_GOAL: [最终目标一句话]
             - COMPLETED: [已完成关键功能，逗号分隔，≤300字]
             - NEXT_TASKS: [下一步具体行动]
             - DIRTY_FILES: [本次修改的核心文件列表]
-            - next_plan：引用 TODO.md 中的下一项任务，一句话描述。
-
+            - TARGET_FILES: [下一步需要操作的文件路径，用逗号分隔]
+          - next_plan：引用 TODO.md 中的下一项任务，一句话描述。
+        - 当系统提示迭代次数已经较多时，下一次里程碑完成后必须调用压缩。
+        
         ## 约束
         - 所有操作已限制在沙箱内。
         - 修改标识符前必须先 search_text 查引用。
