@@ -70,13 +70,22 @@ public class ContextManager {
     private int apiCallCount = 0;
     private double price = 0;
 
-    // ===== 价格常量 =====
-    private static final double PRICE_FLASH_IN_HIT = 0.02;
-    private static final double PRICE_FLASH_IN_NOT_HIT = 1;
-    private static final double PRICE_FLASH_OUT = 2;
-    private static final double PRICE_PRO_IN_HIT = 0.025;
-    private static final double PRICE_PRO_IN_NOT_HIT = 3;
-    private static final double PRICE_PRO_OUT = 6;
+    // ===== 价格常量（新） =====
+// Flash
+    private static final double FLASH_IN_HIT_OFF_PEAK = 0.05;
+    private static final double FLASH_IN_HIT_PEAK = 0.10;
+    private static final double FLASH_IN_NOT_HIT_OFF_PEAK = 1.5;
+    private static final double FLASH_IN_NOT_HIT_PEAK = 3.0;
+    private static final double FLASH_OUT_OFF_PEAK = 4.5;
+    private static final double FLASH_OUT_PEAK = 9.0;
+
+    // Pro
+    private static final double PRO_IN_HIT_OFF_PEAK = 0.15;
+    private static final double PRO_IN_HIT_PEAK = 0.30;
+    private static final double PRO_IN_NOT_HIT_OFF_PEAK = 4.5;
+    private static final double PRO_IN_NOT_HIT_PEAK = 9.0;
+    private static final double PRO_OUT_OFF_PEAK = 13.5;
+    private static final double PRO_OUT_PEAK = 27.0;
 
     public ContextManager(OkHttpClient httpClient, ObjectMapper objectMapper,
                           String apiKey, Consumer<String> logConsumer) {
@@ -335,6 +344,17 @@ public class ContextManager {
 
     // ===================== 计费统计 =====================
 
+    // ===== 辅助：判断是否高峰时段 =====
+    private boolean isPeakHour() {
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Shanghai"));
+        int hour = now.getHour();
+        int minute = now.getMinute();
+        int totalMinutes = hour * 60 + minute;
+        // 高峰：9:00-12:00，14:00-18:00
+        return (totalMinutes >= 9 * 60 && totalMinutes < 12 * 60) ||
+                (totalMinutes >= 14 * 60 && totalMinutes < 18 * 60);
+    }
+
     public void recordUsage(String model, long promptTokens, long cachedTokens, long completionTokens) {
         this.totalPromptTokens += promptTokens;
         this.totalCachedTokens += cachedTokens;
@@ -359,12 +379,23 @@ public class ContextManager {
         );
     }
 
+    // ===== 修改 calculateCost =====
     private double calculateCost(String model, long promptTokens, long cachedTokens, long completionTokens) {
         boolean isPro = AgentConfig.getModelPro().equals(model);
-        double inHit = isPro ? PRICE_PRO_IN_HIT : PRICE_FLASH_IN_HIT;
-        double inNotHit = isPro ? PRICE_PRO_IN_NOT_HIT : PRICE_FLASH_IN_NOT_HIT;
-        double out = isPro ? PRICE_PRO_OUT : PRICE_FLASH_OUT;
+        boolean peak = isPeakHour();
         long uncached = promptTokens - cachedTokens;
+
+        double inHit, inNotHit, out;
+        if (isPro) {
+            inHit = peak ? PRO_IN_HIT_PEAK : PRO_IN_HIT_OFF_PEAK;
+            inNotHit = peak ? PRO_IN_NOT_HIT_PEAK : PRO_IN_NOT_HIT_OFF_PEAK;
+            out = peak ? PRO_OUT_PEAK : PRO_OUT_OFF_PEAK;
+        } else {
+            inHit = peak ? FLASH_IN_HIT_PEAK : FLASH_IN_HIT_OFF_PEAK;
+            inNotHit = peak ? FLASH_IN_NOT_HIT_PEAK : FLASH_IN_NOT_HIT_OFF_PEAK;
+            out = peak ? FLASH_OUT_PEAK : FLASH_OUT_OFF_PEAK;
+        }
+
         return (uncached / 1_000_000.0 * inNotHit) +
                 (cachedTokens / 1_000_000.0 * inHit) +
                 (completionTokens / 1_000_000.0 * out);
