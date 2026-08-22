@@ -7,8 +7,10 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+// @anchor: pathUtils_class
 public class PathUtils {
     private static final String sandboxDir = AgentConfig.getSandboxDir();
+    // @anchor: pathUtils_safeResolve
     static Path safeResolve(String... parts) throws IOException {
         // 1. 获取沙箱根目录的绝对规范化路径
         Path root = Paths.get(sandboxDir).toAbsolutePath().normalize();

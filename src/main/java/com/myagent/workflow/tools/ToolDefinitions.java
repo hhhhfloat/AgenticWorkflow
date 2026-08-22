@@ -10,6 +10,7 @@ import java.util.Map;
  * 工具定义构建器 —— 生成 DeepSeek Function Calling 所需的 tools 列表。
  * 从 Main.java 中独立出来，便于单独维护工具 Schema。
  */
+// @anchor: toolDefinitions_class_single
 public final class ToolDefinitions {
 
     private ToolDefinitions() {
@@ -21,6 +22,7 @@ public final class ToolDefinitions {
      * 构建全部工具定义（符合 DeepSeek Function Calling 规范）。
      * @return 工具定义列表
      */
+    // @anchor: toolDefinitions_build_single
     public static List<Map<String, Object>> build() {
         List<Map<String, Object>> tools = new ArrayList<>();
 
@@ -214,6 +216,7 @@ public final class ToolDefinitions {
         ));
 
         // 在 ToolDefinitions.java 中添加
+        // @anchor: toolDef_requestCheckpoint
         tools.add(defineTool(
                 "request_checkpoint",
                 "当完成 TODO.md 中一个明确的阶段（如完成一组相关文件或通过编译验证）后调用。保存当前进度并压缩历史，以便后续低成本续跑。",
@@ -229,6 +232,7 @@ public final class ToolDefinitions {
 
     // ========== 内部构建辅助 ==========
 
+    // @anchor: toolDefinitions_defineTool
     private static Map<String, Object> defineTool(String name, String description,
                                                    Map<String, Object> parameters, List<String> required) {
         parameters.put("required", required);
@@ -243,11 +247,13 @@ public final class ToolDefinitions {
         return tool;
     }
 
+    // @anchor: toolDefinitions_defineParams
     private static ParamsBuilder defineParams() {
         return new ParamsBuilder();
     }
 
     /** 流畅构建 parameters JSON Schema */
+    // @anchor: toolDefinitions_paramsBuilder
     private static class ParamsBuilder {
         private final Map<String, Object> props = new HashMap<>();
 

@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Consumer;
 
+// @anchor: fileOperator_class
 public class FileOperator {
     private static final Logger logger = LoggerFactory.getLogger(FileOperator.class);
     private Consumer<String> logConsumer;
@@ -22,6 +23,7 @@ public class FileOperator {
 
 
     // ===== 工具方法 =====
+    // @anchor: fileOperator_writeFile
     public String writeFile(String filename, String code) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -37,6 +39,7 @@ public class FileOperator {
     }
 
 
+    // @anchor: fileOperator_readFile
     public String readFile(String filename) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -55,6 +58,7 @@ public class FileOperator {
         }
     }
 
+    // @anchor: fileOperator_deleteFile
     public String deleteFile(String filename) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -73,6 +77,7 @@ public class FileOperator {
     }
 
 
+    // @anchor: fileOperator_listDirectory
     public String listDirectory(String path, boolean recursive) {
         if (path == null || path.trim().isEmpty()) {
             path = ".";
@@ -109,6 +114,7 @@ public class FileOperator {
     }
 
     // 辅助递归
+    // @anchor: fileOperator_buildTree
     private void buildTree(StringBuilder sb, Path dir, String indent, boolean isLast) {
         try {
             List<Path> entries = Files.list(dir)
@@ -153,6 +159,7 @@ public class FileOperator {
     /**
      * 判断是否应忽略该路径（隐藏目录/IDE元数据目录/版本控制目录）
      */
+    // @anchor: fileOperator_shouldIgnore
     private boolean shouldIgnore(Path p) {
         String name = p.getFileName().toString();
         // 忽略以点开头的目录（Unix 隐藏目录），但保留 .gitignore 这样的文件

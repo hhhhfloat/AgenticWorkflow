@@ -15,17 +15,20 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.regex.Pattern;
 
+// @anchor: anchorManager_class
 public class AnchorManager {
     private static final Logger logger = LoggerFactory.getLogger(AnchorManager.class);
     private final ObjectMapper objectMapper;
     private boolean migrationAttempted = false;
 
+    // @anchor: anchorManager_constructor
     public AnchorManager(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
 
     // ===== 工具方法 =====
 
+    // @anchor: anchorManager_getIndexPath
     /**
      * 获取项目锚点索引文件的路径
      * @param projectPath 项目相对路径（如 "task-cli"）
@@ -41,6 +44,7 @@ public class AnchorManager {
         }
     }
 
+    // @anchor: anchorManager_migrateOldIndex
     /**
      * 迁移旧的全局锚点索引文件（sandbox/.anchor_index.json）
      * 拆分为每个项目的 .anchors.json
@@ -101,6 +105,7 @@ public class AnchorManager {
 
     // ===== 工具方法 =====
 
+    // @anchor: anchorManager_buildIndex
     String buildAnchorIndex(String projectPath) {
         // 首先执行迁移（如果尚未执行）
         migrateOldIndexIfNeeded();
@@ -237,6 +242,7 @@ public class AnchorManager {
         }
     }
 
+    // @anchor: anchorManager_listAnchors
     /**
      * 列出指定项目的所有锚点
      */
@@ -244,6 +250,7 @@ public class AnchorManager {
         return listAnchors(projectPath, null);
     }
 
+    // @anchor: anchorManager_listAnchorsByFile
     /**
      * 列出指定项目的锚点，可指定具体文件
      * @param projectPath 项目路径
@@ -312,6 +319,7 @@ public class AnchorManager {
         }
     }
 
+    // @anchor: anchorManager_insertAtAnchor
     String insertAtAnchor(String anchorId, String content, String position) {
         // 注意：由于需要 projectPath，我们需要先查找锚点所在项目
         AnchorLocation loc = findAnchorGlobally(anchorId);
@@ -340,6 +348,7 @@ public class AnchorManager {
         }
     }
 
+    // @anchor: anchorManager_deleteBetweenAnchors
     String deleteBetweenAnchors(String startAnchor, String endAnchor) {
         AnchorLocation startLoc = findAnchorGlobally(startAnchor);
         AnchorLocation endLoc = findAnchorGlobally(endAnchor);
@@ -387,6 +396,7 @@ public class AnchorManager {
         }
     }
 
+    // @anchor: anchorManager_readBetweenAnchors
     String readBetweenAnchors(String startAnchor, String endAnchor) {
         AnchorLocation startLoc = findAnchorGlobally(startAnchor);
         AnchorLocation endLoc = findAnchorGlobally(endAnchor);
@@ -454,10 +464,14 @@ public class AnchorManager {
 
     // ===== 辅助：查找锚点 =====
 
+    // @anchor: anchorManager_findAnchor
     /**
-     * 在指定项目中查找锚点
+     * 在指定项目中查找锚点（推荐使用的新 API）
+     * @param projectPath 项目相对路径（如 "task-cli"）
+     * @param anchorId 锚点 ID
+     * @return 锚点位置信息，未找到返回 null
      */
-    private AnchorLocation findAnchor(String projectPath, String anchorId) {
+    AnchorLocation findAnchor(String projectPath, String anchorId) {
         try {
             Path indexFile = getIndexPath(projectPath);
             if (indexFile == null) {
@@ -491,9 +505,10 @@ public class AnchorManager {
         }
     }
 
+    // @anchor: anchorManager_findAnchorGlobally
     /**
-     * 全局查找锚点（遍历所有项目，用于 insertAtAnchor 等需要自动定位的方法）
-     * 注意：此方法仅在旧有工具方法中使用，新代码应使用 findAnchor(projectPath, anchorId)
+     * 全局查找锚点（遍历所有项目，仅内部使用）
+     * 供 insertAtAnchor / deleteBetweenAnchors / readBetweenAnchors 等需要自动定位项目的工具方法使用。
      */
     private AnchorLocation findAnchorGlobally(String anchorId) {
         // 首先尝试迁移
@@ -522,12 +537,5 @@ public class AnchorManager {
             logger.error("全局查找锚点失败", e);
             return null;
         }
-    }
-
-    // ===== 兼容旧有的 findAnchor 方法（用于未修改的调用方）=====
-    // 注意：此方法已废弃，仅用于兼容，新代码应使用 findAnchor(projectPath, anchorId)
-    @Deprecated
-    AnchorLocation findAnchor(String anchorId) {
-        return findAnchorGlobally(anchorId);
     }
 }

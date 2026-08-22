@@ -31,6 +31,7 @@ import java.util.stream.Stream;
  * 工具执行器 —— 实现所有 Agent 可调用工具的具体逻辑。
  * 从 Main.java 中独立出来，Main 仅保留工作流编排。
  */
+// @anchor: toolExecutor_class_single
 public class ToolExecutor {
     private static final Logger logger = LoggerFactory.getLogger(ToolExecutor.class);
 
@@ -60,6 +61,7 @@ public class ToolExecutor {
         this.contextManager = contextManager;
     }
 
+    // @anchor: toolExecutor_setLogConsumer
     public void setLogConsumer(Consumer<String> consumer) {
         this.logConsumer = consumer;
     }
@@ -70,6 +72,7 @@ public class ToolExecutor {
      * @anchor: toolExecutor_dispatch
      * 根据工具名和参数分发执行，返回结果字符串。
      */
+    // @anchor: toolExecutor_dispatch_single
     public String dispatch(String functionName, Map<String, Object> args) throws IOException {
         switch (functionName) {
             case "write_file":
@@ -148,6 +151,7 @@ public class ToolExecutor {
 
     // ==================== 工具 : compile_and_run ====================
 
+    // @anchor: toolExecutor_compileAndRun
     private String compileAndRun(String filename, String mode, boolean run) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -220,6 +224,7 @@ public class ToolExecutor {
     }
 
     // 辅助判断：检查结果是否包含错误标识
+    // @anchor: toolExecutor_isError
     private boolean isErrorResult(String result) {
         if (result == null) return true;
         // 不再检查 "error"，因为编译输出可能包含它但编译是成功的
@@ -231,6 +236,7 @@ public class ToolExecutor {
     }
 
     // 写入注册表
+    // @anchor: toolExecutor_writeEntry
     private void writeEntryFile(Path projectDir, String filename, String mode) {
         try {
             Path entryFile = projectDir.resolve(".agent_entry.json");
@@ -249,6 +255,7 @@ public class ToolExecutor {
         }
     }
 
+    // @anchor: toolExecutor_switchModel
     private String switchModel(Map<String, Object> args) {
         if (modelSwitcher == null) {
             return "⚠️ 模型切换功能未启用（回调未设置）";
@@ -270,6 +277,7 @@ public class ToolExecutor {
     }
 
     // queryHistory 方法
+    // @anchor: toolExecutor_queryHistory
     private String queryHistory(Map<String, Object> args) {
         String keyword = (String) args.get("keyword");
         int limit = args.containsKey("limit") ? (int) args.get("limit") : 10;
@@ -317,6 +325,7 @@ public class ToolExecutor {
         }
     }
 
+    // @anchor: toolExecutor_getFileStructure
     private String getFileStructure(String filename) {
         try {
             Path filePath = PathUtils.safeResolve(filename);

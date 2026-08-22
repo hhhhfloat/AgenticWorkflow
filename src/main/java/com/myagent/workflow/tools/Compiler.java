@@ -24,6 +24,7 @@ import java.util.stream.Stream;
  * 编译运行引擎 —— 负责 HTML 预览、单文件 Java 编译运行、Maven 项目编译。
  * 从 ToolExecutor 中分离，专一管理所有“执行”逻辑。
  */
+// @anchor: compiler_class_single
 public class Compiler {
     private static final Logger logger = LoggerFactory.getLogger(Compiler.class);
 
@@ -39,6 +40,7 @@ public class Compiler {
     }
 
     // ==================== 自动检测调度器 ====================
+    // @anchor: compiler_compileAuto
     public String compileAuto(Path filePath, String filename, boolean run) {
         try {
             if (filename.endsWith(".html") || filename.endsWith(".htm")) {
@@ -73,6 +75,7 @@ public class Compiler {
     }
 
     // ==================== HTML 预览 ====================
+    // @anchor: compiler_previewHtml
     public String previewHtml(Path filePath, String filename) throws IOException {
         if (!Files.exists(filePath)) {
             return "HTML 文件不存在: " + filename;
@@ -96,6 +99,7 @@ public class Compiler {
     }
 
     // ==================== 单文件 Java 编译运行 ====================
+    // @anchor: compiler_compileJava
     public String compileJava(Path filePath, String filename, boolean run) {
         try {
             // 1. 获取项目目录（源文件所在目录）
@@ -156,6 +160,7 @@ public class Compiler {
         }
     }
     // ==================== Maven 编译（只编译，不运行）====================
+    // @anchor: compiler_compileMaven
     public String compileMaven(Path filePath, boolean run) throws IOException {
         Path projectDir = filePath.toAbsolutePath().normalize();
         if (!Files.isDirectory(projectDir)) {
@@ -266,6 +271,7 @@ public class Compiler {
      * 在 Maven 项目的 target/classes 中查找包含 main 方法的类
      * @return 全限定类名（如 com.test.Hello），如果没找到返回 null
      */
+    // @anchor: compiler_findMainClass
     private String findMainClass(Path projectDir) throws IOException, InterruptedException {
         Path classesDir = projectDir.resolve("target/classes");
         if (!Files.exists(classesDir) || !Files.isDirectory(classesDir)) {
@@ -306,6 +312,7 @@ public class Compiler {
 
     // ==================== C++ 编译运行（MSVC）====================
     @SuppressWarnings("ConstantConditions")
+    // @anchor: compiler_compileCpp
     public String compileAndRunCpp(Path filePath, String filename, boolean run) {
         logger.info("🔧 compileAndRunCpp 被调用: filename={}, run={}, filePath={}", filename, run, filePath);
         try {
@@ -389,6 +396,7 @@ public class Compiler {
     }
     // ==================== Python 解释执行 ====================
 // ==================== Python 解释执行 ====================
+    // @anchor: compiler_runPython
     public String runPython(Path filePath, String filename, boolean run) {
         if (!run) {
             return "✅ Python 脚本已就绪（未运行）！\n文件: " + filename;
@@ -452,6 +460,7 @@ public class Compiler {
         return "✅ Python 运行成功！\n输出:\n" + result.output;
     }
     // ==================== Node.js 解释执行 ====================
+    // @anchor: compiler_runNode
     public String runNode(Path filePath, String filename, boolean run) {
         if (!run) {
             return "✅ Node.js 脚本已就绪（未运行）！\n文件: " + filename;
@@ -490,6 +499,7 @@ public class Compiler {
      * @param detectStdinStall 是否开启输入阻塞检测（GUI程序可关闭）
      * @return 执行结果
      */
+    // @anchor: compiler_executeProcess
     private ProcessResult executeProcess(ProcessBuilder pb, long timeoutSeconds, boolean detectStdinStall) {
         // ========== 新增：安全加固 ==========
         try {
@@ -614,6 +624,7 @@ public class Compiler {
     /**
      * 为子进程设置安全的环境变量，将临时目录和用户主目录重定向到沙箱内。
      */
+    // @anchor: compiler_secureEnvironment
     private void secureEnvironment(ProcessBuilder pb) throws IOException {
         Map<String, String> env = pb.environment();
         Path sandboxRoot = Paths.get(sandboxDir).toAbsolutePath().normalize();
