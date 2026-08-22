@@ -1,9 +1,7 @@
 package com.myagent.workflow.core;
 
-import ch.qos.logback.core.joran.action.AppenderRefAction;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.myagent.workflow.tools.ToolDefinitions;
 import com.myagent.workflow.tools.ToolExecutor;
@@ -13,13 +11,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
@@ -32,10 +23,7 @@ import java.util.function.Consumer;
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
-    private static final int MAX_MIDDLE_SIZE = 32768;
-
-    private String currentModel;  // ✅ 新增：运行时可变模型指针
-
+    private String currentModel;
 
     // @anchor: main_fields
     private final OkHttpClient httpClient;
@@ -48,7 +36,7 @@ public class Main {
 
     private final AgentConfig runConfig;
 
-    private Thread runningThread = null;  // 新增：持有工作线程引用
+    private Thread runningThread = null;
 
     private final ContextManager contextManager;
 
@@ -56,9 +44,9 @@ public class Main {
     // @anchor: main_constructor
     public Main(AgentConfig runConfig) {
         this.apiKey = runConfig.apiKey();
-        this.runConfig = runConfig;  // 存下来供 run 使用
+        this.runConfig = runConfig;
 
-        this.currentModel = runConfig.model(); // ✅ 默认使用配置的模型
+        this.currentModel = runConfig.model();
 
         this.httpClient = new OkHttpClient.Builder()
                 .connectTimeout(30, TimeUnit.SECONDS)
@@ -72,15 +60,11 @@ public class Main {
             sandbox.mkdirs();
         }
 
-
         this.contextManager = new ContextManager(
-                4,  // hotSuffixSize
-                MAX_MIDDLE_SIZE, // maxMiddleSize (字符数)
                 httpClient,
                 objectMapper,
                 apiKey,
-                Main::logIf,   // 传入静态方法引用作为日志消费者
-                false
+                Main::logIf
         );
 
         this.toolExecutor = new ToolExecutor(
@@ -91,7 +75,6 @@ public class Main {
                     logIf("🔄 [工具] Agent 主动切换模型至: " + newModel);
                 },
                 contextManager);
-
     }
 
     // ==================== API Key 校验 ====================
@@ -125,17 +108,14 @@ public class Main {
                 } else if (code == 401) {
                     return false;
                 } else {
-                    // 其他状态码（如 429、500 等）视为 Key 可能有效但服务有问题
                     System.err.println("⚠️ API 返回异常状态码: " + code + "，请稍后重试");
                     return false;
                 }
             }
         } catch (java.net.UnknownHostException e) {
-            // 网络不通，提示但不阻止启动
             System.err.println("⚠️ 无法连接 DeepSeek API，请检查网络连接");
-            return true; // 允许继续启动
+            return true;
         } catch (Exception e) {
-            // 其他异常，如超时等，也允许继续（避免误判）
             System.err.println("⚠️ 验证 API Key 时发生异常: " + e.getMessage());
             return true;
         }
@@ -156,10 +136,8 @@ public class Main {
     public String run(String userRequest, int maxIterations) throws IOException {
         this.runningThread = Thread.currentThread();
         try {
-            // 初始化上下文管理器：将系统提示和用户请求放入前缀
             contextManager.init(SystemPrompt.get(), userRequest);
 
-            // 工具定义（委托给 ToolDefinitions）
             List<Map<String, Object>> tools = ToolDefinitions.build();
 
             for (int iteration = 0; iteration < maxIterations; iteration++) {
@@ -167,7 +145,6 @@ public class Main {
 
                 logIf("--- 第 " + (iteration + 1) + " 次迭代 ---");
 
-                // 构建 API 请求体
                 Map<String, Object> requestBody = new HashMap<>();
                 requestBody.put("model", currentModel);
                 requestBody.put("messages", contextManager.buildMessages());
@@ -176,7 +153,6 @@ public class Main {
 
                 String jsonBody = objectMapper.writeValueAsString(requestBody);
 
-                // 发送 HTTP 请求
                 checkStop();
                 Request httpRequest = new Request.Builder()
                         .url(AgentConfig.getApiUrl())
@@ -194,7 +170,6 @@ public class Main {
                     responseBody = response.body().string();
                 }
 
-                // 解析响应
                 JsonNode root = objectMapper.readTree(responseBody);
                 JsonNode choices = root.get("choices");
                 if (choices == null || choices.isEmpty()) {
@@ -203,7 +178,6 @@ public class Main {
                 JsonNode messageNode = choices.get(0).get("message");
                 Map<String, Object> assistantMsg = objectMapper.convertValue(messageNode, Map.class);
 
-                // 记录模型返回的 content（解释性文字）
                 if (messageNode.has("content") && !messageNode.get("content").isNull()) {
                     String content = messageNode.get("content").asText();
                     if (!content.isEmpty()) {
@@ -216,7 +190,6 @@ public class Main {
                     String content = messageNode.has("content") ? messageNode.get("content").asText() : "任务完成";
                     logIf("Agent 完成: " + content);
 
-                    // 记录本次 API 调用统计
                     JsonNode usage = root.get("usage");
                     if (usage != null) {
                         long prompt = usage.get("prompt_tokens").asLong(0);
@@ -231,21 +204,17 @@ public class Main {
                         contextManager.recordUsage(currentModel, prompt, cached, completion);
                     }
 
-                    // 本轮消息（仅 assistant）追加到后缀
                     List<Map<String, Object>> finalRound = new ArrayList<>();
                     finalRound.add(assistantMsg);
-                    contextManager.appendRoundToSuffix(finalRound);
-                    // 旋转并检查是否需要压缩（可能无压缩）
-                    contextManager.rotateAndCompress();
+                    contextManager.appendToWorking(finalRound);  // ✅ 修正：使用 finalRound
 
                     return content;
                 }
 
-                // 处理 tool_calls（委托给 ToolExecutor）
+                // 处理 tool_calls
                 ArrayNode toolCalls = (ArrayNode) messageNode.get("tool_calls");
-                // 本轮消息收集：包括 assistant 和所有 tool
                 List<Map<String, Object>> currentRound = new ArrayList<>();
-                currentRound.add(assistantMsg); // 先加入 assistant
+                currentRound.add(assistantMsg);
 
                 for (JsonNode tc : toolCalls) {
                     checkStop();
@@ -253,7 +222,6 @@ public class Main {
                     String functionName = tc.get("function").get("name").asText();
                     String argumentsJson = tc.get("function").get("arguments").asText();
 
-                    // 记录工具调用参数（调试）
                     String outputJson = (functionName.equals("write_file") || functionName.equals("insert_at_anchor"))
                             ? (argumentsJson.substring(0, 30) + "...[已截断，共 " + argumentsJson.length() + " 字符]")
                             : argumentsJson;
@@ -270,14 +238,13 @@ public class Main {
                         logIf("⚠️ 工具 [" + functionName + "] 返回 null，已替换为占位符");
                     }
 
-                    // 将工具结果添加到对话
+
                     Map<String, Object> toolMsg = new HashMap<>();
                     toolMsg.put("role", "tool");
                     toolMsg.put("tool_call_id", toolCallId);
                     toolMsg.put("content", result);
-                    currentRound.add(toolMsg); // 加入本轮
+                    currentRound.add(toolMsg);
 
-                    // 日志展示（对 read_file 结果做截断）
                     String displayResult;
                     if ("read_file".equals(functionName)) {
                         int totalLen = result.length();
@@ -292,10 +259,9 @@ public class Main {
                     logIf("工具 [" + functionName + "] 执行结果: " + displayResult);
                 }
 
-                // 记录本轮所有消息到上下文管理器
-                contextManager.appendRoundToSuffix(currentRound);
+                // 记录本轮所有消息到工作区
+                contextManager.appendToWorking(currentRound);
 
-                // 记录本次 API 调用统计（放在 append 之后或之前均可，但需在解析 usage 时完成）
                 JsonNode usage = root.get("usage");
                 if (usage != null) {
                     long prompt = usage.get("prompt_tokens").asLong(0);
@@ -309,9 +275,6 @@ public class Main {
                     }
                     contextManager.recordUsage(currentModel, prompt, cached, completion);
                 }
-
-                // 旋转并触发压缩（如果需要）
-                contextManager.rotateAndCompress();
             }
 
             return "达到最大迭代次数，任务可能未完成。请检查生成的代码。";
@@ -319,29 +282,26 @@ public class Main {
         } catch (IOException e) {
             throw e;
         } finally {
-            // 输出成本统计
             contextManager.printStats();
             this.runningThread = null;
         }
     }
 
-    // 原有 run(String) 保持兼容，调用新方法
+    // 原有 run(String) 保持兼容
     public String run(String userRequest) throws IOException {
         return run(userRequest, AgentConfig.getDefaultMaxIterations());
     }
 
     // @anchor: main_stop
-    /** 请求停止 Agent */
     public void stop() {
         this.stopRequested = true;
         Thread t = this.runningThread;
         if (t != null && t != Thread.currentThread()) {
-            t.interrupt();  // 中断工作线程
+            t.interrupt();
         }
     }
 
     // @anchor: main_checkStop
-    /** 检查停止标志，若已请求停止则抛出异常 */
     private void checkStop() throws IOException {
         if (stopRequested) {
             throw new IOException("用户手动停止了任务");
@@ -358,10 +318,6 @@ public class Main {
     }
 
     // @anchor: main_entry
-    /**
-     * 命令行入口（独立运行模式）。
-     * 用法: java -jar agent.jar "需求描述"
-     */
     public static void main(String[] args) {
         String apiKey = System.getenv("DEEPSEEK_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {
@@ -389,5 +345,4 @@ public class Main {
             e.printStackTrace();
         }
     }
-
 }

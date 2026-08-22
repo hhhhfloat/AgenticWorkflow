@@ -59,6 +59,8 @@ public class HttpServerMain {
     // 检测到有其他进程
     public static final int EXIT_CODE_EXISTED_THREAD = 12;
 
+    public static final int MAX_ITERATIONS = 100;
+
     // 在 HttpServerMain 类中
     private static volatile boolean apiKeyClearedByUser = false;
     public static boolean isApiKeyCleared() {
@@ -363,12 +365,14 @@ public class HttpServerMain {
                 JsonNode root = mapper.readTree(body);
                 userRequest = root.get("prompt").asText();
 
+                Main.logIf("🔍 [调试] 收到请求体: " + body);
+
                 runConfig = ConfigEditor.buildFromRequest(root);
 
                 maxIterations = AgentConfig.getDefaultMaxIterations();
                 if (root.has("maxIterations")) {
                     int raw = root.get("maxIterations").asInt();
-                    if (raw >= 3 && raw <= 50) {
+                    if (raw >= 3 && raw <= MAX_ITERATIONS) {
                         maxIterations = raw;
                     }
                 }

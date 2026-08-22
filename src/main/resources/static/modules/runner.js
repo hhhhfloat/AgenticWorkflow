@@ -33,7 +33,8 @@ async function runProjectWithPath(projectName, filename, mode) {
         msvcCompiler: settings.msvcCompiler || '',
         msvcInclude: '',
         msvcLib: '',
-        mingwCompiler: settings.mingwCompiler || ''
+        mingwCompiler: settings.mingwCompiler || '',
+        enableSecurityScan: settings.enableSecurityScan !== false
     };
 
     try {

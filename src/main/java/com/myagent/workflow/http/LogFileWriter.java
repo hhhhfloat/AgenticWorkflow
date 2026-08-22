@@ -41,7 +41,7 @@ class LogFileWriter implements AutoCloseable {
         Path logDir = Paths.get("./HistoryOutput");
         if (!Files.exists(logDir)) return;
 
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(30);
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(3000);
         try (Stream<Path> files = Files.list(logDir)) {
             files.filter(p -> p.toString().endsWith(".log"))
                     .forEach(p -> {

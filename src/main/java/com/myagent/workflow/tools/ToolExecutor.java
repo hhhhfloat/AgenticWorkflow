@@ -47,6 +47,7 @@ public class ToolExecutor {
     private final AgentConfig config;
 
 
+
     // @anchor: toolExecutor_constructor
     public ToolExecutor(AgentConfig config, ObjectMapper objectMapper, Consumer<String> modelSwitcher, ContextManager contextManager) {
         this.config = config;
@@ -135,6 +136,10 @@ public class ToolExecutor {
                 );
             case "get_file_structure":
                 return getFileStructure((String) args.get("filename"));
+            case "request_checkpoint":
+                String phaseSummary = (String) args.get("phase_summary");
+                String nextPlan = (String) args.get("next_plan");
+                return contextManager.requestCheckpoint(phaseSummary, nextPlan);
             default:
                 return "未知工具: " + functionName;
         }
@@ -329,4 +334,5 @@ public class ToolExecutor {
             return "❌ 解析文件结构失败: " + e.getMessage();
         }
     }
+
 }

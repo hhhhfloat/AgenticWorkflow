@@ -88,9 +88,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const iterInput = document.getElementById('maxIterations');
     iterInput.addEventListener('change', function() {
         let val = parseInt(this.value);
-        if (isNaN(val)) val = 20;
+        if (isNaN(val)) val = 30;
         if (val < 3) val = 3;
-        if (val > 50) val = 50;
+        if (val > 100) val = 100;
         this.value = val;
     });
     startHeartbeat();

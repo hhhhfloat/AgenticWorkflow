@@ -16,36 +16,61 @@ import java.util.*;
 import java.util.function.Consumer;
 
 /**
- * 上下文管理器 —— 负责三段式消息存储、轮次滚动、压缩触发与执行
+ * 上下文管理器 —— 双区存储模型：
+ * - immutableBase：不可变基础区（SystemPrompt + 原始User + 目录树 + 累积摘要）
+ * - volatileWorking：易失工作区（仅存最近 1~2 轮，每次 checkpoint 后清空）
+ * <p>
+ * v4.1 精细化增强：
+ * - 双重裁剪策略（消息条数上限 + 字符数软上限）
+ * - 详细的调试日志
+ * - 提供工作区状态查询
  */
 public class ContextManager {
 
-    // 三段结构：每个元素是一个轮次（List<Map>）
-    private final List<List<Map<String, Object>>> prefix = new ArrayList<>();
-    private final List<List<Map<String, Object>>> toCompress = new ArrayList<>();
-    private final List<List<Map<String, Object>>> suffix = new ArrayList<>();
+    // ===== 核心存储 =====
+    private final List<Map<String, Object>> immutableBase = new ArrayList<>();
+    private final List<Map<String, Object>> volatileWorking = new ArrayList<>();
+    // ===== 文件变化日志缓冲（待合并到 immutableBase） =====
+    private final Set<String> pendingDocChanges = new HashSet<>();
+    // ===== 🚀 新增：待压缩的 PROJECT.md（单独标记） =====
+    private boolean projectMdPending = false;
 
-    private final int hotSuffixRounds;   // 热后缀保留轮次数（如 3 轮）
-    private final int maxCompressSize;   // 触发压缩的字符数阈值
 
-    // 依赖
+    // ===== 裁剪阈值 =====
+    // 硬上限：工作区最多保留 20 条消息（约 2-3 轮完整交互）
+    private static final int MAX_WORKING_MESSAGES = 20;
+    // 软上限：工作区序列化后超过 8000 字符触发裁剪（防止单次请求体过大）
+    private static final int MAX_WORKING_CHARS = 300000;
+
+    // ===== 压缩依赖 =====
     private final OkHttpClient httpClient;
-    private final ObjectMapper objectMapper;
     private final String apiKey;
+    private final ObjectMapper objectMapper; // 已有，但用于序列化
     private final Consumer<String> logConsumer;
 
-    // 历史记录
+
+    // ===== 压缩状态追踪 =====
+    private int roundsSinceLastCheckpoint = 0;
+    private final int MIN_INTERVAL = AgentConfig.getCheckpointMinInterval();
+    private final int MAX_INTERVAL = AgentConfig.getCheckpointMaxInterval();
+
+    // ===== 历史记录 =====
     private Path historyFile;
     private final List<Long> historyOffsets = new ArrayList<>();
 
-    // 计费统计
+    // ===== 待应用的检查点摘要 =====
+    private String pendingSummary = null;
+
+    private final Compressor compressor;
+
+    // ===== 计费统计 =====
     private long totalPromptTokens = 0;
     private long totalCachedTokens = 0;
     private long totalCompletionTokens = 0;
     private int apiCallCount = 0;
     private double price = 0;
 
-    // 价格常量
+    // ===== 价格常量 =====
     private static final double PRICE_FLASH_IN_HIT = 0.02;
     private static final double PRICE_FLASH_IN_NOT_HIT = 1;
     private static final double PRICE_FLASH_OUT = 2;
@@ -53,23 +78,19 @@ public class ContextManager {
     private static final double PRICE_PRO_IN_NOT_HIT = 3;
     private static final double PRICE_PRO_OUT = 6;
 
-    private final boolean compressionEnabled;
-
-    public ContextManager(int hotSuffixRounds, int maxCompressSize,
-                          OkHttpClient httpClient, ObjectMapper objectMapper,
-                          String apiKey, Consumer<String> logConsumer,
-                          boolean compressionEnabled) {
-        this.hotSuffixRounds = hotSuffixRounds;
-        this.maxCompressSize = maxCompressSize;
+    public ContextManager(OkHttpClient httpClient, ObjectMapper objectMapper,
+                          String apiKey, Consumer<String> logConsumer) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.logConsumer = logConsumer;
-        this.compressionEnabled = compressionEnabled;
+        this.compressor = new Compressor(httpClient, objectMapper, apiKey);  // ← 新增
         initHistoryFile();
     }
 
-    // 初始化历史文件
+
+
+    // ===== 初始化历史文件 =====
     private void initHistoryFile() {
         try {
             String sessionId = LocalDateTime.now()
@@ -89,303 +110,204 @@ public class ContextManager {
 
     // ===================== 对外 API =====================
 
-    /**
-     * 初始化：将系统提示和用户请求作为第一个轮次放入前缀
-     */
     public void init(String systemPrompt, String userRequest) {
-        List<Map<String, Object>> initialRound = new ArrayList<>();
-        initialRound.add(Map.of("role", "system", "content", systemPrompt));
-        initialRound.add(Map.of("role", "user", "content", userRequest));
-        prefix.add(initialRound);
-        // 记录历史
-        for (Map<String, Object> msg : initialRound) {
+        immutableBase.add(Map.of("role", "system", "content", systemPrompt));
+        immutableBase.add(Map.of("role", "user", "content", userRequest));
+        for (Map<String, Object> msg : immutableBase) {
             appendToHistory(msg);
         }
+        log("📌 [系统] 上下文初始化完成，基础区大小: " + immutableBase.size() + " 条消息");
     }
 
     /**
-     * 追加一个完整的轮次到后缀末尾（由主循环调用）
+     * 追加一个完整的轮次到工作区（易失区）
      */
-    public void appendRoundToSuffix(List<Map<String, Object>> round) {
+    public void appendToWorking(List<Map<String, Object>> round) {
         if (round == null || round.isEmpty()) return;
-        suffix.add(round);
+
+        // 1. 追加本轮消息到工作区
+        volatileWorking.addAll(round);
         for (Map<String, Object> msg : round) {
             appendToHistory(msg);
         }
-    }
+        roundsSinceLastCheckpoint++;
 
-    /**
-     * 旋转 + 压缩判断（每轮迭代结束后调用）
-     */
-    public void rotateAndCompress() {
+        // ✅ 如果有待应用的摘要，追加到 immutableBase 作为 system 消息
+        if (pendingSummary != null && !pendingSummary.isBlank()) {
+            String summary = pendingSummary;
+            pendingSummary = null;
 
-        if(!compressionEnabled)return;
+            // 🔥 关键：将摘要作为 system 消息追加，不参与交替规则
+            Map<String, Object> summaryMsg = Map.of(
+                    "role", "system",
+                    "content", "【压缩摘要】\n" + summary
+            );
+            immutableBase.add(summaryMsg);
+            appendToHistory(summaryMsg);
 
-        // 1. 如果后缀超过上限，将最旧的轮次移到中间
-        while (suffix.size() > hotSuffixRounds) {
-            toCompress.add(suffix.remove(0));
+            // 清空工作区
+            int workingSizeBefore = volatileWorking.size();
+            volatileWorking.clear();
+            roundsSinceLastCheckpoint = 0;
+
+            log("📌 [系统] 压缩摘要已追加到基础区（system 角色），工作区已清空（原有 " + workingSizeBefore + " 条消息）");
+            log("📊 [系统] 当前基础区消息数: " + immutableBase.size() + "，工作区消息数: 0");
         }
 
-        // 2. 计算中间体积，判断是否触发压缩
-        int middleSize = estimateMiddleSize();
-        if (middleSize >= maxCompressSize) {
-            String summary = compressWithFlash();
-            if (summary != null && !summary.isEmpty()) {
-                List<Map<String, Object>> summaryRound = new ArrayList<>();
-                summaryRound.add(Map.of("role", "user", "content", "【累积摘要】" + summary));
-                prefix.add(summaryRound);
-                appendToHistory(summaryRound.get(0));
-                toCompress.clear();
-                log("🧹 [系统] 上下文已压缩，中间已清空");
-            }
-        }
+        // 双重裁剪（保持注释状态）
+        // trimWorkingIfNeeded();
     }
+
+
+    public int getRoundsSinceLastCheckpoint() {
+        return roundsSinceLastCheckpoint;
+    }
+
 
     /**
      * 构建完整的消息列表（供 API 请求使用）
      */
     public List<Map<String, Object>> buildMessages() {
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (List<Map<String, Object>> round : prefix) result.addAll(round);
-        for (List<Map<String, Object>> round : toCompress) result.addAll(round);
-        for (List<Map<String, Object>> round : suffix) result.addAll(round);
+        List<Map<String, Object>> result = new ArrayList<>(immutableBase);
+        result.addAll(volatileWorking);
         return result;
     }
 
-    // ===================== 压缩核心 =====================
-
-    private String compressWithFlash() {
-        // 如果没有中间内容，跳过压缩
-        if (toCompress == null || toCompress.isEmpty()) {
-            return "\n";
+    // --- 具体压缩部分 ---
+    /**
+     * 处理检查点请求（由 ToolExecutor 调用）。
+     * 返回 "__CHECKPOINT_TRIGGERED__" 表示压缩成功，Main 应清空工作区并继续。
+     * 返回普通字符串表示压缩被拒绝（过早），Agent 需要继续工作。
+     */
+    public String requestCheckpoint(String phaseSummary, String nextPlan) {
+        // 阈值检查（不变）
+        if (roundsSinceLastCheckpoint < MIN_INTERVAL) {
+            String msg = "⚠️ 距上次压缩仅过了 " + roundsSinceLastCheckpoint + " 轮...";
+            log(msg);
+            return msg;
         }
 
-        // 展平中间部分用于白名单遍历
-        List<Map<String, Object>> flatMiddle = flatten(toCompress);
-
-        // ===== 1. 白名单保护 =====
-        List<String> whitelistFiles = Arrays.asList("PROJECT.md", "TODO.md", "UPDATE.md", "README.md");
-        StringBuilder whitelistContext = new StringBuilder();
-        List<Map<String, Object>> filteredMiddle = new ArrayList<>();
-        List<String> allDirectoryResults = new ArrayList<>();
-
-        for (Map<String, Object> msg : flatMiddle) {
-            String role = (String) msg.get("role");
-            if ("tool".equals(role)) {
-                String content = (String) msg.get("content");
-                if (content == null) {
-                    filteredMiddle.add(msg);
-                    continue;
-                }
-
-                boolean isWhitelistFile = whitelistFiles.stream().anyMatch(content::contains);
-                if (isWhitelistFile) {
-                    whitelistContext.append("【保留关键文件】\n").append(content).append("\n\n");
-                    continue;
-                }
-
-                boolean isListDirectory = content.startsWith("📁 目录") ||
-                        content.startsWith("[LIST_DIRECTORY_RESULT]");
-                if (isListDirectory) {
-                    allDirectoryResults.add(content);
-                    continue;
-                }
-            }
-            filteredMiddle.add(msg);
+        if (roundsSinceLastCheckpoint > MAX_INTERVAL) {
+            log("⚠️ 警告：已超过最大间隔 " + MAX_INTERVAL + " 轮（当前 " +
+                    roundsSinceLastCheckpoint + " 轮），本次压缩为超期压缩");
         }
 
-        // 添加目录结果到白名单
-        if (!allDirectoryResults.isEmpty()) {
-            whitelistContext.append("【目录结构快照（按调用顺序）】\n");
-            for (int i = 0; i < allDirectoryResults.size(); i++) {
-                whitelistContext.append("--- 第 ").append(i + 1).append(" 次目录列举 ---\n");
-                whitelistContext.append(allDirectoryResults.get(i)).append("\n");
-            }
-            whitelistContext.append("\n");
-        }
-
-        String whitelistPrefix = !whitelistContext.isEmpty() ?
-                "【以下为系统保留的目录结构和关键文件内容，请勿忽略】\n" +
-                        whitelistContext.toString() + "\n" : "";
-
-        if (filteredMiddle.isEmpty()) {
-            return whitelistPrefix + "（无其他历史操作）";
-        }
-
-        // ===== 2. 构建压缩提示词 =====
-        String sysPrompt = """
-        你是一个**中间历史叙事者**。你的唯一职责是：将【中间部分】的历史操作压缩为一段**流畅的叙事性摘要**，让【上文】和【下文】能够自然衔接。
-
-        【核心原则】
-        1. **只压缩中间部分**：你收到的是完整的【上文】+【中间】+【下文】，但你的摘要必须**仅基于【中间】的内容生成**。上文和下文只用于帮助你理解“从哪来、到哪去”，但不要将其内容写入摘要。
-        2. **叙事而非报告**：你的输出应该是一段连续的叙述文字（不是要点列表），用“首先……接着……随后……”等过渡词串联，让 Agent 读起来像在读一段连贯的故事。
-        3. **过渡性质**：摘要的开头要能承接上文（如“在确认项目结构后，…… ”），结尾要能自然引向下文（如“至此，代码已就绪，可以开始验证”）。
-        4. **只写中间发生了什么**：不需要重复上文已有的内容（如用户需求、系统提示），也不需要预判下文要做什么（如下一步验证）。只描述中间部分实际执行的操作。
-
-        【提取内容（针对中间部分）】
-        1. 执行了哪些工具调用（list_directory / read_file / write_file / compile_and_run / …）
-        2. 这些工具调用的关键结果（文件创建成功、编译通过、发现了什么问题）
-        3. 任何对后续有影响的状态变更（如“TODO.md 已更新”、“锚点索引已重建”）
-
-        【严格禁止】
-        1. ❌ 不要输出任何“当前任务状态”或“待办事项”列表——那不是叙事的一部分。
-        2. ❌ 不要输出任何代码细节（类名、方法签名、CSS 变量名）——那不是叙事的一部分。
-        3. ❌ 不要重复上文（系统提示、用户请求）的内容。
-        4. ❌ 不要预判下文（下一步应该做什么）的内容。
-        5. ❌ 不要使用“✅”、“⏳”、“**”等标记——那是报告格式，不是叙事。
-
-        【格式要求】
-        - 输出 800~1000 字的中文叙事段落（不是要点，不是列表）。
-        - 使用自然的过渡词（“于是”、“接下来”、“然后”、“随后”等）。
-        - 开头：承接上文的一句话（如“在确认项目目录后，助手开始创建核心文件”）。
-        - 结尾：自然引向下文的一句话（如“至此，所有源文件已准备就绪”）。
-
-        【示例输出】
-        在确认项目目录后，助手依次创建了三个核心源文件。首先创建了 index.html，定义了计算器的完整 DOM 结构，包含显示屏、按钮面板和主题切换按钮。随后创建了 style.css，实现了一套通过 CSS 变量驱动的双主题系统，覆盖了浅色和深色模式的全部颜色变量和按钮样式。最后创建了 script.js，实现了完整的计算器逻辑，包括状态管理、数字输入、运算符处理和键盘支持。三个文件均成功写入磁盘，TODO.md 中对应的步骤已标记为完成。
-        """;
-
-        List<Map<String, Object>> msgs = new ArrayList<>();
-        msgs.add(Map.of("role", "system", "content", sysPrompt));
-
-        int originLength = 0;
+        log("📌 [系统] 开始压缩流程（距上次压缩已过 " + roundsSinceLastCheckpoint + " 轮）");
 
         try {
-            // 构建上下文：将所有三段展平后序列化
-            String contextInfo = "【上文（最近历史开始前）】\n" +
-                    serializeNested(prefix) +
-                    "\n【中间待压缩部分】\n" +
-                    serializeMessages(filteredMiddle) +
-                    "\n【下文（最近历史末尾）】\n" +
-                    serializeNested(suffix);
-
-            originLength = contextInfo.length();
-            msgs.add(Map.of("role", "user", "content", "请压缩以下历史记录：\n" + contextInfo));
-
-        } catch (Exception e) {
-            return whitelistPrefix + "（历史记录序列化失败，跳过压缩）";
-        }
-
-        // ===== 3. 构建请求体 =====
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", "deepseek-v4-flash");
-        requestBody.put("messages", msgs);
-        requestBody.put("max_tokens", 2048);
-        requestBody.put("temperature", 0.3);
-
-        String jsonBody;
-        try {
-            jsonBody = objectMapper.writeValueAsString(requestBody);
-        } catch (Exception e) {
-            return whitelistPrefix + "（压缩请求构建失败）";
-        }
-
-        // ===== 4. 发送请求 =====
-        Request httpRequest = new Request.Builder()
-                .url(AgentConfig.getApiUrl())
-                .header("Authorization", "Bearer " + apiKey)
-                .header("Content-Type", "application/json")
-                .post(RequestBody.create(jsonBody, MediaType.parse("application/json")))
-                .build();
-
-        try (Response response = httpClient.newCall(httpRequest).execute()) {
-            if (!response.isSuccessful()) {
-                System.err.println("⚠️ 压缩 API 请求失败: " + response.code() + " " + response.message());
-                return whitelistPrefix + "（压缩服务暂时不可用，已跳过）";
-            }
-
-            String responseBody = response.body().string();
-            JsonNode root = objectMapper.readTree(responseBody);
-
-            // 解析 usage
-            JsonNode usage = root.get("usage");
-            if (usage != null) {
-                long prompt = usage.get("prompt_tokens").asLong(0);
-                long completion = usage.get("completion_tokens").asLong(0);
-                long cached = 0;
-                if (usage.has("prompt_tokens_details")) {
-                    JsonNode details = usage.get("prompt_tokens_details");
-                    if (details.has("cached_tokens")) {
-                        cached = details.get("cached_tokens").asLong(0);
-                    }
+            // 1. 处理 PROJECT.md 压缩
+            String compressedProjectMd = null;
+            if (projectMdPending) {
+                Path projectMdPath = Paths.get(AgentConfig.getSandboxDir())
+                        .resolve("PROJECT.md").normalize();
+                if (Files.exists(projectMdPath)) {
+                    String rawContent = Files.readString(projectMdPath, StandardCharsets.UTF_8);
+                    compressedProjectMd = compressor.compressProjectMd(rawContent);
+                    log("📌 [系统] PROJECT.md 压缩完成，长度: " + compressedProjectMd.length());
                 }
-                this.totalPromptTokens += prompt;
-                this.totalCachedTokens += cached;
-                this.totalCompletionTokens += completion;
-                this.apiCallCount++;
-                this.price += calculateCost("deepseek-v4-flash", prompt, cached, completion);
+                projectMdPending = false;
             }
 
-            // 解析摘要
-            JsonNode choices = root.get("choices");
-            if (choices == null || choices.size() == 0) {
-                return whitelistPrefix + "（压缩响应格式异常）";
-            }
-            JsonNode messageNode = choices.get(0).get("message");
-            if (messageNode == null || !messageNode.has("content") || messageNode.get("content").isNull()) {
-                return whitelistPrefix + "（压缩响应缺少内容）";
-            }
-            String summary = messageNode.get("content").asText().trim();
+            // ✅ 新增：刷新普通文档变更（TODO.md、README.md 等），获取文档摘要
+            String docsSummary = flushPendingChanges();
 
-            if (summary.length() > 4000) {
-                summary = summary.substring(0, 4000) + "...（已截断）";
+            // 2. 获取当前工作区的序列化内容
+            String workingContent = null;
+            if (!volatileWorking.isEmpty()) {
+                workingContent = objectMapper.writeValueAsString(volatileWorking);
             }
 
-            log("LENGTH : " + originLength + " --> " + summary.length() + "\nCONTENT : \n" + summary);
+            // 3. 🔥 通过 Compressor 压缩上下文（现在包含文档变更摘要）
+            String structuredSummary = compressor.compressContext(
+                    phaseSummary,
+                    nextPlan,
+                    workingContent,
+                    compressedProjectMd,
+                    docsSummary  // ← 新增参数
+            );
 
-            return whitelistPrefix + "\n【压缩摘要】\n" + summary;
+            if (structuredSummary == null || structuredSummary.isBlank()) {
+                log("⚠️ [系统] 上下文压缩失败");
+                return "压缩失败，请稍后重试";
+            }
+
+            // 🔥 存储摘要（纯文本）到 pendingSummary
+            this.pendingSummary = structuredSummary;
+            log("📌 [系统] 压缩摘要已生成，将在本轮消息保存后应用");
+
+            return "✅ 检查点已准备，将在本轮结束后自动应用压缩。";
 
         } catch (Exception e) {
-            System.err.println("⚠️ 压缩过程异常: " + e.getMessage());
-            return whitelistPrefix + "（压缩过程中发生异常，已跳过）";
+            log("❌ [系统] 压缩流程异常: " + e.getMessage());
+            e.printStackTrace();
+            return "压缩过程发生异常: " + e.getMessage();
         }
     }
 
     // ===================== 辅助方法 =====================
 
-    private int estimateMiddleSize() {
-        // 估算中间所有轮次的序列化长度
-        int total = 0;
-        for (List<Map<String, Object>> round : toCompress) {
-            total += serializeMessages(round).length();
-        }
-        return total;
+    /**
+     * 获取当前工作区的大小（消息条数）
+     */
+    public int getWorkingMessageCount() {
+        return volatileWorking.size();
     }
 
-    private String serializeMessages(List<Map<String, Object>> msgs) {
+    /**
+     * 获取当前工作区的序列化字符数（用于调试）
+     */
+    public int getCurrentWorkingSize() {
         try {
-            return objectMapper.writeValueAsString(msgs);
+            return objectMapper.writeValueAsString(volatileWorking).length();
         } catch (Exception e) {
-            return "（序列化失败）";
+            return 0;
         }
     }
 
-    private String serializeNested(List<List<Map<String, Object>>> nested) {
-        if (nested == null || nested.isEmpty()) return "（空）";
-        StringBuilder sb = new StringBuilder();
-        for (List<Map<String, Object>> round : nested) {
-            sb.append(serializeMessages(round)).append("\n");
-        }
-        return sb.toString();
+    /**
+     * 获取基础区的消息数
+     */
+    public int getBaseMessageCount() {
+        return immutableBase.size();
     }
 
-    private List<Map<String, Object>> flatten(List<List<Map<String, Object>>> nested) {
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (List<Map<String, Object>> round : nested) {
-            result.addAll(round);
-        }
-        return result;
+    public boolean isProjectMdPending() {
+        return projectMdPending;
     }
 
-    private double calculateCost(String model, long promptTokens, long cachedTokens, long completionTokens) {
-        boolean isPro = "deepseek-v4-pro".equals(model);
-        double inHit = isPro ? PRICE_PRO_IN_HIT : PRICE_FLASH_IN_HIT;
-        double inNotHit = isPro ? PRICE_PRO_IN_NOT_HIT : PRICE_FLASH_IN_NOT_HIT;
-        double out = isPro ? PRICE_PRO_OUT : PRICE_FLASH_OUT;
-        long uncached = promptTokens - cachedTokens;
-        return (uncached / 1_000_000.0 * inNotHit) +
-                (cachedTokens / 1_000_000.0 * inHit) +
-                (completionTokens / 1_000_000.0 * out);
+    /**
+     * 双重裁剪策略：
+     * 1. 若消息条数超过 MAX_WORKING_MESSAGES，移除最早的消息至上限。
+     * 2. 若序列化字符数超过 MAX_WORKING_CHARS，进一步裁剪至字符数以下（保留最新消息）。
+     */
+    private void trimWorkingIfNeeded() {
+        // ----- 策略1：按消息条数硬裁剪 -----
+        if (volatileWorking.size() > MAX_WORKING_MESSAGES) {
+            int toRemove = volatileWorking.size() - MAX_WORKING_MESSAGES;
+            volatileWorking.subList(0, toRemove).clear();
+            log("✂️ [系统] 工作区超限（> " + MAX_WORKING_MESSAGES + " 条消息），已移除最早 " + toRemove + " 条消息");
+        }
+
+        // ----- 策略2：按字符数软裁剪（保留最新消息，逐条移除最旧的直到达标） -----
+        try {
+            int currentSize = objectMapper.writeValueAsString(volatileWorking).length();
+            int removeCount = 0;
+            while (currentSize > MAX_WORKING_CHARS && volatileWorking.size() > 1) {
+                // 移除最旧的一条消息
+                volatileWorking.remove(0);
+                removeCount++;
+                currentSize = objectMapper.writeValueAsString(volatileWorking).length();
+            }
+            if (removeCount > 0) {
+                log("✂️ [系统] 工作区字符数超限（> " + MAX_WORKING_CHARS + " 字符），已移除最早 " + removeCount + " 条消息，当前大小: " + currentSize + " 字符");
+            }
+        } catch (Exception e) {
+            // 序列化失败则跳过字符数裁剪
+        }
     }
+
+
+    // ===================== 历史记录 =====================
 
     private void appendToHistory(Map<String, Object> msg) {
         if (historyFile == null) return;
@@ -399,7 +321,10 @@ public class ContextManager {
         }
     }
 
-    // ===================== 对外统计 =====================
+    public Path getHistoryFile() { return historyFile; }
+    public List<Long> getHistoryOffsets() { return historyOffsets; }
+
+    // ===================== 计费统计 =====================
 
     public void recordUsage(String model, long promptTokens, long cachedTokens, long completionTokens) {
         this.totalPromptTokens += promptTokens;
@@ -410,21 +335,125 @@ public class ContextManager {
     }
 
     public void printStats() {
-        log("📊 ========== 成本统计 ==========\n"+
+        long uncached = totalPromptTokens - totalCachedTokens;
+        double hitRate = totalPromptTokens == 0 ? 0 : (double) totalCachedTokens / totalPromptTokens * 100;
+        log("📊 ========== 成本统计 ==========\n" +
                 "\n📨 API 调用次数: " + apiCallCount +
                 "\n📥 总输入 Token: " + totalPromptTokens +
                 "\n   ├─ 缓存命中: " + totalCachedTokens +
-                "\n   └─ 缓存未命中: " + (totalPromptTokens - totalCachedTokens) +
-                "\n♾️总缓存命中率："+ totalCachedTokens*100L/totalPromptTokens + "%" +
+                "\n   └─ 缓存未命中: " + uncached +
+                "\n♾️ 总缓存命中率: " + String.format("%.2f", hitRate) + "%" +
                 "\n📤 总输出 Token: " + totalCompletionTokens +
                 "\n💵 总成本: ¥" + String.format("%.6f", price) +
-                ((apiCallCount > 0)?("📊 平均每次成本: ¥" + String.format("%.6f", price / apiCallCount)):"")
-                +"\n\n=================================="
+                (apiCallCount > 0 ? "\n📊 平均每次成本: ¥" + String.format("%.6f", price / apiCallCount) : "") +
+                "\n\n=================================="
         );
     }
 
-    public Path getHistoryFile() { return historyFile; }
-    public List<Long> getHistoryOffsets() { return historyOffsets; }
+    private double calculateCost(String model, long promptTokens, long cachedTokens, long completionTokens) {
+        boolean isPro = AgentConfig.getModelPro().equals(model);
+        double inHit = isPro ? PRICE_PRO_IN_HIT : PRICE_FLASH_IN_HIT;
+        double inNotHit = isPro ? PRICE_PRO_IN_NOT_HIT : PRICE_FLASH_IN_NOT_HIT;
+        double out = isPro ? PRICE_PRO_OUT : PRICE_FLASH_OUT;
+        long uncached = promptTokens - cachedTokens;
+        return (uncached / 1_000_000.0 * inNotHit) +
+                (cachedTokens / 1_000_000.0 * inHit) +
+                (completionTokens / 1_000_000.0 * out);
+    }
+
+    /**
+     * 记录一个关键文档发生了变更（写入缓冲区，等待合并）。
+     * 在 write_file 检测到 PROJECT.md / TODO.md / README.md 时调用。
+     * 使用 Set 去重，避免重复记录同一文件。
+     */
+    public void addPendingDocChange(String filename) {
+        if (filename == null || filename.isBlank()) return;
+        // 如果是 PROJECT.md，单独标记
+        if (filename.equalsIgnoreCase("PROJECT.md")) {
+            projectMdPending = true;
+            log("📝 [系统] 标记 PROJECT.md 待压缩（将在下次检查点处理）");
+            return;
+        }
+        pendingDocChanges.add(filename);
+        log("📝 [系统] 记录待合并文档变更: " + filename + "（缓冲区当前 " + pendingDocChanges.size() + " 个文件待合并）");
+    }
+
+    /**
+     * 将缓冲区中的所有待合并文档变更，读取最新内容后合并成一条日志，
+     * 追加到 immutableBase 末尾，然后清空缓冲区。
+     * 返回一个文本摘要，供压缩器使用。
+     */
+    public String flushPendingChanges() {
+        StringBuilder summary = new StringBuilder();
+
+        // 1. 处理 PROJECT.md 的占位日志（如果有）
+        if (projectMdPending) {
+            Map<String, Object> placeholderMsg = Map.of(
+                    "role", "system",
+                    "content", "【PROJECT.md 已更新】\n（将在下次压缩时处理）"
+            );
+            immutableBase.add(placeholderMsg);
+            appendToHistory(placeholderMsg);
+            log("📌 [系统] PROJECT.md 变更占位已写入基础区（system 角色）");
+            projectMdPending = false;
+            summary.append("PROJECT.md 已更新。");
+        }
+
+        // 2. 处理普通文档（TODO.md、README.md 等）
+        if (pendingDocChanges.isEmpty()) {
+            return summary.toString();  // 没有普通文档变更
+        }
+
+        summary.append("本次周期内关键文档变动（非 PROJECT.md）：\n");
+        Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
+        int successCount = 0;
+
+        StringBuilder logBuilder = new StringBuilder();
+        logBuilder.append("【本次周期内关键文档变动（非 PROJECT.md）】\n");
+
+        for (String filename : pendingDocChanges) {
+            try {
+                Path filePath = sandboxRoot.resolve(filename).normalize();
+                if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
+                    logBuilder.append("- ").append(filename).append(": （文件不存在或已被删除）\n");
+                    summary.append("- ").append(filename).append(": 已删除\n");
+                    continue;
+                }
+
+                String content = Files.readString(filePath, StandardCharsets.UTF_8);
+                // 普通文档截断到 2000 字符（用于日志显示）
+                String truncated = content.length() > 2000 ? content.substring(0, 2000) + "\n...（已截断）" : content;
+                logBuilder.append("- ").append(filename).append(":\n");
+                logBuilder.append("```\n").append(truncated).append("\n```\n\n");
+
+                // 用于压缩摘要（保留完整内容，但限制长度避免过大）
+                String summaryContent = content.length() > 3000 ? content.substring(0, 3000) + "\n...（已截断）" : content;
+                summary.append("- ").append(filename).append(":\n").append(summaryContent).append("\n\n");
+                successCount++;
+            } catch (IOException e) {
+                logBuilder.append("- ").append(filename).append(": （读取失败: ").append(e.getMessage()).append("）\n");
+                summary.append("- ").append(filename).append(": 读取失败\n");
+            }
+        }
+
+        if (successCount == 0) {
+            logBuilder.append("（无有效文件内容可记录）");
+        } else {
+            // 追加文档日志到 immutableBase（作为历史记录）
+            Map<String, Object> logMsg = Map.of(
+                    "role", "user",
+                    "content", logBuilder.toString()
+            );
+            immutableBase.add(logMsg);
+            appendToHistory(logMsg);
+            log("📌 [系统] 已合并 " + pendingDocChanges.size() + " 个文档变更到基础区");
+        }
+
+        // 清空缓冲区
+        pendingDocChanges.clear();
+
+        return summary.toString();
+    }
 
     // ===================== 日志 =====================
 

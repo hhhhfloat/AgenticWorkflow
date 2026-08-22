@@ -114,9 +114,9 @@ public final class ToolDefinitions {
         // @anchor: toolDef_buildAnchor
         tools.add(defineTool(
                 "build_anchor_index",
-                "扫描指定项目目录下的所有文本文件，提取所有 @anchor 注释，重建锚点索引文件。通常在修改代码后调用此工具更新索引。",
+                "扫描指定项目目录下的所有文本文件，提取所有 @anchor 注释，重建该项目锚点索引文件（.anchors.json）。通常在修改代码后调用此工具更新索引。",
                 defineParams()
-                        .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。如果为空，则扫描整个沙箱。")
+                        .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
                         .build(),
                 List.of("project_path")
         ));
@@ -124,9 +124,10 @@ public final class ToolDefinitions {
         // @anchor: toolDef_listAnchors
         tools.add(defineTool(
                 "list_anchors",
-                "列出指定项目中的所有锚点，返回锚点ID、所在文件、行号和内容预览。",
+                "列出指定项目中的所有锚点，返回锚点ID、所在文件、行号和内容预览。可指定文件参数仅列出该文件的锚点。",
                 defineParams()
                         .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
+                        .prop("file", "string", "可选，指定文件名（如 'task.py'），仅列出该文件的锚点。")
                         .build(),
                 List.of("project_path")
         ));
@@ -210,6 +211,17 @@ public final class ToolDefinitions {
                         .prop("limit", "integer", "返回结果的最大条数，默认 10")
                         .build(),
                 List.of("keyword")
+        ));
+
+        // 在 ToolDefinitions.java 中添加
+        tools.add(defineTool(
+                "request_checkpoint",
+                "当完成 TODO.md 中一个明确的阶段（如完成一组相关文件或通过编译验证）后调用。保存当前进度并压缩历史，以便后续低成本续跑。",
+                defineParams()
+                        .prop("phase_summary", "string", "刚刚完成的工作摘要（如'已完成用户认证模块，包含 JWT 生成和验证'）")
+                        .prop("next_plan", "string", "接下来即将执行的具体任务（如'下一步将实现权限管理拦截器'）")
+                        .build(),
+                List.of("phase_summary", "next_plan")
         ));
 
         return tools;
