@@ -347,10 +347,17 @@ public class ContextManager {
     // ===== 辅助：判断是否高峰时段 =====
     private boolean isPeakHour() {
         java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Shanghai"));
+        java.time.DayOfWeek dow = now.getDayOfWeek();
+
+        // ✅ 周六（SATURDAY）和周日（SUNDAY）全天为低谷
+        if (dow == java.time.DayOfWeek.SATURDAY || dow == java.time.DayOfWeek.SUNDAY) {
+            return false;
+        }
+
         int hour = now.getHour();
         int minute = now.getMinute();
         int totalMinutes = hour * 60 + minute;
-        // 高峰：9:00-12:00，14:00-18:00
+        // 高峰：9:00-12:00，14:00-18:00（仅工作日）
         return (totalMinutes >= 9 * 60 && totalMinutes < 12 * 60) ||
                 (totalMinutes >= 14 * 60 && totalMinutes < 18 * 60);
     }
