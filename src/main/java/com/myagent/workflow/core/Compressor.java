@@ -9,9 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 压缩器 —— 独立于上下文管理，只负责调用 Flash API 压缩文本。
- * 输入是原始上下文的字符串列表，输出是压缩后的摘要文本。
- * 不涉及消息格式、角色、存储等逻辑。
+ * 压缩器 —— 独立于上下文管理，负责调用 Flash API 压缩 PROJECT.md。
+ * 上下文压缩已由 Agent 自压缩代替（见 SystemPrompt 中的压缩模式）。
  */
 public class Compressor {
 
@@ -32,7 +31,7 @@ public class Compressor {
      */
     public String compressProjectMd(String rawContent) throws IOException {
         if (rawContent == null || rawContent.length() < 3000) {
-            return rawContent; // 内容不长，直接返回原文
+            return rawContent;
         }
 
         String prompt = """
@@ -50,62 +49,6 @@ public class Compressor {
 
             【原始 PROJECT.md 内容】
             """ + rawContent;
-
-        return callFlash(prompt);
-    }
-
-    /**
-     * 压缩上下文状态（Agent 提供的摘要 + 工作区内容）。
-     * @param phaseSummary Agent 提供的阶段总结（含模板）
-     * @param nextPlan 下一步计划
-     * @param workingContent 当前工作区的序列化内容
-     * @param projectMdSummary PROJECT.md 压缩版（可选）
-     * @return 压缩后的状态摘要（严格按模板输出）
-     */
-    public String compressContext(String phaseSummary, String nextPlan,
-                                  String workingContent, String projectMdSummary,
-                                  String docsSummary) throws IOException {
-        StringBuilder contextBuilder = new StringBuilder();
-
-        contextBuilder.append("【当前阶段总结（Agent 提供）】\n");
-        contextBuilder.append(phaseSummary).append("\n\n");
-
-        contextBuilder.append("【下一步计划】\n");
-        contextBuilder.append(nextPlan).append("\n\n");
-
-        if (projectMdSummary != null && !projectMdSummary.isBlank()) {
-            contextBuilder.append("【项目结构快照（PROJECT.md 压缩版）】\n");
-            contextBuilder.append(projectMdSummary).append("\n\n");
-        }
-
-        // ✅ 新增：加入文档变更摘要
-        if (docsSummary != null && !docsSummary.isBlank()) {
-            contextBuilder.append("【本次周期内文档变更】\n");
-            contextBuilder.append(docsSummary).append("\n\n");
-        }
-
-        if (workingContent != null && !workingContent.isBlank()) {
-            contextBuilder.append("【最近工作区内容】\n");
-            contextBuilder.append(workingContent).append("\n\n");
-        }
-
-        String prompt = """
-        你是上下文状态压缩专家。请根据以下输入，生成一个结构化的项目状态摘要。
-        
-        【输出要求】
-        必须严格按以下模板输出，不得增减字段：
-    
-        ## PROJECT_STATE_SNAPSHOT
-        - TOTAL_GOAL: [最终目标，一句话概括]
-        - COMPLETED: [已完成的全部关键功能，用逗号分隔，不超过 300 字]
-        - NEXT_TASKS: [下一步具体行动，一句话描述]
-        - DIRTY_FILES: [本次周期内修改的核心文件列表，用逗号分隔]
-        - TARGET_FILES: [下一步需要操作的文件路径，用逗号分隔]
-    
-        【重要】只输出上述模板内容，不要添加任何额外说明、评价或分析。
-        
-        【待压缩内容】
-        """ + contextBuilder.toString();
 
         return callFlash(prompt);
     }

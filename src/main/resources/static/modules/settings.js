@@ -17,7 +17,8 @@ const DEFAULT_SETTINGS = {
     msvcInclude: '',
     msvcLib: '',
     mingwCompiler: '',
-    enableSecurityScan: true
+    enableSecurityScan: true,
+    compressionEnabled: true  // ← 新增
 };
 
 // 加载配置
@@ -62,6 +63,7 @@ function applySettingsToForm(settings) {
     document.getElementById('setMsvcCompiler').value = settings.msvcCompiler || '';
     document.getElementById('setMingwCompiler').value = settings.mingwCompiler || '';
     document.getElementById('setEnableSecurityScan').checked = settings.enableSecurityScan !== false;
+    document.getElementById('setCompressionEnabled').checked = settings.compressionEnabled !== false;
 }
 
 // 从表单读取配置
@@ -78,7 +80,8 @@ function readSettingsFromForm() {
         msvcInclude: '',
         msvcLib: '',
         mingwCompiler: document.getElementById('setMingwCompiler').value.trim(),
-    enableSecurityScan: document.getElementById('setEnableSecurityScan').checked
+        enableSecurityScan: document.getElementById('setEnableSecurityScan').checked,
+        compressionEnabled: document.getElementById('setCompressionEnabled').checked
     };
 }
 

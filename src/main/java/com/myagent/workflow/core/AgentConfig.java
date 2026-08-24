@@ -14,7 +14,8 @@ public record AgentConfig(
         String msvcInclude,
         String msvcLib,
         String mingwCompiler,
-        boolean enableSecurityScan
+        boolean enableSecurityScan,
+        boolean enableCompression
 ) {
     // ===== 系统级常量（静态） =====
     private static final String ARCHIVE_VERSION = "v4_2";
@@ -62,6 +63,8 @@ public record AgentConfig(
     private static final String PYTHON_INTERPRETER = "C:/Users/hhhhu/AppData/Local/Python/bin/python.exe";
     private static final String NODE_INTERPRETER = "C:/Program Files/nodejs/node.exe";
 
+    private static final boolean ENABLE_COMPRESSION = true;
+
     // ========== 公共 Getter ==========
 
     public static String getModelFlash() { return MODEL_FLASH; }
@@ -92,7 +95,8 @@ public record AgentConfig(
                 MSVC_INCLUDE,
                 MSVC_LIB,
                 MINGW_COMPILER,
-                ENABLE_SECURITY_SCAN
+                ENABLE_SECURITY_SCAN,
+                ENABLE_COMPRESSION
         );
     }
 }

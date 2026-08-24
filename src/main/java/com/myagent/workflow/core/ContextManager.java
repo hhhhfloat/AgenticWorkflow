@@ -61,6 +61,11 @@ public class ContextManager {
     // ===== 待应用的检查点摘要 =====
     private String pendingSummary = null;
 
+    // 🔥 新增：压缩模式标记（Agent 自压缩）
+    private boolean pendingCompression = false;
+    private String pendingPhaseSummary = null;
+    private String pendingNextPlan = null;
+
     private final Compressor compressor;
 
     // ===== 计费统计 =====
@@ -71,7 +76,7 @@ public class ContextManager {
     private double price = 0;
 
     // ===== 价格常量（新） =====
-// Flash
+    // Flash
     private static final double FLASH_IN_HIT_OFF_PEAK = 0.05;
     private static final double FLASH_IN_HIT_PEAK = 0.10;
     private static final double FLASH_IN_NOT_HIT_OFF_PEAK = 1.5;
@@ -86,14 +91,17 @@ public class ContextManager {
     private static final double PRO_IN_NOT_HIT_PEAK = 9.0;
     private static final double PRO_OUT_OFF_PEAK = 13.5;
     private static final double PRO_OUT_PEAK = 27.0;
+    private final boolean compressionEnabled;
 
     public ContextManager(OkHttpClient httpClient, ObjectMapper objectMapper,
-                          String apiKey, Consumer<String> logConsumer) {
+                          String apiKey, Consumer<String> logConsumer,
+                          boolean compressionEnabled) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.logConsumer = logConsumer;
         this.compressor = new Compressor(httpClient, objectMapper, apiKey);  // ← 新增
+        this.compressionEnabled = compressionEnabled;
         initHistoryFile();
     }
 
@@ -141,32 +149,52 @@ public class ContextManager {
         }
         roundsSinceLastCheckpoint++;
 
-        // ✅ 如果有待应用的摘要，追加到 immutableBase 作为 system 消息
-        if (pendingSummary != null && !pendingSummary.isBlank()) {
-            String summary = pendingSummary;
-            pendingSummary = null;
+        // 2. 🔥 检测压缩模式（Agent 自压缩）
+        if (pendingCompression) {
+            String summary = null;
+            for (Map<String, Object> msg : round) {
+                String role = (String) msg.get("role");
+                String content = (String) msg.get("content");
+                if ("assistant".equals(role) && content != null
+                        && content.contains("## PROJECT_STATE_SNAPSHOT")) {
+                    int startIdx = content.indexOf("## PROJECT_STATE_SNAPSHOT");
+                    if (startIdx != -1) {
+                        summary = content.substring(startIdx);
+                        break;
+                    }
+                }
+            }
 
-            // 🔥 关键：将摘要作为 system 消息追加，不参与交替规则
-            Map<String, Object> summaryMsg = Map.of(
-                    "role", "system",
-                    "content", "【压缩摘要】\n" + summary
-            );
-            immutableBase.add(summaryMsg);
-            appendToHistory(summaryMsg);
+            if (summary != null && !summary.isBlank()) {
+                // 先合并待提交的文档变更
+                flushPendingChanges();
 
-            // 清空工作区
-            int workingSizeBefore = volatileWorking.size();
-            volatileWorking.clear();
-            roundsSinceLastCheckpoint = 0;
+                // 追加摘要到 immutableBase
+                Map<String, Object> summaryMsg = Map.of(
+                        "role", "system",
+                        "content", "【压缩摘要】\n" + summary
+                );
+                immutableBase.add(summaryMsg);
+                appendToHistory(summaryMsg);
 
-            log("📌 [系统] 压缩摘要已追加到基础区（system 角色），工作区已清空（原有 " + workingSizeBefore + " 条消息）");
-            log("📊 [系统] 当前基础区消息数: " + immutableBase.size() + "，工作区消息数: 0");
+                int workingSizeBefore = volatileWorking.size();
+                volatileWorking.clear();
+                roundsSinceLastCheckpoint = 0;
+                pendingCompression = false;
+
+                log("📌 [系统] Agent 自压缩摘要已追加到基础区（system 角色），工作区已清空（原有 " + workingSizeBefore + " 条消息）");
+                log("📊 [系统] 当前基础区消息数: " + immutableBase.size() + "，工作区消息数: 0");
+            } else {
+                // 如果 Agent 没有生成摘要，说明可能走了默认模式
+                log("⚠️ [系统] 压缩模式下未检测到摘要，Agent 可能未按指令执行");
+                pendingCompression = false;
+                // 可选：在下一轮注入提醒
+            }
         }
 
         // 双重裁剪（保持注释状态）
         // trimWorkingIfNeeded();
     }
-
 
     public int getRoundsSinceLastCheckpoint() {
         return roundsSinceLastCheckpoint;
@@ -180,10 +208,10 @@ public class ContextManager {
         List<Map<String, Object>> result = new ArrayList<>(immutableBase);
 
         // 🔥 如果距离上次压缩已超过阈值（如 >= MAX_INTERVAL - 2），注入提醒
-        if (roundsSinceLastCheckpoint >= MAX_INTERVAL) {
+        if (roundsSinceLastCheckpoint >= MAX_INTERVAL && compressionEnabled) {
             String reminder = "💡 【系统提醒】你已迭代 " + roundsSinceLastCheckpoint +
                     " 轮，达到最大压缩间隔（" + MAX_INTERVAL + " 轮）。" +
-                    "请在当前里程碑完成后调用 request_checkpoint 压缩上下文，避免token消耗。";
+                    "请在当前里程碑完成后调用工具压缩上下文，避免token消耗。";
             result.add(Map.of("role", "system", "content", reminder));
         }
 
@@ -198,68 +226,23 @@ public class ContextManager {
      * 返回普通字符串表示压缩被拒绝（过早），Agent 需要继续工作。
      */
     public String requestCheckpoint(String phaseSummary, String nextPlan) {
-        // 阈值检查（不变）
         if (roundsSinceLastCheckpoint < MIN_INTERVAL) {
-            String msg = "⚠️ 距上次压缩仅过了 " + roundsSinceLastCheckpoint + " 轮...";
-            log(msg);
-            return msg;
+            return "⚠️ 距上次压缩仅过了 " + roundsSinceLastCheckpoint + " 轮...";
         }
 
         if (roundsSinceLastCheckpoint > MAX_INTERVAL) {
-            log("⚠️ 警告：已超过最大间隔 " + MAX_INTERVAL + " 轮（当前 " +
-                    roundsSinceLastCheckpoint + " 轮），本次压缩为超期压缩");
+            log("⚠️ 警告：已超过最大间隔 " + MAX_INTERVAL + " 轮...");
         }
 
-        log("📌 [系统] 开始压缩流程（距上次压缩已过 " + roundsSinceLastCheckpoint + " 轮）");
+        log("📌 [系统] 进入压缩模式（距上次压缩已过 " + roundsSinceLastCheckpoint + " 轮）");
 
-        try {
-            // 1. 处理 PROJECT.md 压缩
-            String compressedProjectMd = null;
-            if (projectMdPending) {
-                Path projectMdPath = Paths.get(AgentConfig.getSandboxDir())
-                        .resolve("PROJECT.md").normalize();
-                if (Files.exists(projectMdPath)) {
-                    String rawContent = Files.readString(projectMdPath, StandardCharsets.UTF_8);
-                    compressedProjectMd = compressor.compressProjectMd(rawContent);
-                    log("📌 [系统] PROJECT.md 压缩完成，长度: " + compressedProjectMd.length());
-                }
-                projectMdPending = false;
-            }
+        // 🔥 标记压缩模式（Agent 会在下一轮根据 SystemPrompt 自动执行）
+        this.pendingCompression = true;
+        this.pendingPhaseSummary = phaseSummary;
+        this.pendingNextPlan = nextPlan;
 
-            // ✅ 新增：刷新普通文档变更（TODO.md、README.md 等），获取文档摘要
-            String docsSummary = flushPendingChanges();
-
-            // 2. 获取当前工作区的序列化内容
-            String workingContent = null;
-            if (!volatileWorking.isEmpty()) {
-                workingContent = objectMapper.writeValueAsString(volatileWorking);
-            }
-
-            // 3. 🔥 通过 Compressor 压缩上下文（现在包含文档变更摘要）
-            String structuredSummary = compressor.compressContext(
-                    phaseSummary,
-                    nextPlan,
-                    workingContent,
-                    compressedProjectMd,
-                    docsSummary  // ← 新增参数
-            );
-
-            if (structuredSummary == null || structuredSummary.isBlank()) {
-                log("⚠️ [系统] 上下文压缩失败");
-                return "压缩失败，请稍后重试";
-            }
-
-            // 🔥 存储摘要（纯文本）到 pendingSummary
-            this.pendingSummary = structuredSummary;
-            log("📌 [系统] 压缩摘要已生成，将在本轮消息保存后应用");
-
-            return "✅ 检查点已准备，将在本轮结束后自动应用压缩。";
-
-        } catch (Exception e) {
-            log("❌ [系统] 压缩流程异常: " + e.getMessage());
-            e.printStackTrace();
-            return "压缩过程发生异常: " + e.getMessage();
-        }
+        // 🔥 简单确认，Agent 看到这个就知道已经进入压缩模式
+        return "✅ 已进入压缩模式。下一轮请按系统提示词中的【压缩模式】要求生成摘要，不要进行任何代码修改或工具调用。";
     }
 
     // ===================== 辅助方法 =====================

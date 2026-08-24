@@ -1,0 +1,16 @@
+.chart-title {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+}
+
+.default-color0.chart-bar {
+    -fx-bar-fill: #4CAF50;
+}
+
+.default-color1.chart-bar {
+    -fx-bar-fill: #FF5722;
+}
+
+.table-view {
+    -fx-font-size: 13px;
+}

@@ -23,7 +23,7 @@ public final class ToolDefinitions {
      * @return 工具定义列表
      */
     // @anchor: toolDefinitions_build_single
-    public static List<Map<String, Object>> build() {
+    public static List<Map<String, Object>> build(boolean enableCompression) {
         List<Map<String, Object>> tools = new ArrayList<>();
 
         // @anchor: toolDef_listDirectory
@@ -217,15 +217,18 @@ public final class ToolDefinitions {
 
         // 在 ToolDefinitions.java 中添加
         // @anchor: toolDef_requestCheckpoint
-        tools.add(defineTool(
-                "request_checkpoint",
-                "当完成 TODO.md 中一个明确的阶段（如完成一组相关文件或通过编译验证）后调用。保存当前进度并压缩历史，以便后续低成本续跑。",
-                defineParams()
-                        .prop("phase_summary", "string", "刚刚完成的工作摘要（如'已完成用户认证模块，包含 JWT 生成和验证'）")
-                        .prop("next_plan", "string", "接下来即将执行的具体任务（如'下一步将实现权限管理拦截器'）")
-                        .build(),
-                List.of("phase_summary", "next_plan")
-        ));
+        // 仅在启用压缩时添加 request_checkpoint
+        if (enableCompression) {
+            tools.add(defineTool(
+                    "request_checkpoint",
+                    "当完成一个明确的里程碑（如一组文件创建完成、编译通过）后调用。调用后系统将进入压缩模式，下一轮迭代中你需要按系统提示词中的【压缩模式】要求生成 PROJECT_STATE_SNAPSHOT 摘要。",
+                    defineParams()
+                            .prop("phase_summary", "string", "刚刚完成的工作摘要")
+                            .prop("next_plan", "string", "下一步计划（引用 TODO.md 中的下一项任务）")
+                            .build(),
+                    List.of("phase_summary", "next_plan")
+            ));
+        }
 
         return tools;
     }

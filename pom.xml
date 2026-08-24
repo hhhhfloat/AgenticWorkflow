@@ -4,29 +4,26 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <!-- 【已修改】改为你当前项目的组织名称 -->
     <groupId>com.myagent</groupId>
-    <!-- 【已修改】改为你当前项目的工件名称 -->
     <artifactId>agentic-workflow</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <properties>
-        <!-- 使用 Java 21（稳定） -->
+        <!-- Java 版本 -->
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <maven.compiler.useRelease>false</maven.compiler.useRelease>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     </properties>
 
     <dependencies>
-        <!-- OkHttp：调用 DeepSeek API -->
         <dependency>
             <groupId>com.squareup.okhttp3</groupId>
             <artifactId>okhttp</artifactId>
             <version>4.12.0</version>
         </dependency>
 
-        <!-- Jackson：解析 JSON -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -39,21 +36,57 @@
             <version>1.5.6</version>
         </dependency>
 
-        <!-- 对于 JDK 8 及以下，tools.jar 在系统 classpath 中，无需额外配置 -->
-        <!-- 对于 JDK 9+，可能需要添加 jdk.compiler 模块 -->
-
+        <!-- JavaFX 仅测试时使用 -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>21</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-fxml</artifactId>
+            <version>21</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
         <plugins>
-            <!-- 打包成胖包（Fat Jar） -->
+            <!-- 编译器插件 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.11.0</version>
+                <configuration>
+                    <source>21</source>
+                    <target>21</target>
+                    <encoding>UTF-8</encoding>   <!-- ✅ 强制 javac 使用 GBK -->
+                    <compilerArgs>
+                        <arg>--add-modules</arg>
+                        <arg>jdk.compiler</arg>
+                        <arg>--add-exports</arg>
+                        <arg>jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg>
+                        <arg>jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg>
+                        <arg>jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg>
+                        <arg>jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
+                        <arg>--add-exports</arg>
+                        <arg>jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
+                        <arg>-parameters</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+
+            <!-- 打包 Fat Jar -->
             <plugin>
                 <artifactId>maven-assembly-plugin</artifactId>
                 <version>3.7.1</version>
                 <configuration>
                     <archive>
                         <manifest>
-                            <!-- 【关键】入口类要改成和包名一致 -->
                             <mainClass>com.myagent.workflow.http.HttpServerMain</mainClass>
                         </manifest>
                     </archive>
@@ -72,42 +105,43 @@
                 </executions>
             </plugin>
 
-            <!-- 新增：配置编译器以支持 jdk.compiler 模块 -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
-                <configuration>
-                    <source>21</source>
-                    <target>21</target>
-                    <compilerArgs>
-                        <arg>--add-modules</arg>
-                        <arg>jdk.compiler</arg>
-                        <arg>--add-exports</arg>
-                        <arg>jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg>
-                        <arg>jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg>
-                        <arg>jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg>
-                        <arg>jdk.compiler/com.sun.tools.javac.model=ALL-UNNAMED</arg>
-                        <arg>--add-exports</arg>
-                        <arg>jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED</arg>
-                        <arg>-parameters</arg>
-                    </compilerArgs>
-                </configuration>
-            </plugin>
+            <!-- 执行插件 -->
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
-                <configuration>
-                    <mainClass>com.myagent.workflow.http.HttpServerMain</mainClass>
-                    <cleanupDaemonThreads>false</cleanupDaemonThreads>
-                    <arguments>
-                        <!-- 如果需要传入参数，可以在此添加 -->
-                    </arguments>
-                </configuration>
+                <executions>
+                    <!-- 主服务 -->
+                    <execution>
+                        <id>default-run</id>
+                        <configuration>
+                            <mainClass>com.myagent.workflow.http.HttpServerMain</mainClass>
+                            <cleanupDaemonThreads>false</cleanupDaemonThreads>
+                        </configuration>
+                    </execution>
+
+                    <!-- 测试工具 -->
+                    <execution>
+                        <id>test-runner</id>
+                        <configuration>
+                            <mainClass>com.myagent.workflow.testtool.TestRunnerFX</mainClass>
+                            <classpathScope>test</classpathScope>
+                            <cleanupDaemonThreads>false</cleanupDaemonThreads>
+                            <!-- ✅ 强制 JVM 使用 GBK 输出 -->
+                            <systemProperties>
+                                <systemProperty>
+                                    <key>file.encoding</key>
+                                    <value>GBK</value>
+                                </systemProperty>
+                            </systemProperties>
+                            <!-- ✅ 传递 JavaFX 模块参数 -->
+                            <arguments>
+                                <argument>--add-modules</argument>
+                                <argument>javafx.controls,javafx.fxml</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

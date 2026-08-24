@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -32,6 +33,8 @@ public class Compiler {
     private final boolean autoOpenBrowser;
 
     private final AgentConfig config;
+
+    private static final Charset WINDOWS_GBK = Charset.forName("GBK");
 
     public Compiler(AgentConfig config) {
         this.sandboxDir = AgentConfig.getSandboxDir();
@@ -119,7 +122,7 @@ public class Compiler {
 
             Process compileProc = compilePb.start();
             int compileExit = compileProc.waitFor();
-            String compileOutput = new String(compileProc.getInputStream().readAllBytes());
+            String compileOutput = new String(compileProc.getInputStream().readAllBytes(), WINDOWS_GBK);
 
             if (compileExit != 0) {
                 return "编译失败 (退出码 " + compileExit + "):\n" + compileOutput;
@@ -181,7 +184,7 @@ public class Compiler {
 
             Process compileProc = compilePb.start();
             boolean finished = compileProc.waitFor(60, TimeUnit.SECONDS);
-            String compileOutput = new String(compileProc.getInputStream().readAllBytes());
+            String compileOutput = new String(compileProc.getInputStream().readAllBytes(), WINDOWS_GBK);
 
             if (!finished) {
                 compileProc.destroyForcibly();
@@ -212,7 +215,7 @@ public class Compiler {
 
                 Process runProc = runPb.start();
                 // 等待最多 5 秒检测是否启动成功（GUI 程序不会退出，所以超时即认为启动成功）
-                boolean started = runProc.waitFor(5, TimeUnit.SECONDS);
+                boolean started = runProc.waitFor(10, TimeUnit.SECONDS);
                 if (!started) {
                     // 程序还在运行，视为启动成功
                     // 注意：进程仍在后台运行，我们无法自动关闭它，但可以返回提示
@@ -222,7 +225,7 @@ public class Compiler {
                             "注意：该进程仍在后台运行，如需关闭请手动终止（Ctrl+C 或任务管理器）。";
                 } else {
                     // 异常情况：程序退出了，可能有问题
-                    String runOutput = new String(runProc.getInputStream().readAllBytes());
+                    String runOutput = new String(runProc.getInputStream().readAllBytes(), WINDOWS_GBK);
                     return "⚠️ JavaFX 应用启动后立即退出，可能有错误。\n输出:\n" + runOutput;
                 }
             }
@@ -297,7 +300,7 @@ public class Compiler {
                 );
                 pb.redirectErrorStream(true);
                 Process p = pb.start();
-                String output = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                String output = new String(p.getInputStream().readAllBytes(), WINDOWS_GBK);
                 int exitCode = p.waitFor();
                 if (exitCode != 0) continue;
 
@@ -436,7 +439,7 @@ public class Compiler {
                     return "✅ Python GUI 程序已启动！\n窗口应该已弹出，请查看。\n注意：该进程仍在后台运行，如需关闭请手动终止。";
                 } else {
                     // 进程提前退出，可能出错
-                    String output = new String(p.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+                    String output = new String(p.getInputStream().readAllBytes(), WINDOWS_GBK);
                     return "⚠️ GUI 程序启动后立即退出，可能有错误。\n输出:\n" + output;
                 }
             } catch (IOException | InterruptedException e) {
@@ -542,7 +545,7 @@ public class Compiler {
                     byte[] buffer = new byte[1024];
                     int len;
                     while ((len = is.read(buffer)) != -1) {
-                        String chunk = new String(buffer, 0, len, StandardCharsets.UTF_8);
+                        String chunk = new String(buffer, 0, len, WINDOWS_GBK);
                         synchronized (output) {
                             output.append(chunk);
                         }

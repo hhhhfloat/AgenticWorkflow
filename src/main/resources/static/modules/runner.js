@@ -22,20 +22,7 @@ async function runProjectWithPath(projectName, filename, mode) {
     appendLog(logPrefix);
 
     const settings = getEffectiveSettings ? getEffectiveSettings() : {};
-    const config = {
-        model: settings.model || 'deepseek-v4-flash',
-        autoOpenBrowser: settings.autoOpenBrowser || false,
-        mavenCommand: settings.mavenCommand || '',
-        javaHome: settings.javaHome || '',
-        pythonInterpreter: settings.pythonInterpreter || '',
-        nodeInterpreter: settings.nodeInterpreter || '',
-        cppCompilerType: settings.cppCompilerType || 'msvc',
-        msvcCompiler: settings.msvcCompiler || '',
-        msvcInclude: '',
-        msvcLib: '',
-        mingwCompiler: settings.mingwCompiler || '',
-        enableSecurityScan: settings.enableSecurityScan !== false
-    };
+    const config = buildRunConfig(settings);
 
     try {
         const res = await fetch('/runProject', {

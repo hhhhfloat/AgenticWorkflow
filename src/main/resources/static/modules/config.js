@@ -24,3 +24,22 @@ const MAX_HISTORY = 30;
 const STORAGE_KEY = 'promptHistory';
 const HEARTBEAT_INTERVAL_MS = 3000;
 const BASE_URL = 'http://localhost:8080';
+
+// ===== 统一构建运行配置 =====
+function buildRunConfig(settings) {
+    return {
+        model: settings.model || 'deepseek-v4-flash',
+        autoOpenBrowser: settings.autoOpenBrowser || false,
+        mavenCommand: settings.mavenCommand || '',
+        javaHome: settings.javaHome || '',
+        pythonInterpreter: settings.pythonInterpreter || '',
+        nodeInterpreter: settings.nodeInterpreter || '',
+        cppCompilerType: settings.cppCompilerType || 'msvc',
+        msvcCompiler: settings.msvcCompiler || '',
+        msvcInclude: '',
+        msvcLib: '',
+        mingwCompiler: settings.mingwCompiler || '',
+        enableSecurityScan: settings.enableSecurityScan !== false,
+        compressionEnabled: settings.compressionEnabled !== false   // ← 新增
+    };
+}

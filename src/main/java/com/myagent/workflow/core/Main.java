@@ -64,7 +64,8 @@ public class Main {
                 httpClient,
                 objectMapper,
                 apiKey,
-                Main::logIf
+                Main::logIf,
+                runConfig.enableCompression()
         );
 
         this.toolExecutor = new ToolExecutor(
@@ -136,9 +137,9 @@ public class Main {
     public String run(String userRequest, int maxIterations) throws IOException {
         this.runningThread = Thread.currentThread();
         try {
-            contextManager.init(SystemPrompt.get(), userRequest);
+            contextManager.init(SystemPrompt.get(runConfig.enableCompression()), userRequest);
 
-            List<Map<String, Object>> tools = ToolDefinitions.build();
+            List<Map<String, Object>> tools = ToolDefinitions.build(runConfig.enableCompression());
 
             for (int iteration = 0; iteration < maxIterations; iteration++) {
                 checkStop();

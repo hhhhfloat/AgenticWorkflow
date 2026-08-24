@@ -31,7 +31,8 @@ public class ConfigEditor {
                 getString(cfg, "msvcInclude", baseConfig.msvcInclude()),
                 getString(cfg, "msvcLib", baseConfig.msvcLib()),
                 getString(cfg, "mingwCompiler", baseConfig.mingwCompiler()),
-                getBool(cfg, "enableSecurityScan", baseConfig.enableSecurityScan())
+                getBool(cfg, "enableSecurityScan", baseConfig.enableSecurityScan()),
+                getBool(cfg, "enableCompression", baseConfig.enableCompression())
         );
     }
 
