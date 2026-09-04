@@ -1,6 +1,5 @@
 package com.myagent.workflow.tools;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.AgentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,8 +12,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
@@ -34,7 +31,8 @@ public class Compiler {
 
     private final AgentConfig config;
 
-    private static final Charset WINDOWS_GBK = Charset.forName("GBK");
+    private static final Charset PROCESS_CHARSET = StandardCharsets.UTF_8;
+
 
     public Compiler(AgentConfig config) {
         this.sandboxDir = AgentConfig.getSandboxDir();
@@ -122,7 +120,7 @@ public class Compiler {
 
             Process compileProc = compilePb.start();
             int compileExit = compileProc.waitFor();
-            String compileOutput = new String(compileProc.getInputStream().readAllBytes(), WINDOWS_GBK);
+            String compileOutput = new String(compileProc.getInputStream().readAllBytes(), PROCESS_CHARSET);
 
             if (compileExit != 0) {
                 return "编译失败 (退出码 " + compileExit + "):\n" + compileOutput;
@@ -184,7 +182,7 @@ public class Compiler {
 
             Process compileProc = compilePb.start();
             boolean finished = compileProc.waitFor(60, TimeUnit.SECONDS);
-            String compileOutput = new String(compileProc.getInputStream().readAllBytes(), WINDOWS_GBK);
+            String compileOutput = new String(compileProc.getInputStream().readAllBytes(), PROCESS_CHARSET);
 
             if (!finished) {
                 compileProc.destroyForcibly();
@@ -225,7 +223,7 @@ public class Compiler {
                             "注意：该进程仍在后台运行，如需关闭请手动终止（Ctrl+C 或任务管理器）。";
                 } else {
                     // 异常情况：程序退出了，可能有问题
-                    String runOutput = new String(runProc.getInputStream().readAllBytes(), WINDOWS_GBK);
+                    String runOutput = new String(runProc.getInputStream().readAllBytes(), PROCESS_CHARSET);
                     return "⚠️ JavaFX 应用启动后立即退出，可能有错误。\n输出:\n" + runOutput;
                 }
             }
@@ -300,7 +298,7 @@ public class Compiler {
                 );
                 pb.redirectErrorStream(true);
                 Process p = pb.start();
-                String output = new String(p.getInputStream().readAllBytes(), WINDOWS_GBK);
+                String output = new String(p.getInputStream().readAllBytes(), PROCESS_CHARSET);
                 int exitCode = p.waitFor();
                 if (exitCode != 0) continue;
 
@@ -439,7 +437,7 @@ public class Compiler {
                     return "✅ Python GUI 程序已启动！\n窗口应该已弹出，请查看。\n注意：该进程仍在后台运行，如需关闭请手动终止。";
                 } else {
                     // 进程提前退出，可能出错
-                    String output = new String(p.getInputStream().readAllBytes(), WINDOWS_GBK);
+                    String output = new String(p.getInputStream().readAllBytes(), PROCESS_CHARSET);
                     return "⚠️ GUI 程序启动后立即退出，可能有错误。\n输出:\n" + output;
                 }
             } catch (IOException | InterruptedException e) {
@@ -545,7 +543,7 @@ public class Compiler {
                     byte[] buffer = new byte[1024];
                     int len;
                     while ((len = is.read(buffer)) != -1) {
-                        String chunk = new String(buffer, 0, len, WINDOWS_GBK);
+                        String chunk = new String(buffer, 0, len, PROCESS_CHARSET);
                         synchronized (output) {
                             output.append(chunk);
                         }

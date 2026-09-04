@@ -19,6 +19,10 @@ public class DataStore {
     private final List<TestResult> history = new ArrayList<>();
     private final String storageDir;
 
+    // ===== 迭代数据存储（用于实时折线图） =====
+    private final List<IterationData> iterationDataA = new ArrayList<>();  // 启用压缩
+    private final List<IterationData> iterationDataB = new ArrayList<>();  // 禁用压缩
+
     public DataStore() {
         this("token-tests");
     }
@@ -99,5 +103,59 @@ public class DataStore {
             ));
         }
         Files.writeString(file, sb.toString(), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * 添加一轮迭代数据
+     * @param isCompressionOn true 表示启用压缩，false 表示禁用压缩
+     * @param data 迭代数据
+     */
+    public void addIterationData(boolean isCompressionOn, IterationData data) {
+        if (data == null) return;
+        if (isCompressionOn) {
+            iterationDataA.add(data);
+        } else {
+            iterationDataB.add(data);
+        }
+    }
+
+
+
+    /**
+     * 获取指定测试的迭代数据
+     * @param isCompressionOn true 表示启用压缩，false 表示禁用压缩
+     * @return 迭代数据列表（只读）
+     */
+    public List<IterationData> getIterationData(boolean isCompressionOn) {
+        return Collections.unmodifiableList(isCompressionOn ? iterationDataA : iterationDataB);
+    }
+
+    /**
+     * 获取指定测试的累计缓存命中率（从第 1 轮到当前轮）
+     * @param isCompressionOn true 表示启用压缩，false 表示禁用压缩
+     * @return 累计命中率（百分比 0~100）
+     */
+    public double getCumulativeHitRate(boolean isCompressionOn) {
+        List<IterationData> list = isCompressionOn ? iterationDataA : iterationDataB;
+        if (list.isEmpty()) {
+            return 0.0;
+        }
+
+        long totalPrompt = 0;
+        long totalCached = 0;
+        for (IterationData data : list) {
+            totalPrompt += data.promptTokens();
+            totalCached += data.cachedTokens();
+        }
+
+        return totalPrompt > 0 ? (double) totalCached / totalPrompt * 100 : 0.0;
+    }
+
+    /**
+     * 清空所有迭代数据
+     */
+    public void clearIterationData() {
+        iterationDataA.clear();
+        iterationDataB.clear();
     }
 }

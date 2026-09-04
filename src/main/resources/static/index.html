@@ -113,6 +113,21 @@
                             <span class="hint-text">关闭后 Agent 不会进行上下文压缩（用于对比测试）</span>
                         </div>
                     </div>
+                    <!-- 🆕 新增：压缩间隔参数 -->
+                    <div class="setting-row">
+                        <label>📏 最小压缩间隔</label>
+                        <div class="toggle-group">
+                            <input type="number" id="setMinInterval" value="5" min="2" max="10" step="1">
+                            <span class="hint-text">（2~10，建议 ≥ 3）</span>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <label>📏 最大压缩间隔</label>
+                        <div class="toggle-group">
+                            <input type="number" id="setMaxInterval" value="15" min="10" max="30" step="1">
+                            <span class="hint-text">（10~30，必须 ≥ 最小压缩间隔）</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button id="saveSettingsBtn">💾 保存</button>

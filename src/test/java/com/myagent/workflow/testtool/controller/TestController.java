@@ -3,10 +3,7 @@ package com.myagent.workflow.testtool.controller;
 import com.myagent.workflow.core.AgentConfig;
 import com.myagent.workflow.core.ConfigEditor;
 import com.myagent.workflow.core.Main;
-import com.myagent.workflow.testtool.model.DataStore;
-import com.myagent.workflow.testtool.model.ResultCollector;
-import com.myagent.workflow.testtool.model.TestConfig;
-import com.myagent.workflow.testtool.model.TestResult;
+import com.myagent.workflow.testtool.model.*;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
@@ -42,9 +39,13 @@ public class TestController {
     public interface TestCallback {
         void onLog(String message);
         void onTestStarted(String label);
+
+        void onIterationUpdate(boolean isCompressionOn, IterationData data);
+
         void onTestCompleted(TestResult result);
         void onAllTestsCompleted();
         void onError(String error);
+
     }
 
 
@@ -84,6 +85,9 @@ public class TestController {
                 if (result.isValid()) {
                     dataStore.addResult(result);
                     callback.onTestCompleted(result);
+
+                    // System.out.println("[1] 测试 B 完成，准备显示图表 --- " + "result: "+ result.toString().length());
+
                     callback.onLog("✅ " + config.label() + " 完成");
                 } else {
                     callback.onError("测试结果无效");
@@ -126,7 +130,9 @@ public class TestController {
                     baseConfig.msvcLib(),
                     baseConfig.mingwCompiler(),
                     baseConfig.enableSecurityScan(),
-                    config.compressionEnabled()
+                    config.compressionEnabled(),
+                    config.minInterval(),    // 🆕 第 15 个参数
+                    config.maxInterval()
             );
 
             Main agent = new Main(testConfig);
@@ -137,6 +143,33 @@ public class TestController {
                 ps.flush();
                 callback.onLog(msg);
             });
+
+            // 🆕 设置迭代监听器
+            agent.setIterationListener((iteration, prompt, cached, completion, cost) -> {
+                // System.out.println("[DEBUG] iterationListener 被触发！轮次=" + iteration);
+
+                // 🆕 本轮命中率（直接用本轮数据计算）
+                double currentRoundHitRate = prompt > 0 ? (double) cached / prompt * 100 : 0.0;
+
+                // 🆕 累计命中率：从 DataStore 获取（DataStore 需要维护累计值）
+                double cumulativeHitRate = dataStore.getCumulativeHitRate(config.compressionEnabled());
+
+                // 🆕 传入两个命中率：累计 + 本轮
+                IterationData data = new IterationData(
+                        iteration,
+                        prompt,
+                        cached,
+                        completion,
+                        cumulativeHitRate,      // 累计命中率（橙色线）
+                        currentRoundHitRate,    // 本轮命中率（绿色线）
+                        cost
+                );
+
+                dataStore.addIterationData(config.compressionEnabled(), data);
+                callback.onIterationUpdate(config.compressionEnabled(), data);
+            });
+
+            // System.out.println("[DEBUG] iterationListener 已设置: " + (agent.iterationListenerIsNull()));
 
             agent.run(config.prompt(), config.maxIterations());
 

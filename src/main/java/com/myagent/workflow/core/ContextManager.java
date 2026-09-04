@@ -51,8 +51,8 @@ public class ContextManager {
 
     // ===== 压缩状态追踪 =====
     private int roundsSinceLastCheckpoint = 0;
-    private final int MIN_INTERVAL = AgentConfig.getCheckpointMinInterval();
-    private final int MAX_INTERVAL = AgentConfig.getCheckpointMaxInterval();
+    private int MIN_INTERVAL;
+    private int MAX_INTERVAL;
 
     // ===== 历史记录 =====
     private Path historyFile;
@@ -93,15 +93,20 @@ public class ContextManager {
     private static final double PRO_OUT_PEAK = 27.0;
     private final boolean compressionEnabled;
 
+
     public ContextManager(OkHttpClient httpClient, ObjectMapper objectMapper,
                           String apiKey, Consumer<String> logConsumer,
-                          boolean compressionEnabled) {
+                          boolean compressionEnabled, int minInterval, int maxInterval) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.logConsumer = logConsumer;
         this.compressor = new Compressor(httpClient, objectMapper, apiKey);  // ← 新增
         this.compressionEnabled = compressionEnabled;
+
+        this.MIN_INTERVAL = minInterval;
+        this.MAX_INTERVAL = maxInterval;
+
         initHistoryFile();
     }
 
@@ -370,7 +375,7 @@ public class ContextManager {
     }
 
     // ===== 修改 calculateCost =====
-    private double calculateCost(String model, long promptTokens, long cachedTokens, long completionTokens) {
+    double calculateCost(String model, long promptTokens, long cachedTokens, long completionTokens) {
         boolean isPro = AgentConfig.getModelPro().equals(model);
         boolean peak = isPeakHour();
         long uncached = promptTokens - cachedTokens;

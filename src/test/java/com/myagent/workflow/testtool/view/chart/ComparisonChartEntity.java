@@ -8,7 +8,6 @@ import javafx.scene.chart.*;
 import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
-import javafx.scene.shape.Line;
 
 /**
  * 对比柱状图实体 —— Token 堆叠 + 成本横线 + 命中率标注
@@ -33,6 +32,7 @@ public class ComparisonChartEntity extends Chart {
 
     @Override
     public Node render() {
+
         if (resultA == null || resultB == null || !resultA.isValid() || !resultB.isValid()) {
             return new Label("数据不足，无法生成对比图表");
         }
@@ -63,7 +63,7 @@ public class ComparisonChartEntity extends Chart {
         cachedSeries.setName("缓存命中");
         cachedSeries.getData().add(new XYChart.Data<>("启用压缩", resultA.totalCachedTokens()));
         cachedSeries.getData().add(new XYChart.Data<>("禁用压缩", resultB.totalCachedTokens()));
-        cachedSeries.getNode().setStyle("-fx-bar-fill: " + toHex(COLOR_CACHED) + ";");
+        applySeriesColor(cachedSeries, COLOR_CACHED);
 
         // 系列2：缓存未命中（深蓝，中间）
         XYChart.Series<String, Number> uncachedSeries = new XYChart.Series<>();
@@ -72,16 +72,33 @@ public class ComparisonChartEntity extends Chart {
         long uncachedB = resultB.totalPromptTokens() - resultB.totalCachedTokens();
         uncachedSeries.getData().add(new XYChart.Data<>("启用压缩", uncachedA));
         uncachedSeries.getData().add(new XYChart.Data<>("禁用压缩", uncachedB));
-        uncachedSeries.getNode().setStyle("-fx-bar-fill: " + toHex(COLOR_UNCACHED) + ";");
+        applySeriesColor(uncachedSeries, COLOR_UNCACHED);
 
         // 系列3：输出（深绿，顶部）
         XYChart.Series<String, Number> outputSeries = new XYChart.Series<>();
         outputSeries.setName("输出");
         outputSeries.getData().add(new XYChart.Data<>("启用压缩", resultA.totalCompletionTokens()));
         outputSeries.getData().add(new XYChart.Data<>("禁用压缩", resultB.totalCompletionTokens()));
-        outputSeries.getNode().setStyle("-fx-bar-fill: " + toHex(COLOR_OUTPUT) + ";");
+        applySeriesColor(outputSeries, COLOR_OUTPUT);
 
         chart.getData().addAll(cachedSeries, uncachedSeries, outputSeries);
+    }
+
+    /**
+     * 安全地为 series 设置颜色，避免 NPE
+     */
+    private void applySeriesColor(XYChart.Series<String, Number> series, Color color) {
+        String hexColor = toHex(color);
+        // 先尝试直接设置（如果节点已存在）
+        if (series.getNode() != null) {
+            series.getNode().setStyle("-fx-bar-fill: " + hexColor + ";");
+        }
+        // 同时添加监听器，确保节点创建后也能设置
+        series.nodeProperty().addListener((obs, oldNode, newNode) -> {
+            if (newNode != null) {
+                newNode.setStyle("-fx-bar-fill: " + hexColor + ";");
+            }
+        });
     }
 
     /**
@@ -96,17 +113,11 @@ public class ComparisonChartEntity extends Chart {
         javafx.scene.layout.StackPane stackPane = new javafx.scene.layout.StackPane();
         stackPane.getChildren().add(chart);
 
-        // 创建一个透明的标注层（在 chart 上方）
-        // 由于 StackedBarChart 无法直接叠加，我们使用 chart 的 parent 来添加标注
-        // 更可靠的方式：在 chart 的布局完成后，用子节点添加
-
         // 简化的方式：使用 Region 作为标注层
         javafx.scene.layout.Region overlay = new javafx.scene.layout.Region();
         overlay.setMouseTransparent(true);
         overlay.setStyle("-fx-background-color: transparent;");
 
-        // 由于在 chart 上叠加精确位置比较复杂，这里使用 VBox 在图表下方显示补充信息
-        // 更实际的做法：在图表下方添加一个信息面板
 
         VBox infoPanel = new VBox(5);
         infoPanel.setPadding(new Insets(10, 0, 0, 0));

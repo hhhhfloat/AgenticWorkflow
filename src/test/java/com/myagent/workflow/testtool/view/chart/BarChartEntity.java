@@ -13,6 +13,7 @@ import java.util.List;
 
 /**
  * 柱状图实体 —— 用于对比不同指标
+ * 使用 nodeProperty 监听方式安全设置颜色，避免 NPE
  */
 public class BarChartEntity extends Chart {
 
@@ -62,6 +63,8 @@ public class BarChartEntity extends Chart {
     }
 
     private void buildChart() {
+        if (barChart == null) return;
+
         barChart.getData().clear();
 
         int colorIndex = 0;
@@ -79,20 +82,20 @@ public class BarChartEntity extends Chart {
 
             barChart.getData().add(series);
 
-            // ✅ 安全设置颜色：使用监听器等待节点可用
+            // ✅ 安全设置颜色：使用监听器方式
             if (colorIndex < DEFAULT_COLORS.length) {
                 String color = DEFAULT_COLORS[colorIndex];
-                // 如果节点已存在（例如重新渲染时），直接设置
+                // 先尝试直接设置（如果节点已存在）
                 if (series.getNode() != null) {
                     series.getNode().setStyle("-fx-bar-fill: " + color + ";");
-                } else {
-                    // 否则监听节点创建事件
-                    series.nodeProperty().addListener((obs, oldNode, newNode) -> {
-                        if (newNode != null) {
-                            newNode.setStyle("-fx-bar-fill: " + color + ";");
-                        }
-                    });
                 }
+                // 同时添加监听器，确保节点创建后也能设置
+                final String finalColor = color;
+                series.nodeProperty().addListener((obs, oldNode, newNode) -> {
+                    if (newNode != null) {
+                        newNode.setStyle("-fx-bar-fill: " + finalColor + ";");
+                    }
+                });
             }
             colorIndex++;
         }

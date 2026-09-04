@@ -41,8 +41,6 @@ public class LogController {
      */
     public void append(String message) {
 
-        System.out.println("[LogController] " + message);  // ← 加这行
-
         if (message == null) return;
 
         // 写入内存

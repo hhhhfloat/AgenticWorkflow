@@ -365,7 +365,7 @@ public class HttpServerMain {
                 JsonNode root = mapper.readTree(body);
                 userRequest = root.get("prompt").asText();
 
-                Main.logIf("🔍 [调试] 收到请求体: " + body);
+                // Main.logIf("🔍 [调试] 收到请求体: " + body);
 
                 runConfig = ConfigEditor.buildFromRequest(root);
 

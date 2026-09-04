@@ -40,6 +40,8 @@ function buildRunConfig(settings) {
         msvcLib: '',
         mingwCompiler: settings.mingwCompiler || '',
         enableSecurityScan: settings.enableSecurityScan !== false,
-        compressionEnabled: settings.compressionEnabled !== false   // ← 新增
+        compressionEnabled: settings.compressionEnabled !== false,
+        minInterval: settings.minInterval ?? 5,
+        maxInterval: settings.maxInterval ?? 15
     };
 }

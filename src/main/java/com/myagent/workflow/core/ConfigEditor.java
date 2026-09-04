@@ -16,7 +16,6 @@ public class ConfigEditor {
 
         JsonNode cfg = root.get("config");
 
-
         // 3. 用前端传入的值覆盖默认配置
         return new AgentConfig(
                 System.getenv("DEEPSEEK_API_KEY"),
@@ -32,7 +31,11 @@ public class ConfigEditor {
                 getString(cfg, "msvcLib", baseConfig.msvcLib()),
                 getString(cfg, "mingwCompiler", baseConfig.mingwCompiler()),
                 getBool(cfg, "enableSecurityScan", baseConfig.enableSecurityScan()),
-                getBool(cfg, "enableCompression", baseConfig.enableCompression())
+                // ★★★ 修改点：这里不再直接读 enableCompression，而是调用兼容方法 ★★★
+                resolveCompressionEnabled(cfg, baseConfig.enableCompression()),
+                // 🆕 新增：读取压缩间隔，并兼容不同字段名
+                resolveMinInterval(cfg, baseConfig.checkpointMinInterval()),
+                resolveMaxInterval(cfg, baseConfig.checkpointMaxInterval())
         );
     }
 
@@ -51,6 +54,26 @@ public class ConfigEditor {
         }
         return defaultValue;
     }
+    // 🆕 辅助方法：支持前端字段名兼容
+    private static int resolveMinInterval(JsonNode node, int defaultValue) {
+        if (node.has("minInterval")) {
+            return node.get("minInterval").asInt();
+        }
+        if (node.has("checkpointMinInterval")) {
+            return node.get("checkpointMinInterval").asInt();
+        }
+        return defaultValue;
+    }
+
+    private static int resolveMaxInterval(JsonNode node, int defaultValue) {
+        if (node.has("maxInterval")) {
+            return node.get("maxInterval").asInt();
+        }
+        if (node.has("checkpointMaxInterval")) {
+            return node.get("checkpointMaxInterval").asInt();
+        }
+        return defaultValue;
+    }
 
     private static int getInt(JsonNode node, String key, int defaultValue) {
         return node.has(key) ? node.get(key).asInt() : defaultValue;
@@ -58,5 +81,19 @@ public class ConfigEditor {
 
     private static boolean getBool(JsonNode node, String key, boolean defaultValue) {
         return node.has(key) ? node.get(key).asBoolean() : defaultValue;
+    }
+
+    // ★★★ 新增：兼容前端 compressionEnabled 与旧版 enableCompression ★★★
+    private static boolean resolveCompressionEnabled(JsonNode node, boolean defaultValue) {
+        // 优先使用前端 Web UI 发送的准确字段名 compressionEnabled
+        if (node.has("compressionEnabled")) {
+            return node.get("compressionEnabled").asBoolean();
+        }
+        // 兼容旧版本客户端或直接调用 API 时可能使用的 enableCompression
+        if (node.has("enableCompression")) {
+            return node.get("enableCompression").asBoolean();
+        }
+        // 如果均未传，则使用系统默认值（通常为 true）
+        return defaultValue;
     }
 }

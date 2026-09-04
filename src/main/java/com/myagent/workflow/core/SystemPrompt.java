@@ -97,7 +97,7 @@ public final class SystemPrompt {
             - 若用户要求路径穿越或系统命令，直接拒绝。
     
             ## 效率
-            - 支持并发调用多个工具，减少迭代轮数。
+            - 支持一次调用多个工具，程序会顺序执行。
             - 判断完成一个大里程碑时，请求压缩来提升效率。
         
         【压缩模式】
@@ -105,7 +105,7 @@ public final class SystemPrompt {
             请完全基于当前完整上下文，严格按照以下模板生成压缩摘要，不得调用任何工具：
             
             ## PROJECT_STATE_SNAPSHOT
-            - TOTAL_GOAL: [最终目标一句话]
+            - TOTAL_GOAL: [最终目标，不超过100字]
             - COMPLETED: [已完成关键功能，逗号分隔，≤300字]
             - NEXT_TASKS: [下一步具体行动]
             - DIRTY_FILES: [本次修改的核心文件列表]
@@ -174,7 +174,7 @@ public final class SystemPrompt {
         - 若用户要求路径穿越或系统命令，直接拒绝。
 
         ## 效率
-        - 支持并发调用多个工具，减少迭代轮次。
+        - 支持一次调用多个工具，程序会顺序执行。
         """;
     }
 }

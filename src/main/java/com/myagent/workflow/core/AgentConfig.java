@@ -15,7 +15,9 @@ public record AgentConfig(
         String msvcLib,
         String mingwCompiler,
         boolean enableSecurityScan,
-        boolean enableCompression
+        boolean enableCompression,
+        int checkpointMinInterval,
+        int checkpointMaxInterval
 ) {
     // ===== 系统级常量（静态） =====
     private static final String ARCHIVE_VERSION = "v4_2";
@@ -25,10 +27,6 @@ public record AgentConfig(
     // ===== 🚀 新增：模型常量（替代硬编码） =====
     private static final String MODEL_FLASH = "deepseek-v4-flash";
     private static final String MODEL_PRO = "deepseek-v4-pro";
-
-    // ===== 🚀 新增：锯齿压缩策略阈值 =====
-    private static final int CHECKPOINT_MIN_INTERVAL = 5;
-    private static final int CHECKPOINT_MAX_INTERVAL = 15;
 
     // ===== 🚀 锚点索引文件名（项目内部） =====
     private static final String ANCHOR_INDEX_NAME = ".anchors.json";
@@ -64,13 +62,13 @@ public record AgentConfig(
     private static final String NODE_INTERPRETER = "C:/Program Files/nodejs/node.exe";
 
     private static final boolean ENABLE_COMPRESSION = true;
+    private static final int DEFAULT_MIN_COMPRESS = 5;
+    private static final int DEFAULT_MAX_COMPRESS = 15;
 
     // ========== 公共 Getter ==========
 
     public static String getModelFlash() { return MODEL_FLASH; }
     public static String getModelPro() { return MODEL_PRO; }
-    public static int getCheckpointMinInterval() { return CHECKPOINT_MIN_INTERVAL; }
-    public static int getCheckpointMaxInterval() { return CHECKPOINT_MAX_INTERVAL; }
     public static int getDefaultMaxIterations() { return DEFAULT_MAX_ITERATIONS; }
     public static String getSandboxDir() { return SANDBOX_DIR; }
     public static String getApiUrl() { return API_URL; }
@@ -96,7 +94,9 @@ public record AgentConfig(
                 MSVC_LIB,
                 MINGW_COMPILER,
                 ENABLE_SECURITY_SCAN,
-                ENABLE_COMPRESSION
+                ENABLE_COMPRESSION,
+                DEFAULT_MIN_COMPRESS,
+                DEFAULT_MAX_COMPRESS
         );
     }
 }

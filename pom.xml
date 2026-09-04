@@ -127,14 +127,6 @@
                             <mainClass>com.myagent.workflow.testtool.TestRunnerFX</mainClass>
                             <classpathScope>test</classpathScope>
                             <cleanupDaemonThreads>false</cleanupDaemonThreads>
-                            <!-- ✅ 强制 JVM 使用 GBK 输出 -->
-                            <systemProperties>
-                                <systemProperty>
-                                    <key>file.encoding</key>
-                                    <value>GBK</value>
-                                </systemProperty>
-                            </systemProperties>
-                            <!-- ✅ 传递 JavaFX 模块参数 -->
                             <arguments>
                                 <argument>--add-modules</argument>
                                 <argument>javafx.controls,javafx.fxml</argument>

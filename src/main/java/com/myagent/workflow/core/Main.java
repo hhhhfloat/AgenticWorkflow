@@ -40,6 +40,21 @@ public class Main {
 
     private final ContextManager contextManager;
 
+    public boolean iterationListenerIsNull() {
+        return iterationListener != null;
+    }
+
+    // ===== 迭代监听器（用于测试程序实时追踪） =====
+    public interface IterationListener {
+        void onIteration(int iteration, long promptTokens, long cachedTokens, long completionTokens, double cost);
+    }
+
+    private IterationListener iterationListener = null;
+
+    public void setIterationListener(IterationListener listener) {
+        this.iterationListener = listener;
+    }
+
 
     // @anchor: main_constructor
     public Main(AgentConfig runConfig) {
@@ -65,7 +80,9 @@ public class Main {
                 objectMapper,
                 apiKey,
                 Main::logIf,
-                runConfig.enableCompression()
+                runConfig.enableCompression(),
+                runConfig.checkpointMinInterval(),
+                runConfig.checkpointMaxInterval()
         );
 
         this.toolExecutor = new ToolExecutor(
@@ -203,6 +220,12 @@ public class Main {
                             }
                         }
                         contextManager.recordUsage(currentModel, prompt, cached, completion);
+
+                        // 在 contextManager.recordUsage() 之后
+                        if (iterationListener != null) {
+                            double cost = contextManager.calculateCost(currentModel, prompt, cached, completion);
+                            iterationListener.onIteration(iteration + 1, prompt, cached, completion, cost);
+                        }
                     }
 
                     List<Map<String, Object>> finalRound = new ArrayList<>();
@@ -275,6 +298,11 @@ public class Main {
                         }
                     }
                     contextManager.recordUsage(currentModel, prompt, cached, completion);
+
+                    if (iterationListener != null) {
+                        double cost = contextManager.calculateCost(currentModel, prompt, cached, completion);
+                        iterationListener.onIteration(iteration + 1, prompt, cached, completion, cost);
+                    }
                 }
             }
 
@@ -334,13 +362,13 @@ public class Main {
         }
 
         String request = args[0];
-        System.out.println("📝 收到需求: " + request);
+        // System.out.println("📝 收到需求: " + request);
 
         Main agent = new Main(ConfigEditor.buildDefault());
         try {
             String result = agent.run(request);
-            System.out.println("========== Agent 最终回答 ==========");
-            System.out.println(result);
+            // System.out.println("========== Agent 最终回答 ==========");
+            // System.out.println(result);
         } catch (IOException e) {
             System.err.println("运行 Agent 时发生错误: " + e.getMessage());
             e.printStackTrace();
