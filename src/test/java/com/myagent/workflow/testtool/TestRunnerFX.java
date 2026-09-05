@@ -1,8 +1,10 @@
 package com.myagent.workflow.testtool;
 
+import com.myagent.workflow.core.AgentConfig;
 import com.myagent.workflow.testtool.controller.ChartController;
 import com.myagent.workflow.testtool.controller.LogController;
 import com.myagent.workflow.testtool.controller.TestController;
+import com.myagent.workflow.testtool.export.PortfolioWriter;
 import com.myagent.workflow.testtool.model.DataStore;
 import com.myagent.workflow.testtool.model.IterationData;
 import com.myagent.workflow.testtool.model.TestConfig;
@@ -17,7 +19,19 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
+
 public class TestRunnerFX extends Application {
+
+    private static final int DEFAULT_MIN_INTERVAL = 5;
+    private static final int DEFAULT_MAX_INTERVAL = 15;
 
     // ===== Controllers =====
     private final DataStore dataStore = new DataStore();
@@ -210,6 +224,44 @@ public class TestRunnerFX extends Application {
         dataStore.clearHistory();
         chartController.initLineCharts();
 
+        // ===== 1. 清理本次测试项目目录 =====
+        try {
+            Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
+            Path projectDir = sandboxRoot.resolve(projectName).toAbsolutePath().normalize();
+
+            // 安全检查：确保路径在 sandbox 内，且不是 sandbox 本身
+            if (projectDir.startsWith(sandboxRoot) && !projectDir.equals(sandboxRoot)) {
+                if (Files.exists(projectDir)) {
+                    Files.walk(projectDir)
+                            .sorted(Comparator.reverseOrder())
+                            .map(Path::toFile)
+                            .forEach(File::delete);
+                    logController.append("🧹 已清理旧项目目录: " + projectDir);
+                } else {
+                    logController.append("📁 项目目录不存在，无需清理: " + projectDir);
+                }
+            } else {
+                logController.append("⚠️ 跳过清理: 路径不安全或为根目录 " + projectDir);
+            }
+        } catch (IOException e) {
+            logController.append("⚠️ 清理项目目录失败: " + e.getMessage());
+        }
+
+        // ===== 2. 设置日志文件 =====
+        try {
+            String sessionId = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            Path logDir = Paths.get("./testPortfolio", "logs");
+            if (!Files.exists(logDir)) {
+                Files.createDirectories(logDir);
+            }
+            String logFileName = "test_" + projectName + "_" + sessionId + ".log";
+            logController.setLogFile(logDir.resolve(logFileName).toString());
+            logController.append("📝 日志文件: " + logFileName);
+        } catch (Exception e) {
+            logController.append("⚠️ 设置日志文件失败: " + e.getMessage());
+        }
+
+
         int maxIter = parseMaxIterations();
 
         String fullPrompt = prompt + "\n\n项目名称：" + projectName + "，所有代码放在 " + projectName + "/ 目录下。";
@@ -263,6 +315,22 @@ public class TestRunnerFX extends Application {
                         statusALabel.setText("✅ 完成");
                         updatePanelData(costA, tokensA, hitA, result);
                         logController.append("✅ 测试 A 完成");
+
+                        // ===== 🆕 在运行 B 之前清理 sandbox，确保 B 从空白状态开始 =====
+                        try {
+                            Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
+                            Path projectDir = sandboxRoot.resolve(finalProjectName).toAbsolutePath().normalize();
+                            if (Files.exists(projectDir) && !projectDir.equals(sandboxRoot)) {
+                                Files.walk(projectDir)
+                                        .sorted(Comparator.reverseOrder())
+                                        .map(Path::toFile)
+                                        .forEach(File::delete);
+                                logController.append("🧹 [A→B] 已清理项目目录，B 将从空目录开始: " + projectDir);
+                            }
+                        } catch (IOException e) {
+                            logController.append("⚠️ [A→B] 清理项目目录失败: " + e.getMessage());
+                        }
+
                         Platform.runLater(() -> {
                             try { Thread.sleep(50); } catch (InterruptedException ignored) {}
                             testController.runTest(finalConfigB, this);
@@ -276,6 +344,26 @@ public class TestRunnerFX extends Application {
                         mainView.updateTable(resultA, resultB);
                         if (resultA != null && resultB != null && resultA.isValid() && resultB.isValid()) {
                             chartController.showComparison(resultA, resultB);
+
+                            // ===== 🆕 生成测试档案 =====
+                            try {
+                                PortfolioWriter.write(
+                                        resultA,
+                                        dataStore.getIterationData(true),   // 启用压缩的逐轮数据
+                                        resultB,
+                                        dataStore.getIterationData(false),  // 禁用压缩的逐轮数据
+                                        logController.getFullLog(),         // 完整控制台日志
+                                        promptArea.getText().trim(),        // 原始提示词
+                                        parseMaxIterations(),               // 最大迭代次数
+                                        DEFAULT_MIN_INTERVAL,                                  // minInterval（当前硬编码，后续可UI化）
+                                        DEFAULT_MAX_INTERVAL,                                 // maxInterval（当前硬编码，后续可UI化）
+                                        "deepseek-v4-flash"                 // 模型名称
+                                );
+                            } catch (Exception e) {
+                                logController.append("❌ 生成测试档案失败: " + e.getMessage());
+                                e.printStackTrace();
+                            }
+
                         }
                         statusLabel.setText("✅ 全部测试完成！");
                         updateStatus("就绪", false);

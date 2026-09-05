@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import okhttp3.*;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -14,6 +16,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.zip.GZIPOutputStream;
 
 /**
  * 上下文管理器 —— 双区存储模型：
@@ -112,17 +115,18 @@ public class ContextManager {
 
 
 
-    // ===== 初始化历史文件 =====
     private void initHistoryFile() {
         try {
-            String sessionId = LocalDateTime.now()
-                    .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + "_" +
-                    UUID.randomUUID().toString().substring(0, 6);
+            String timestamp = LocalDateTime.now()
+                    .format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            String uuid = UUID.randomUUID().toString().substring(0, 6);
+            String fileName = timestamp + "_" + uuid + "_history.jsonl";
+
             Path tempDir = Paths.get("./temp");
             if (!Files.exists(tempDir)) {
                 Files.createDirectories(tempDir);
             }
-            this.historyFile = tempDir.resolve("history_" + sessionId + ".jsonl");
+            this.historyFile = tempDir.resolve(fileName);
             Files.writeString(historyFile, "", StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         } catch (IOException e) {
@@ -146,6 +150,20 @@ public class ContextManager {
      */
     public void appendToWorking(List<Map<String, Object>> round) {
         if (round == null || round.isEmpty()) return;
+
+        // 🔥 检查是否需要注入压缩提醒（追加到最后一条 tool 消息末尾）
+        if (compressionEnabled && roundsSinceLastCheckpoint >= MAX_INTERVAL) {
+            for (int i = round.size() - 1; i >= 0; i--) {
+                Map<String, Object> msg = round.get(i);
+                if ("tool".equals(msg.get("role"))) {
+                    String original = (String) msg.get("content");
+                    String reminder = "\n\n💡 【系统提醒】已达到最大压缩间隔，请在当前里程碑完成后调用 request_checkpoint 压缩上下文。";
+                    msg.put("content", original + reminder);
+                    log("📌 [系统] 已向工具返回结果注入压缩提醒");
+                    break;
+                }
+            }
+        }
 
         // 1. 追加本轮消息到工作区
         volatileWorking.addAll(round);
@@ -185,16 +203,15 @@ public class ContextManager {
                 int workingSizeBefore = volatileWorking.size();
                 volatileWorking.clear();
                 roundsSinceLastCheckpoint = 0;
-                pendingCompression = false;
 
                 log("📌 [系统] Agent 自压缩摘要已追加到基础区（system 角色），工作区已清空（原有 " + workingSizeBefore + " 条消息）");
                 log("📊 [系统] 当前基础区消息数: " + immutableBase.size() + "，工作区消息数: 0");
             } else {
                 // 如果 Agent 没有生成摘要，说明可能走了默认模式
                 log("⚠️ [系统] 压缩模式下未检测到摘要，Agent 可能未按指令执行");
-                pendingCompression = false;
                 // 可选：在下一轮注入提醒
             }
+            pendingCompression = false;
         }
 
         // 双重裁剪（保持注释状态）
@@ -210,17 +227,11 @@ public class ContextManager {
      * 构建完整的消息列表（供 API 请求使用）
      */
     public List<Map<String, Object>> buildMessages() {
+
         List<Map<String, Object>> result = new ArrayList<>(immutableBase);
 
-        // 🔥 如果距离上次压缩已超过阈值（如 >= MAX_INTERVAL - 2），注入提醒
-        if (roundsSinceLastCheckpoint >= MAX_INTERVAL && compressionEnabled) {
-            String reminder = "💡 【系统提醒】你已迭代 " + roundsSinceLastCheckpoint +
-                    " 轮，达到最大压缩间隔（" + MAX_INTERVAL + " 轮）。" +
-                    "请在当前里程碑完成后调用工具压缩上下文，避免token消耗。";
-            result.add(Map.of("role", "system", "content", reminder));
-        }
-
         result.addAll(volatileWorking);
+
         return result;
     }
 
@@ -327,6 +338,67 @@ public class ContextManager {
         }
     }
 
+    public void appendRawLog(String type, String jsonContent) {
+        if (historyFile == null) return;
+        try {
+            // 从 historyFile 中提取基础前缀
+            // 文件名格式: 20260904_212410_29d7c9_history.jsonl
+            String historyFileName = historyFile.getFileName().toString();
+            String basePrefix = historyFileName.replace("_history.jsonl", "");
+            String rawFileName = basePrefix + "_raw.jsonl";
+
+            Path rawFile = historyFile.getParent().resolve(rawFileName);
+            String line = String.format(
+                    "{\"type\":\"%s\",\"timestamp\":\"%s\",\"body\":%s}\n",
+                    type, LocalDateTime.now().toString(), jsonContent
+            );
+            Files.writeString(rawFile, line, StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            System.err.println("⚠️ 原始日志写入失败: " + e.getMessage());
+        }
+    }
+
+    // ===================== 原始日志压缩 =====================
+
+    /**
+     * 压缩原始日志文件（raw_*.jsonl）为 .gz 格式，并删除原文件。
+     * 在测试运行结束后调用。
+     */
+    public void compressRawLog() {
+        if (historyFile == null) return;
+
+        // 从 historyFile 中提取基础前缀
+        String historyFileName = historyFile.getFileName().toString();
+        String basePrefix = historyFileName.replace("_history.jsonl", "");
+        String rawFileName = basePrefix + "_raw.jsonl";
+        Path rawFile = historyFile.getParent().resolve(rawFileName);
+
+        if (!Files.exists(rawFile)) {
+            return; // 没有 raw 日志，跳过
+        }
+
+        try {
+            Path gzFile = rawFile.getParent().resolve(rawFileName + ".gz");
+
+            try (InputStream in = Files.newInputStream(rawFile);
+                 OutputStream out = new GZIPOutputStream(Files.newOutputStream(gzFile))) {
+                byte[] buffer = new byte[8192];
+                int len;
+                while ((len = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, len);
+                }
+            }
+
+            Files.delete(rawFile);
+            log("📦 [系统] 原始日志已压缩: " + gzFile.getFileName() +
+                    " (原大小: " + Files.size(gzFile) + " bytes)");
+
+        } catch (IOException e) {
+            System.err.println("⚠️ 压缩原始日志失败: " + e.getMessage());
+        }
+    }
+
     public Path getHistoryFile() { return historyFile; }
     public List<Long> getHistoryOffsets() { return historyOffsets; }
 
@@ -419,6 +491,9 @@ public class ContextManager {
      * 返回一个文本摘要，供压缩器使用。
      */
     public String flushPendingChanges() {
+
+        System.out.println("【啊啊啊啊啊】 该函数被调用");
+
         StringBuilder summary = new StringBuilder();
 
         // 1. 处理 PROJECT.md 的占位日志（如果有）

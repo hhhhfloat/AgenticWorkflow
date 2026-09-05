@@ -13,11 +13,13 @@ public record TestResult(
         double totalCost,
         double cacheHitRate,
         int compressionCount,
-        int roundsSinceLastCheckpoint
+        int roundsSinceLastCheckpoint,
+        int minInterval,
+        int maxInterval
 ) {
     // 空结果（用于错误情况）
     public static final TestResult EMPTY = new TestResult(
-            "空", "", 0, 0, 0, 0, 0.0, 0.0, 0, 0
+            "空", "", 0, 0, 0, 0, 0.0, 0.0, 0, 0, 0, 0
     );
 
     // 判断是否有效（有实际数据）

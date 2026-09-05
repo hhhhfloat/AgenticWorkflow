@@ -9,7 +9,7 @@ import java.util.regex.Pattern;
  */
 public class ResultCollector {
 
-    public static TestResult extractFromLog(String log, String testName) {
+    public static TestResult extractFromLog(String log, String testName, int minInterval, int maxInterval) {
         int lastIteration = 0;
         int compressionCount = 0;
         long promptTokens = 0;
@@ -84,7 +84,9 @@ public class ResultCollector {
                 cost,
                 hitRate,
                 compressionCount,
-                0
+                0,
+                minInterval,
+                maxInterval
         );
     }
 

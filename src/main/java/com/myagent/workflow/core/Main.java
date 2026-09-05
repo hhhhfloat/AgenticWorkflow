@@ -23,6 +23,9 @@ import java.util.function.Consumer;
 public class Main {
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
+    private static final String[] outputCutToolsString = {"","","",""};
+    private static final HashSet<String> outputCutTools = new HashSet<>(List.of(outputCutToolsString));
+
     private String currentModel;
 
     // @anchor: main_fields
@@ -171,6 +174,9 @@ public class Main {
 
                 String jsonBody = objectMapper.writeValueAsString(requestBody);
 
+                // ===== 🆕 记录完整请求体（原始 JSON） =====
+                contextManager.appendRawLog("request", jsonBody);
+
                 checkStop();
                 Request httpRequest = new Request.Builder()
                         .url(AgentConfig.getApiUrl())
@@ -187,6 +193,9 @@ public class Main {
                     assert response.body() != null;
                     responseBody = response.body().string();
                 }
+
+                // ===== 🆕 记录完整响应体（原始 JSON） =====
+                contextManager.appendRawLog("response", responseBody);
 
                 JsonNode root = objectMapper.readTree(responseBody);
                 JsonNode choices = root.get("choices");
@@ -221,7 +230,6 @@ public class Main {
                         }
                         contextManager.recordUsage(currentModel, prompt, cached, completion);
 
-                        // 在 contextManager.recordUsage() 之后
                         if (iterationListener != null) {
                             double cost = contextManager.calculateCost(currentModel, prompt, cached, completion);
                             iterationListener.onIteration(iteration + 1, prompt, cached, completion, cost);
@@ -230,7 +238,7 @@ public class Main {
 
                     List<Map<String, Object>> finalRound = new ArrayList<>();
                     finalRound.add(assistantMsg);
-                    contextManager.appendToWorking(finalRound);  // ✅ 修正：使用 finalRound
+                    contextManager.appendToWorking(finalRound);
 
                     return content;
                 }
@@ -246,8 +254,8 @@ public class Main {
                     String functionName = tc.get("function").get("name").asText();
                     String argumentsJson = tc.get("function").get("arguments").asText();
 
-                    String outputJson = (functionName.equals("write_file") || functionName.equals("insert_at_anchor"))
-                            ? (argumentsJson.substring(0, 30) + "...[已截断，共 " + argumentsJson.length() + " 字符]")
+                    String outputJson = (argumentsJson.length() > 100)
+                            ? argumentsJson.substring(0, 100) + "...[已截断，共 " + argumentsJson.length() + " 字符]"
                             : argumentsJson;
                     logIf("🤖 模型决策: 调用工具 [" + functionName + "] 参数: " + outputJson);
 
@@ -262,24 +270,13 @@ public class Main {
                         logIf("⚠️ 工具 [" + functionName + "] 返回 null，已替换为占位符");
                     }
 
-
                     Map<String, Object> toolMsg = new HashMap<>();
                     toolMsg.put("role", "tool");
                     toolMsg.put("tool_call_id", toolCallId);
                     toolMsg.put("content", result);
                     currentRound.add(toolMsg);
 
-                    String displayResult;
-                    if ("read_file".equals(functionName)) {
-                        int totalLen = result.length();
-                        if (totalLen > 300) {
-                            displayResult = result.substring(0, 200) + "... [共 " + totalLen + " 字符，已截断显示]";
-                        } else {
-                            displayResult = result;
-                        }
-                    } else {
-                        displayResult = result;
-                    }
+                    String displayResult = getDisplayResult(functionName, result);
                     logIf("工具 [" + functionName + "] 执行结果: " + displayResult);
                 }
 
@@ -312,8 +309,26 @@ public class Main {
             throw e;
         } finally {
             contextManager.printStats();
+
+            contextManager.compressRawLog();
+
             this.runningThread = null;
         }
+    }
+
+    private static String getDisplayResult(String functionName, String result) {
+        String displayResult;
+        if ("read_file".equals(functionName)) {
+            int totalLen = result.length();
+            if (totalLen > 300) {
+                displayResult = result.substring(0, 200) + "... [共 " + totalLen + " 字符，已截断显示]";
+            } else {
+                displayResult = result;
+            }
+        } else {
+            displayResult = result;
+        }
+        return displayResult;
     }
 
     // 原有 run(String) 保持兼容

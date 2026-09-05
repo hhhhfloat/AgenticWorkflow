@@ -178,7 +178,7 @@ public class TestController {
             }
 
             String log = baos.toString(StandardCharsets.UTF_8);
-            return ResultCollector.extractFromLog(log, config.label());
+            return ResultCollector.extractFromLog(log, config.label(), config.minInterval(), config.maxInterval());
 
         } catch (Exception e) {
             if (e instanceof InterruptedException) {

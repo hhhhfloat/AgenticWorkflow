@@ -1,5 +1,6 @@
 package com.myagent.workflow.testtool;
 
+import com.myagent.workflow.testtool.core.PromptContents;
 import com.myagent.workflow.testtool.model.TestResult;
 import com.myagent.workflow.testtool.view.chart.Chart;
 import javafx.geometry.Insets;
@@ -39,9 +40,8 @@ public class MainView {
 
     private VBox root;
 
-    private static final String DEFAULT_PROMPT = """
-            制作一个输入什么就输出什么的程序，无需自测, no need for PROJECT.MD or any complex things。这是一个测试
-            """;
+    private static final String DEFAULT_PROMPT = PromptContents.buildDefault().prompt();
+    private static final String DEFAULT_PROJECT_NAME = PromptContents.buildDefault().projectName();
 
     public void buildUI() {
         root = new VBox(5);
@@ -58,6 +58,7 @@ public class MainView {
 
     // ===== UI 构建方法 =====
     private VBox createPromptArea() {
+
         Label promptLabel = new Label("📝 测试提示词");
         promptLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 14px;");
 
@@ -75,7 +76,7 @@ public class MainView {
         // 项目名称输入框
         Label nameLabel = new Label("项目名称:");
         nameLabel.setStyle("-fx-font-size: 13px;");
-        projectNameField = new TextField("test-programming");
+        projectNameField = new TextField(DEFAULT_PROJECT_NAME);
         projectNameField.setPrefWidth(150);
         HBox nameBox = new HBox(5, nameLabel, projectNameField);
 
@@ -113,13 +114,13 @@ public class MainView {
 
         logArea = new TextArea();
         logArea.setEditable(false);
-        logArea.setPrefHeight(100);
-        logArea.setPrefWidth(280);
+        logArea.setPrefHeight(150);
+        logArea.setPrefWidth(500);
         logArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
         logArea.setWrapText(true);
 
         VBox logBox = new VBox(5, logLabel, logArea);
-        logBox.setPrefWidth(280);
+        logBox.setPrefWidth(500);
         logBox.setPadding(new Insets(5));
 
         // 水平排列，间距 15px

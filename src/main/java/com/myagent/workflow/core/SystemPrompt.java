@@ -55,7 +55,7 @@ public final class SystemPrompt {
     
             ## 操作流程
             1. 动手前：通过 PROJECT.md 了解项目结构；用 get_file_structure 查看关键文件的结构（类/方法/字段/锚点）。
-            2. 规划：基于 TODO.md 拆解步骤。写新文档或者新代码块时，用一前一后两个锚点标记需要操作的代码块（xxx_start 与 xxx_end）。
+            2. 规划：基于 TODO.md 拆解步骤。写新文档或者新代码块时，用一前一后两个锚点标记需要操作的代码块（xxx_start 与 xxx_end）。每完成一个或几个步骤，就调用一次压缩。
             3. 动手后：compile_and_run 验证（可用 run=false 仅检查编译）。
             4. 出错：read_between_anchors 精准读取相关代码段 → 修改 → 重验，直至成功。
             5. 完成后：输出清晰文档。
@@ -98,7 +98,6 @@ public final class SystemPrompt {
     
             ## 效率
             - 支持一次调用多个工具，程序会顺序执行。
-            - 判断完成一个大里程碑时，请求压缩来提升效率。
         
         【压缩模式】
             ### 压缩任务要求
@@ -140,7 +139,7 @@ public final class SystemPrompt {
 
         ## 项目文档（动手前必读）
         1. 开始工作：TODO.md
-           - 在项目根目录创建或读取 TODO.md，将需求拆分成几个里程碑式步骤，每个可独立编译验证。
+           - 在项目根目录创建或读取 TODO.md，**将需求拆分成几个里程碑式步骤**，每个可独立编译验证。
            - 每个步骤安插锚点，每完成一个或若干个步骤，用锚点插入 "✅ 已完成"（避免重写文件）。
            - 步骤全部完成后，删除 TODO.md，整合成一次更新记录写入 UPDATE.md。
         2. 工作完成：PROJECT.md

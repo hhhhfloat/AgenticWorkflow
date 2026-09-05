@@ -68,7 +68,7 @@ public class LineChartEntity extends Chart {
         });
 
         tokenChart = new LineChart<>(sharedXAxis, tokenYAxis);
-        tokenChart.setTitle("Token 消耗 / 缓存命中量");
+        tokenChart.setTitle("Token 消耗");
         tokenChart.setAnimated(false);
         tokenChart.setLegendVisible(true);
         tokenChart.setCreateSymbols(true);
