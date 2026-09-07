@@ -182,34 +182,37 @@
     <h1>⚙️ Agentic Workflow</h1>
     <div class="subtitle">
         基于 DeepSeek API 的本地 AI 编程助手<br>
-        用自然语言描述需求，Agent 自动生成或修改代码
+        用自然语言描述需求，Agent 自动拆解并执行完整项目任务
     </div>
 
     <h2>📌 环境要求</h2>
     <ul>
-        <li>Windows系统</li>
-        <li>需要安装 <strong>Java 21 或更高版本</strong></li>
+        <li>跨平台支持（Windows / macOS / Linux）</li>
+        <li>需要安装 <strong>Java 21 或更高版本</strong>（必须 21+）</li>
         <li>可下载：
             <a href="https://www.oracle.com/java/technologies/downloads/" target="_blank">Oracle JDK</a>
+            或 <a href="https://adoptium.net/" target="_blank">Eclipse Temurin</a>
         </li>
         <li>安装后，在命令行输入 <code>java -version</code> 能正常输出版本信息即可</li>
     </ul>
 
     <h2>🚀 如何使用？</h2>
     <ol class="step-list">
-        <li>双击 <code>start.bat</code></li>
-        <li>输入你的 DeepSeek API Key（首次运行会提示）</li>
-        <li>浏览器自动打开前端页面（本地运行，无服务器）</li>
-        <li>在文本框中输入需求，点击 <strong>“运行”</strong></li>
+        <li>双击 <code>start.bat</code>（或终端执行 JAR 包）</li>
+        <li>首次运行会提示输入 DeepSeek API Key（也可提前设置环境变量 <code>DEEPSEEK_API_KEY</code>）</li>
+        <li>浏览器自动打开前端页面（本地 HTTP 服务，端口 8080）</li>
+        <li>在文本框中输入需求，点击 <strong>“运行”</strong>，Agent 将自动迭代执行</li>
     </ol>
 
     <h2>📝 v4.0 更新说明</h2>
     <ul>
         <li><strong>语义级代码结构解析</strong>：新增 <code>get_file_structure</code> 工具，支持 Java / Python / C++ / JavaScript / HTML / CSS 的文件结构解析，Agent 可直接“看懂”类、方法、字段和锚点</li>
-        <li><strong>精准锚点读取</strong>：新增 <code>read_between_anchors</code>，配合已有的锚点系统形成“先看结构 → 按需读取 → 精准修改”的完整闭环</li>
+        <li><strong>精准锚点读取</strong>：新增 <code>read_between_anchors</code>，配合锚点系统形成“先看结构 → 按需读取 → 精准修改”的完整闭环</li>
         <li><strong>安全扫描模块</strong>：编译前自动拦截危险代码（系统命令执行、路径穿越），作为独立防护层</li>
-        <li><strong>上下文管理重构</strong>：三段式结构管理，便于操作与压缩</li>
-        <li><strong>前端优化</strong>：更流畅了</li>
+        <li><strong>上下文压缩开关</strong>：前端配置面板新增「启用压缩模式」（默认开启）。开启后 Agent 可按需调用 <code>request_checkpoint</code> 自主产出状态摘要，大幅优化长上下文 Token 成本</li>
+        <li><strong>上下文管理重构</strong>：三段式结构管理（前缀+中间+后缀），中间段支持灵活压缩传递</li>
+        <li><strong>A/B 测试工具</strong>：内置 JavaFX 桌面程序（testtool），可量化对比压缩模式开关的实际收益（轮数/成本/命中率）</li>
+        <li><strong>前端优化</strong>：文件树预加载更流畅，支持项目运行/归档/上传/新建全流程</li>
         <li>修复了若干小 bug</li>
     </ul>
 
@@ -224,25 +227,27 @@
 
     <h2>📂 文件目录说明</h2>
     <ul>
-        <li><code>sandbox/</code> → Agent 生成的所有代码都在这里</li>
+        <li><code>sandbox/</code> → Agent 生成的所有代码与运行沙箱</li>
         <li><code>TestProjects/</code> → 归档的完整项目</li>
-        <li><code>HistoryOutput/</code> → 每次运行的日志文件</li>
-        <li>以上几个文件夹会在 <code>.jar</code> 文件同级自动生成</li>
+        <li><code>HistoryOutput/</code> → 每次运行的日志文件（自动保留 30 天）</li>
+        <li><code>testPortfolio/</code> → A/B 测试报告与对比图表（使用 testtool 时生成）</li>
+        <li>以上文件夹会在 <code>.jar</code> 文件同级自动生成</li>
     </ul>
 
     <h2>⚠️ 注意事项</h2>
     <ul>
         <li>需要联网（调用 DeepSeek API）</li>
-        <li>API Key 请从 <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 官网获取（一点小钱够用挺久了）</li>
-        <li>建议迭代次数设为 20+</li>
-        <li>刷新页面会导致断连</li>
-        <li>关闭命令行窗口即可停止服务</li>
+        <li>API Key 请从 <a href="https://platform.deepseek.com" target="_blank">platform.deepseek.com</a> 官网获取（成本极低，充值少量即可长期使用）</li>
+        <li>建议迭代次数设为 20+ 以完成复杂任务</li>
+        <li>刷新前端页面会导致当前 SSE 连接断开，但 Agent 可能仍在后台运行（可观察控制台日志）</li>
+        <li>关闭命令行窗口即可停止后端服务</li>
     </ul>
 
     <h2>🐛 遇到问题？</h2>
     <ul>
-        <li>无法连接 DeepSeek？网络问题或未配置 API</li>
-        <li>中途断连？可能是刷新了前端网页或网络非常不稳定</li>
+        <li>无法连接 DeepSeek？检查网络或 API Key 是否配置正确</li>
+        <li>中途断连？可能是刷新了前端网页或网络不稳定</li>
+        <li>编译报错？请确保本地已安装对应语言的编译器（如 GCC、Python、Node.js 等）</li>
         <li><strong>其他问题 —— 请联系 QQ 2959754375 反馈</strong></li>
     </ul>
 
@@ -250,7 +255,7 @@
 
     <div class="footer-meta">
         <span>📌 版本 <span class="version-tag">v4.0</span></span>
-        <span style="color:#8b949e;">Made with DeepSeek 你看的出来这个文件基本是AI生成的 <span title="其实整个项目都是自己架构、用AI逐步实现的"><code>对吧</code></span></span>
+        <span style="color:#8b949e;">Made with DeepSeek · 整个项目由架构设计 + AI 逐步实现</span>
     </div>
 </div>
 </body>
