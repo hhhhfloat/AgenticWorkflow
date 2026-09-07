@@ -39,7 +39,7 @@
 
 ## 版本记录
 
-**v4.0** — 语义级结构解析 + 安全扫描 + 上下文压缩重构
+**v4.2** — 语义级结构解析 + 安全扫描 + 上下文压缩重构
 - 新增 `get_file_structure`：多语言代码结构解析（Java/Python/C++/JS/HTML/CSS）
 - 新增 `read_between_anchors`：精准锚点区间读取
 - 新增安全扫描模块：编译前自动拦截危险代码（`CommandExecutionRule` / `FilePathRule`）
