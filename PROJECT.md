@@ -66,15 +66,11 @@ resources/
 ### 1.5 构建与运行
 
 ```bash
-# 主程序编译（61 个源文件）
-mvn compile
+# 打包并运行：根目录下命令行中
+mvn clean package
+./start.bat
 
-# 启动 HTTP 服务（需先设置 API Key）
-export DEEPSEEK_API_KEY=sk-xxx
-mvn exec:java                                   # → com.myagent.workflow.http.HttpServerMain
-# 或打包后运行：
-mvn package
-java -jar target/agentic-workflow-1.0-SNAPSHOT-jar-with-dependencies.jar
+# 终止程序：关闭前端并终止后端 -- 命令行 Ctrl + C
 ```
 
 ---
@@ -145,11 +141,8 @@ configs/thresholds.json              # 阈值与共享配置快照
 <!-- @anchor: test_program_build -->
 
 ```bash
-# 编译测试程序（随测试作用域，需要 JavaFX 依赖可解析）
-mvn test-compile
-
-# 启动 JavaFX 桌面工具
-mvn exec:java@test-runner            # → com.myagent.workflow.testtool.TestRunnerFX
+# 编译并运行
+mvn clean test-compile exec:java@test-runner
 ```
 
 > 提示：testtool 为 GUI 程序，运行需本地窗口环境与 JavaFX 模块（`javafx.controls,javafx.fxml`）；本工具仅负责其代码组织与文档，不替代主程序编译验证。

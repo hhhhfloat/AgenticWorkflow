@@ -39,6 +39,8 @@
 
 ## 版本记录
 
+**v4.3** — 自动生成默认配置（编译器）
+
 **v4.2** — 语义级结构解析 + 安全扫描 + 上下文压缩重构
 - 新增 `get_file_structure`：多语言代码结构解析（Java/Python/C++/JS/HTML/CSS）
 - 新增 `read_between_anchors`：精准锚点区间读取
