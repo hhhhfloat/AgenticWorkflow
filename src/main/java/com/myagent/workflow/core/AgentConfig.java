@@ -27,7 +27,7 @@ public record AgentConfig(
         int checkpointMaxInterval
 ) {
     // ===== 系统级常量（与机器无关，不需要外部化） =====
-    private static final String ARCHIVE_VERSION = "v4_2";
+    private static final String ARCHIVE_VERSION = "v4_3";
     private static final String SANDBOX_DIR     = "./sandbox";
     private static final String API_URL         = "https://api.deepseek.com/chat/completions";
     private static final String MODEL_FLASH     = "deepseek-v4-flash";
