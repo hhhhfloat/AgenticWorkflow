@@ -3,6 +3,7 @@
 基于 DeepSeek API 的本地 Agent 代码生成工作流。
 
 > 项目代码及本说明均由 DeepSeek 辅助生成。
+> 可以使用 newVersion 分支下的内容来获取最新开发进度
 
 ## 核心功能
 
