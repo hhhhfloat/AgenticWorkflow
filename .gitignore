@@ -52,3 +52,5 @@ HistoryOutput/
 /token-tests/
 /testPortfolio/
 /temp/
+/agent-config.properties
+/sessions/
