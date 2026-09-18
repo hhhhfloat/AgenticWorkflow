@@ -204,18 +204,7 @@ public final class ToolDefinitions {
                 List.of("target")
         ));
 
-        // @anchor: toolDef_queryHistory
-        tools.add(defineTool(
-                "query_history",
-                "在完整历史记录中搜索指定关键词（支持正则表达式），返回匹配的消息片段（最多 limit 条）。用于在压缩后查找被摘要覆盖的细节信息。",
-                defineParams()
-                        .prop("keyword", "string", "要搜索的关键词（支持正则表达式）")
-                        .prop("limit", "integer", "返回结果的最大条数，默认 10")
-                        .build(),
-                List.of("keyword")
-        ));
 
-        // 在 ToolDefinitions.java 中添加
         // @anchor: toolDef_requestCheckpoint
         // 仅在启用压缩时添加 request_checkpoint
         if (enableCompression) {

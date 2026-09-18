@@ -3,6 +3,7 @@ package com.myagent.workflow.testtool.controller;
 import com.myagent.workflow.core.AgentConfig;
 import com.myagent.workflow.core.ConfigEditor;
 import com.myagent.workflow.core.Main;
+import com.myagent.workflow.session.Session;
 import com.myagent.workflow.testtool.model.*;
 
 import java.io.ByteArrayOutputStream;
@@ -135,14 +136,15 @@ public class TestController {
                     config.maxInterval()
             );
 
-            Main agent = new Main(testConfig);
-            currentAgent = agent;
-
-            agent.setLogConsumer(msg -> {
+            Session session = new Session(testConfig);
+            session.setLogConsumer(msg -> {
                 ps.println(msg);
                 ps.flush();
                 callback.onLog(msg);
             });
+
+            Main agent = new Main(session);
+            currentAgent = agent;
 
             // 🆕 设置迭代监听器
             agent.setIterationListener((iteration, prompt, cached, completion, cost) -> {

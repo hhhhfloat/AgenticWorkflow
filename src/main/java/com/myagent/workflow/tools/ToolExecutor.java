@@ -1,10 +1,8 @@
 package com.myagent.workflow.tools;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.AgentConfig;
 import com.myagent.workflow.core.ContextManager;
-import com.myagent.workflow.core.Main;
 import com.myagent.workflow.model.FileStructure;
 import com.myagent.workflow.parser.FileStructureFormatter;
 import com.myagent.workflow.parser.StructureParser;
@@ -15,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,8 +20,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
  * @anchor: toolExecutor_class
@@ -47,8 +42,6 @@ public class ToolExecutor {
 
     private final AgentConfig config;
 
-
-
     // @anchor: toolExecutor_constructor
     public ToolExecutor(AgentConfig config, ObjectMapper objectMapper, Consumer<String> modelSwitcher, ContextManager contextManager) {
         this.config = config;
@@ -67,7 +60,6 @@ public class ToolExecutor {
     }
 
     // ==================== 工具调度入口 ====================
-
     /**
      * @anchor: toolExecutor_dispatch
      * 根据工具名和参数分发执行，返回结果字符串。
@@ -130,8 +122,6 @@ public class ToolExecutor {
                 );
             case "switch_model":
                 return switchModel(args);
-            case "query_history":
-                return queryHistory(args);
             case "read_between_anchors":
                 return anchorMgr.readBetweenAnchors(
                         (String) args.get("startAnchor"),
@@ -147,7 +137,6 @@ public class ToolExecutor {
                 return "未知工具: " + functionName;
         }
     }
-
 
     // ==================== 工具 : compile_and_run ====================
 
@@ -274,55 +263,6 @@ public class ToolExecutor {
         }
         modelSwitcher.accept(modelName);
         return "✅ 模型已切换至: " + modelName;
-    }
-
-    // queryHistory 方法
-    // @anchor: toolExecutor_queryHistory
-    private String queryHistory(Map<String, Object> args) {
-        String keyword = (String) args.get("keyword");
-        int limit = args.containsKey("limit") ? (int) args.get("limit") : 10;
-        if (limit <= 0) limit = 10;
-
-        Path historyFile = contextManager.getHistoryFile();
-        if (historyFile == null || !Files.exists(historyFile)) {
-            return "[]";
-        }
-
-        List<Map<String, Object>> results = new ArrayList<>();
-        try (Stream<String> lines = Files.lines(historyFile, StandardCharsets.UTF_8)) {
-            Iterator<String> iterator = lines.iterator();
-            while (iterator.hasNext()) {
-                String line = iterator.next();
-                if (line.trim().isEmpty()) continue;
-                JsonNode node = objectMapper.readTree(line);
-                if (node.has("content")) {
-                    String content = node.get("content").asText();
-                    boolean matched = false;
-                    try {
-                        matched = Pattern.compile(keyword, Pattern.CASE_INSENSITIVE)
-                                .matcher(content).find();
-                    } catch (Exception e) {
-                        matched = content.toLowerCase().contains(keyword.toLowerCase());
-                    }
-                    if (matched) {
-                        Map<String, Object> entry = new LinkedHashMap<>();
-                        entry.put("role", node.get("role").asText());
-                        String snippet = content.length() > 200 ? content.substring(0, 200) + "..." : content;
-                        entry.put("snippet", snippet);
-                        results.add(entry);
-                        if (results.size() >= limit) break;
-                    }
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("⚠️ 查询历史失败: " + e.getMessage());
-            return "[]";
-        }
-        try {
-            return objectMapper.writeValueAsString(results);
-        } catch (Exception e) {
-            return "[]";
-        }
     }
 
     // @anchor: toolExecutor_getFileStructure

@@ -12,12 +12,36 @@
     <!-- ===== 侧边栏 ===== -->
     <div id="sidebar">
         <div id="sidebarHeader">
-            <span>📁 文件浏览器</span>
+            <span>📁 工作台</span>
             <button id="toggleSidebarBtn" title="折叠侧边栏">◀</button>
         </div>
-        <div id="sidebarContent">
-            <div class="tree-root" data-path="sandbox">📂 sandbox</div>
-            <div class="tree-root" data-path="TestProjects">📂 TestProjects</div>
+
+        <!-- 顶部视图切换 -->
+        <div id="sidebarToolbar">
+            <button id="viewFilesBtn" class="active">📁 文件</button>
+            <button id="viewSessionsBtn">💬 会话</button>
+        </div>
+
+        <!-- 工作项目占位（阶段 2 改为下拉） -->
+        <div id="projectSelector">
+            <span class="label">📌 工作项目：</span>
+            <span class="value">未选择</span>
+        </div>
+
+        <!-- 文件视图 -->
+        <div id="filesView">
+            <div id="sidebarContent">
+                <div class="tree-root" data-path="sandbox">📂 sandbox</div>
+                <div class="tree-root" data-path="TestProjects">📂 TestProjects</div>
+            </div>
+        </div>
+
+        <!-- 会话视图 -->
+        <div id="sessionsView" style="display:none;">
+            <div class="session-header">
+                <button id="newSessionBtn">＋ 新对话</button>
+            </div>
+            <div id="sessionListView"></div>
         </div>
     </div>
 
@@ -25,22 +49,28 @@
     <div id="main">
         <h2>Agentic 工作台</h2>
 
-        <textarea id="prompt" placeholder="输入你的需求，例如：写一个 HTML 计算器，支持加减乘除">写一个 HTML 计算器，支持加减乘除</textarea>
+        <!-- 日志区（顶部，占据剩余空间） -->
+        <div id="output">等待输入...</div>
 
-        <div id="historyContainer"></div>
+        <div id="usagePanel" class="usage-panel"></div>
+        <!-- 输入区（底部固定） -->
+        <div id="inputArea">
+            <textarea id="prompt" placeholder="输入你的需求，例如：写一个 HTML 计算器，支持加减乘除">写一个 HTML 计算器，支持加减乘除</textarea>
+            <div id="historyContainer"></div>
 
-        <div class = "iteration-control">
-            <label for="maxIterations" >🔄 最大迭代次数：</label>
-            <input type="number" id="maxIterations" value="20" min="3" max="100">
-            <span class="hint">（3-100, 建议 > 15）</span>
-        </div>
+            <div class="iteration-control">
+                <label for="maxIterations">🔄 最大迭代次数：</label>
+                <input type="number" id="maxIterations" value="20" min="3" max="100">
+                <span class="hint">（3-100, 建议 > 15）</span>
+            </div>
 
-        <div class="button-row">
-            <button id="runBtn">▶ 运行</button>
-            <button id="stopBtn" disabled>⏹ 停止</button>
-            <button id="clearBtn" class="clear-btn">🗑 清空</button>
-            <button id="logBtn" class="log-btn" title="打开 HistoryOutput 日志文件夹">📂 日志</button>
-            <button id="configBtn" class="config-btn" title="高级配置">⚙️ 配置</button>
+            <div class="button-row">
+                <button id="runBtn">▶ 运行</button>
+                <button id="stopBtn" disabled>⏹ 停止</button>
+                <button id="clearBtn" class="clear-btn">🗑 清空</button>
+                <button id="logBtn" class="log-btn" title="打开 HistoryOutput 日志文件夹">📂 日志</button>
+                <button id="configBtn" class="config-btn" title="高级配置">⚙️ 配置</button>
+            </div>
         </div>
 
         <!-- ===== 配置弹窗 ===== -->
@@ -137,7 +167,6 @@
             </div>
         </div>
 
-        <div id="output">等待输入...</div>
     </div>
 </div>
 
@@ -156,6 +185,9 @@
 <script src="modules/log.js"></script>
 <!-- 历史记录 -->
 <script src="modules/history.js"></script>
+<script src="modules/sessionState.js"></script>
+<script src="modules/usageStore.js"></script>
+<script src="modules/sessionList.js"></script>
 <!-- 心跳机制 -->
 <script src="modules/heartbeat.js"></script>
 <!-- 文件树 -->

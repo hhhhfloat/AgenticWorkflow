@@ -187,6 +187,9 @@ html, body {
 #sidebar.collapsed #sidebarHeader span {
     display: none;
 }
+#sidebar.collapsed > *:not(#sidebarHeader) {
+    display: none;
+}
 
 #sidebarHeader {
     display: flex;
@@ -508,4 +511,281 @@ html, body {
 .setting-row .api-key-control .hint-text {
     color: #888;
     font-size: 12px;
+}
+
+/* ===== 侧边栏顶部工具栏 ===== */
+#sidebarToolbar {
+    display: flex;
+    border-bottom: 1px solid #333;
+    padding: 4px 6px;
+    gap: 4px;
+}
+#sidebarToolbar button {
+    flex: 1;
+    padding: 6px 8px;
+    background: #2a2a2a;
+    color: #aaa;
+    border: 1px solid #333;
+    cursor: pointer;
+    font-size: 12px;
+    border-radius: 3px;
+}
+#sidebarToolbar button.active {
+    background: #3a5a8a;
+    color: #fff;
+    border-color: #4a6a9a;
+}
+#sidebarToolbar button:hover {
+    background: #333;
+}
+
+/* ===== 工作项目占位 ===== */
+#projectSelector {
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #888;
+    border-bottom: 1px solid #333;
+}
+#projectSelector .value {
+    color: #666;
+}
+
+/* ===== 会话视图 ===== */
+.session-header {
+    padding: 6px;
+    border-bottom: 1px solid #333;
+}
+#newSessionBtn {
+    width: 100%;
+    padding: 6px;
+    background: #2a4a2a;
+    color: #afa;
+    border: 1px solid #3a5a3a;
+    cursor: pointer;
+    font-size: 12px;
+    border-radius: 3px;
+}
+#newSessionBtn:hover {
+    background: #3a5a3a;
+}
+
+#sessionListView {
+    overflow-y: auto;
+    flex: 1;
+}
+.session-item {
+    padding: 8px 10px;
+    border-bottom: 1px solid #2a2a2a;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.session-item:hover {
+    background: #2a2a2a;
+}
+.session-item.active {
+    background: #2a3a5a;
+    border-left: 3px solid #4a8aff;
+}
+.session-title {
+    font-size: 13px;
+    color: #ddd;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.session-time {
+    font-size: 11px;
+    color: #777;
+    margin-top: 2px;
+}
+.session-empty {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    font-size: 12px;
+}
+/* ===== 主区域纵向布局 ===== */
+#main {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+#main h2 {
+    margin: 0 0 10px 0;
+    flex-shrink: 0;
+}
+
+/* ===== 日志区（顶部，占据剩余空间，可滚动） ===== */
+#output {
+    flex: 1;
+    overflow-y: auto;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    padding: 12px;
+    margin-bottom: 10px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border-radius: 4px;
+    /* 滚动到底部时，最新内容可见 */
+    scroll-behavior: smooth;
+}
+
+/* ===== 输入区（底部固定） ===== */
+#inputArea {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid #333;
+    padding-top: 10px;
+}
+
+#prompt {
+    width: 100%;
+    box-sizing: border-box;   /* 关键：让 padding/border 算进宽度内 */
+    resize: none;
+    min-height: 60px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* 迭代控制行、按钮行紧凑一些 */
+.iteration-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.button-row {
+    display: flex;
+    gap: 8px;
+}
+
+/* ===== 本轮运行详情折叠块 ===== */
+.run-detail {
+    margin: 10px 0;
+    padding: 6px 10px;
+    background: #252525;
+    border-left: 3px solid #666;
+    border-radius: 3px;
+}
+.run-detail summary {
+    cursor: pointer;
+    color: #888;
+    font-size: 12px;
+    user-select: none;
+    list-style: none;
+}
+.run-detail summary::before {
+    content: '▸ ';
+}
+.run-detail[open] summary::before {
+    content: '▾ ';
+}
+.run-detail summary:hover {
+    color: #bbb;
+}
+.run-detail pre {
+    margin: 8px 0 0 0;
+    padding: 8px 10px;
+    background: #1a1a1a;
+    color: #bbb;
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border-radius: 3px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* ===== 对话消息样式（微信式） ===== */
+.msg {
+    display: flex;
+    margin: 10px 0;
+}
+
+/* 用户消息：右对齐 + 绿色气泡 */
+.msg-user {
+    justify-content: flex-end;
+}
+.msg-user .msg-body {
+    background: #95ec69;      /* 微信绿 */
+    color: #111;
+    padding: 8px 12px;
+    border-radius: 8px;
+    max-width: 70%;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* Agent 消息：左对齐 + 无底色 + 限宽 */
+.msg-assistant {
+    justify-content: flex-start;
+}
+.msg-assistant .msg-body {
+    background: transparent;
+    color: #ddd;
+    padding: 4px 0;
+    max-width: 85%;           /* 限宽，留出右侧"呼吸空间" */
+    word-wrap: break-word;
+    font-size: 14px;
+    line-height: 1.6;
+}
+.msg-assistant .msg-body p {
+    margin: 4px 0;
+}
+.msg-assistant .msg-body pre {
+    background: #1a1a1a;
+    padding: 8px 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+/* 系统/摘要：居中灰色小字 */
+.msg-system {
+    justify-content: flex-start;
+    margin: 8px 0;
+}
+.msg-system .msg-body {
+    color: #bbb;
+    background: #1e1e1e;
+    border-left: 3px solid #4a8aff;
+    padding: 8px 12px;
+    border-radius: 3px;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 85%;
+    white-space: pre-wrap;
+    text-align: left;
+}
+
+/* ===== 用户消息与 Agent 消息之间的分割线 ===== */
+.msg + .msg::before {
+    content: '';
+    position: absolute;
+    /* 用 border 代替，避免伪元素定位麻烦 */
+}
+.usage-panel {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: #888;
+    padding: 2px 4px;
+    min-height: 16px;
+}
+.usage-panel span {
+    white-space: nowrap;
 }

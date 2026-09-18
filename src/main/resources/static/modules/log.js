@@ -61,3 +61,27 @@ function appendLog(msg) {
         }
     }
 }
+/**
+ * 以"对话消息"形式追加到 #output。
+ * @param {string} role - 'user' | 'assistant' | 'system'
+ * @param {string} content - 消息内容（支持 Markdown）
+ */
+function appendMessage(role, content) {
+    if (!output || !content) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = `msg msg-${role}`;
+
+    const body = document.createElement('div');
+    body.className = 'msg-body';
+
+    if (role === 'user') {
+        body.textContent = content;  // 用户消息通常不需要 Markdown
+    } else {
+        body.innerHTML = marked.parse(content);
+    }
+
+    wrap.appendChild(body);
+    output.appendChild(wrap);
+    output.scrollTop = output.scrollHeight;
+}

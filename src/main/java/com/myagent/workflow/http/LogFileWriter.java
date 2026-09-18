@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.stream.Stream;
 
-class LogFileWriter implements AutoCloseable {
+public class LogFileWriter implements AutoCloseable {
     private final Path logFile;
     private final BufferedWriter writer;
 

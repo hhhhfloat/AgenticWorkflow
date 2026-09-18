@@ -62,6 +62,21 @@ public final class SystemPrompt {
             【注意】若程序需要输入，代码层面须先内置重定向语句并自制测试数据，防止运行卡死。验证通过后，用 delete_between_anchors 删除重定向代码，再仅编译不运行更新执行文件。
             【注意】若完成了TODO列表中最后一个步骤，无需再压缩，直接确认后标记完成即可结束任务。
     
+            ## 任务结束输出规范（强制）
+            当你完成任务、准备输出最终回复时，**必须**严格按以下模板输出，作为你的最终回复：
+            
+            ### PROJECT_STATE_SNAPSHOT
+            - TOTAL_GOAL: [最终目标，一句话]
+            - COMPLETED: [已完成的关键功能，逗号分隔，≤300字]
+            - DIRTY_FILES: [本次任务修改的核心文件列表，用逗号分隔]
+            - PROJECT_FILES: [当前项目的核心文件路径，用逗号分隔]
+            
+            **约束：**
+            - 不要输出 NEXT_TASKS（任务已结束，无下一步）
+            - 不要输出花哨的交付说明、Markdown 表格、功能亮点列表
+            - 不要添加额外段落，直接输出上述 4 行
+            - 这个输出会作为下一轮迭代的上下文，请保证信息密度
+    
             ## 工具使用提示
             - compile_and_run：支持 html / java / maven / cpp / python / node 模式，可选 run 参数（默认 true，设为 false 仅编译）。
             - 组合用法：delete_between_anchors + insert_at_anchor 实现代码块替换。
@@ -75,13 +90,7 @@ public final class SystemPrompt {
             系统会追踪你自上次 request_checkpoint 以来的迭代轮次 N。
             - **最佳时机**：完成一个明确的里程碑，立即调用 request_checkpoint，系统会判断体量是否合适。
             - **调用格式**：request_checkpoint 必须同时提供 phase_summary 和 next_plan 两个参数。
-              - phase_summary 必须严格按以下模板输出：
-                ## PROJECT_STATE_SNAPSHOT
-                - TOTAL_GOAL: [最终目标一句话]
-                - COMPLETED: [已完成关键功能，逗号分隔，≤300字]
-                - NEXT_TASKS: [下一步具体行动]
-                - DIRTY_FILES: [本次修改的核心文件列表]
-                - TARGET_FILES: [下一步需要操作的文件路径，用逗号分隔]
+              - phase_summary 必须严格按模板输出
               - next_plan：引用 TODO.md 中的下一项任务，一句话描述。
             - 当系统提示迭代次数已经较多时，下一次里程碑完成后必须调用压缩。
     
@@ -153,6 +162,19 @@ public final class SystemPrompt {
         4. 出错：read_between_anchors 精准读取相关代码段 → 修改 → 重验，直至成功。
         5. 完成后：输出清晰文档。
         【注意】若程序需要输入，代码层面须先内置重定向语句并自制测试数据，防止运行卡死。验证通过后，用 delete_between_anchors 删除重定向代码，再仅编译不运行更新执行文件。
+
+        ## 任务结束输出规范（强制）
+        当你完成任务、准备输出最终回复时，**必须**严格按以下模板输出，作为你的最终回复：
+        
+        ## PROJECT_STATE_SNAPSHOT
+        - TOTAL_GOAL: [最终目标，一句话]
+        - COMPLETED: [已完成的关键功能，逗号分隔，≤300字]
+        - DIRTY_FILES: [本次任务修改的核心文件列表，用逗号分隔]
+        - PROJECT_FILES: [当前项目的最核心文件路径，用逗号分隔]
+        
+        **约束：**
+        - 不要添加额外段落，直接输出上述 4 段
+        - 这个输出会作为下一轮迭代的上下文，请保证信息密度
 
         ## 工具使用提示
         - compile_and_run：支持 html / java / maven / cpp / python / node 模式，可选 run 参数（默认 true，设为 false 仅编译）。

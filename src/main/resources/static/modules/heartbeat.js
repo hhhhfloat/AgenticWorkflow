@@ -11,9 +11,12 @@ function sendHeartbeat() {
         return Promise.resolve();
     }
 
+    const sessionId = getCurrentSessionId();
+
     return fetch(BASE_URL + '/heartbeat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({sessionId: sessionId})
     })
         .then(res => res.json())
         .then(data => {

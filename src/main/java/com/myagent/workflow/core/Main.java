@@ -3,6 +3,7 @@ package com.myagent.workflow.core;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.myagent.workflow.session.Session;
 import com.myagent.workflow.tools.ToolDefinitions;
 import com.myagent.workflow.tools.ToolExecutor;
 import okhttp3.*;
@@ -13,57 +14,62 @@ import java.io.File;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 
 /**
- * @anchor: main_class
- * Agent 工作流编排器 —— 核心职责：接收用户需求，驱动 DeepSeek API 多轮对话，调度工具执行。
- * 工具定义 → ToolDefinitions，工具实现 → ToolExecutor，配置 → AgentConfig。
+ * Agent 工作流编排器。
+ * <p>
+ * v5.0 重构要点：
+ * - 绑定 Session：Main 的生命周期从属于一个 Session，不再是独立的一次性执行器
+ * - 日志实例化：logConsumer 从静态改为通过 Session 转发
+ * - 传输层通用化：sendAndReceive 只接收组装好的 requestBody
+ * - 多轮对话：首轮 init()，后续 appendUserMessage()；任务结束 mergeSummaryToBase()
+ * - 去冗余：移除 outputCutTools、iterationListenerIsNull、未使用的静态 logIf
  */
 public class Main {
+
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
-    private static final String[] outputCutToolsString = {"","","",""};
-    private static final HashSet<String> outputCutTools = new HashSet<>(List.of(outputCutToolsString));
+    // ===== 绑定的会话 =====
+    private final Session session;
+    private final AgentConfig runConfig;
 
-    private String currentModel;
-
-    // @anchor: main_fields
+    // ===== 依赖 =====
     private final OkHttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final String apiKey;
     private final ToolExecutor toolExecutor;
-
-    private static Consumer<String> logConsumer = null;
-    private volatile boolean stopRequested = false;
-
-    private final AgentConfig runConfig;
-
-    private Thread runningThread = null;
-
     private final ContextManager contextManager;
 
-    public boolean iterationListenerIsNull() {
-        return iterationListener != null;
+    // ===== 实例级运行时状态 =====
+    private volatile boolean stopRequested = false;
+    private Thread runningThread = null;
+    private String currentModel;
+
+    // ===== 迭代监听器（供测试程序实时追踪） =====
+    public interface IterationListener {
+        void onIteration(int iteration, long promptTokens, long cachedTokens,
+                         long completionTokens, double cost);
     }
 
-    // ===== 迭代监听器（用于测试程序实时追踪） =====
-    public interface IterationListener {
-        void onIteration(int iteration, long promptTokens, long cachedTokens, long completionTokens, double cost);
-    }
+    public record TaskUsage(long promptTokens, long cachedTokens, long completionTokens,
+                            int apiCalls, double cost) {}
+
+    private volatile TaskUsage lastTaskUsage = null;
+    public TaskUsage getLastTaskUsage() { return lastTaskUsage; }
 
     private IterationListener iterationListener = null;
 
-    public void setIterationListener(IterationListener listener) {
-        this.iterationListener = listener;
-    }
+    // ==================== 构造 ====================
 
-
-    // @anchor: main_constructor
-    public Main(AgentConfig runConfig) {
+    /**
+     * 首选构造：绑定到 Session。
+     * <p>
+     * 若 Session 尚无 ContextManager，此构造会创建并注入。
+     */
+    public Main(Session session) {
+        this.session = session;
+        this.runConfig = session.getConfig();
         this.apiKey = runConfig.apiKey();
-        this.runConfig = runConfig;
-
         this.currentModel = runConfig.model();
 
         this.httpClient = new OkHttpClient.Builder()
@@ -78,38 +84,46 @@ public class Main {
             sandbox.mkdirs();
         }
 
-        this.contextManager = new ContextManager(
-                httpClient,
-                objectMapper,
-                apiKey,
-                Main::logIf,
-                runConfig.enableCompression(),
-                runConfig.checkpointMinInterval(),
-                runConfig.checkpointMaxInterval()
-        );
+        // 确保 Session 持有 ContextManager（延迟注入）
+        if (session.getContextManager() == null) {
+            ContextManager cm = new ContextManager(
+                    objectMapper,
+                    session::log,
+                    runConfig.enableCompression(),
+                    runConfig.checkpointMinInterval(),
+                    runConfig.checkpointMaxInterval()
+            );
+            session.attachContextManager(cm);
+        }
+        this.contextManager = session.getContextManager();
 
+        // ToolExecutor 绑定日志到 Session
         this.toolExecutor = new ToolExecutor(
                 runConfig,
                 objectMapper,
-                newModel -> {
-                    this.currentModel = newModel;
-                    logIf("🔄 [工具] Agent 主动切换模型至: " + newModel);
-                },
-                contextManager);
+                this::switchModel,
+                contextManager
+        );
+        this.toolExecutor.setLogConsumer(session::log);
+    }
+
+    /**
+     * 兼容构造：内部创建一个独立的临时 Session。
+     * 供 TestRunnerFX 等场景使用。
+     */
+    public Main(AgentConfig config) {
+        this(new Session(config));
     }
 
     // ==================== API Key 校验 ====================
 
     /**
      * 校验 DeepSeek API Key 是否有效。
-     * 调用 /v1/models 接口，如果返回 200 则有效，401 则无效。
-     * 网络异常时返回 true（允许启动），避免因网络问题误判。
      */
     public static boolean checkApiKey(String apiKey) {
         if (apiKey == null || apiKey.isEmpty()) {
             return false;
         }
-
         try {
             OkHttpClient client = new OkHttpClient.Builder()
                     .connectTimeout(5, TimeUnit.SECONDS)
@@ -124,14 +138,10 @@ public class Main {
 
             try (Response response = client.newCall(request).execute()) {
                 int code = response.code();
-                if (code == 200) {
-                    return true;
-                } else if (code == 401) {
-                    return false;
-                } else {
-                    System.err.println("⚠️ API 返回异常状态码: " + code + "，请稍后重试");
-                    return false;
-                }
+                if (code == 200) return true;
+                if (code == 401) return false;
+                System.err.println("⚠️ API 返回异常状态码: " + code + "，请稍后重试");
+                return false;
             }
         } catch (java.net.UnknownHostException e) {
             System.err.println("⚠️ 无法连接 DeepSeek API，请检查网络连接");
@@ -142,29 +152,49 @@ public class Main {
         }
     }
 
-    // @anchor: main_setLogConsumer
-    public void setLogConsumer(Consumer<String> consumer) {
-        this.logConsumer = consumer;
-        this.toolExecutor.setLogConsumer(consumer);
+    // ==================== 模型切换回调 ====================
+
+    private void switchModel(String newModel) {
+        this.currentModel = newModel;
+        session.log("🔄 [工具] Agent 主动切换模型至: " + newModel);
     }
 
-    // @anchor: main_run
+    // ==================== 运行入口 ====================
+
     /**
-     * 运行 Agent 工作流。
-     * @param userRequest 用户自然语言需求
-     * @return Agent 的最终回答
+     * 在绑定的 Session 中运行一次任务。
+     * <p>
+     * 若 Session 上下文为空，视为首轮（init）；
+     * 否则视为多轮对话（appendUserMessage）。
+     * 任务结束后，摘要合并到 immutableBase，工作区清空。
      */
     public String run(String userRequest, int maxIterations) throws IOException {
         this.runningThread = Thread.currentThread();
-        try {
-            contextManager.init(SystemPrompt.get(runConfig.enableCompression()), userRequest);
+        session.markRunning(this);
+        session.touch();
 
+        long startPrompt = contextManager.getTotalPromptTokens();
+        long startCached = contextManager.getTotalCachedTokens();
+        long startCompletion = contextManager.getTotalCompletionTokens();
+        int startCalls = contextManager.getApiCallCount();
+        double startPrice = contextManager.getTotalPrice();
+
+        int compressionBefore = contextManager.getCompressionCount();   // ← 新增：记录基线
+        String finalContent = null;
+        try {
+            // 1. 准备用户消息（内部处理首轮/后续分支，并同步 meta）
+            session.prepareUserMessage(
+                    userRequest,
+                    SystemPrompt.get(runConfig.enableCompression())
+            );
+
+            // 2. 工具定义
             List<Map<String, Object>> tools = ToolDefinitions.build(runConfig.enableCompression());
 
+            // 3. 主循环
             for (int iteration = 0; iteration < maxIterations; iteration++) {
                 checkStop();
-
-                logIf("--- 第 " + (iteration + 1) + " 次迭代 ---");
+                session.log("--- 第 " + (iteration + 1) + " 次迭代 ---");
 
                 Map<String, Object> requestBody = new HashMap<>();
                 requestBody.put("model", currentModel);
@@ -172,75 +202,27 @@ public class Main {
                 requestBody.put("tools", tools);
                 requestBody.put("tool_choice", "auto");
 
-                String jsonBody = objectMapper.writeValueAsString(requestBody);
+                JsonNode root = sendAndReceive(requestBody);
 
-                // ===== 🆕 记录完整请求体（原始 JSON） =====
-                contextManager.appendRawLog("request", jsonBody);
-
-                checkStop();
-                Request httpRequest = new Request.Builder()
-                        .url(AgentConfig.getApiUrl())
-                        .header("Authorization", "Bearer " + apiKey)
-                        .header("Content-Type", "application/json")
-                        .post(RequestBody.create(jsonBody, MediaType.parse("application/json")))
-                        .build();
-
-                String responseBody;
-                try (Response response = httpClient.newCall(httpRequest).execute()) {
-                    if (!response.isSuccessful()) {
-                        throw new IOException("API 请求失败: " + response.code() + " " + response.message());
-                    }
-                    assert response.body() != null;
-                    responseBody = response.body().string();
-                }
-
-                // ===== 🆕 记录完整响应体（原始 JSON） =====
-                contextManager.appendRawLog("response", responseBody);
-
-                JsonNode root = objectMapper.readTree(responseBody);
                 JsonNode choices = root.get("choices");
                 if (choices == null || choices.isEmpty()) {
-                    throw new IOException("API 返回异常: " + responseBody);
+                    throw new IOException("API 返回异常");
                 }
                 JsonNode messageNode = choices.get(0).get("message");
                 Map<String, Object> assistantMsg = objectMapper.convertValue(messageNode, Map.class);
 
-                if (messageNode.has("content") && !messageNode.get("content").isNull()) {
-                    String content = messageNode.get("content").asText();
-                    if (!content.isEmpty()) {
-                        logIf("💬 " + content);
-                    }
-                }
+                // 记录 usage
+                recordUsage(root, iteration);
 
-                // 无 tool_calls → Agent 已完成
+                // 无 tool_calls → 任务完成
                 if (!messageNode.has("tool_calls") || messageNode.get("tool_calls").size() == 0) {
-                    String content = messageNode.has("content") ? messageNode.get("content").asText() : "任务完成";
-                    logIf("Agent 完成: " + content);
-
-                    JsonNode usage = root.get("usage");
-                    if (usage != null) {
-                        long prompt = usage.get("prompt_tokens").asLong(0);
-                        long completion = usage.get("completion_tokens").asLong(0);
-                        long cached = 0;
-                        if (usage.has("prompt_tokens_details")) {
-                            JsonNode details = usage.get("prompt_tokens_details");
-                            if (details.has("cached_tokens")) {
-                                cached = details.get("cached_tokens").asLong(0);
-                            }
-                        }
-                        contextManager.recordUsage(currentModel, prompt, cached, completion);
-
-                        if (iterationListener != null) {
-                            double cost = contextManager.calculateCost(currentModel, prompt, cached, completion);
-                            iterationListener.onIteration(iteration + 1, prompt, cached, completion, cost);
-                        }
-                    }
-
+                    finalContent = messageNode.has("content")
+                            ? messageNode.get("content").asText()
+                            : "任务完成";
                     List<Map<String, Object>> finalRound = new ArrayList<>();
                     finalRound.add(assistantMsg);
                     contextManager.appendToWorking(finalRound);
-
-                    return content;
+                    break;
                 }
 
                 // 处理 tool_calls
@@ -255,19 +237,15 @@ public class Main {
                     String argumentsJson = tc.get("function").get("arguments").asText();
 
                     String outputJson = (argumentsJson.length() > 100)
-                            ? argumentsJson.substring(0, 100) + "...[已截断，共 " + argumentsJson.length() + " 字符]"
+                            ? argumentsJson.substring(0, 100) + "...[共 " + argumentsJson.length() + " 字符]"
                             : argumentsJson;
-                    logIf("🤖 模型决策: 调用工具 [" + functionName + "] 参数: " + outputJson);
+                    session.log("🤖 调用工具 [" + functionName + "] 参数: " + outputJson);
 
                     Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
-
                     checkStop();
-
                     String result = toolExecutor.dispatch(functionName, args);
-
                     if (result == null) {
                         result = "（工具返回 null）";
-                        logIf("⚠️ 工具 [" + functionName + "] 返回 null，已替换为占位符");
                     }
 
                     Map<String, Object> toolMsg = new HashMap<>();
@@ -276,67 +254,118 @@ public class Main {
                     toolMsg.put("content", result);
                     currentRound.add(toolMsg);
 
-                    String displayResult = getDisplayResult(functionName, result);
-                    logIf("工具 [" + functionName + "] 执行结果: " + displayResult);
+                    session.log("工具 [" + functionName + "] 结果: " + getDisplayResult(functionName, result));
                 }
 
-                // 记录本轮所有消息到工作区
                 contextManager.appendToWorking(currentRound);
-
-                JsonNode usage = root.get("usage");
-                if (usage != null) {
-                    long prompt = usage.get("prompt_tokens").asLong(0);
-                    long completion = usage.get("completion_tokens").asLong(0);
-                    long cached = 0;
-                    if (usage.has("prompt_tokens_details")) {
-                        JsonNode details = usage.get("prompt_tokens_details");
-                        if (details.has("cached_tokens")) {
-                            cached = details.get("cached_tokens").asLong(0);
-                        }
-                    }
-                    contextManager.recordUsage(currentModel, prompt, cached, completion);
-
-                    if (iterationListener != null) {
-                        double cost = contextManager.calculateCost(currentModel, prompt, cached, completion);
-                        iterationListener.onIteration(iteration + 1, prompt, cached, completion, cost);
-                    }
-                }
             }
 
-            return "达到最大迭代次数，任务可能未完成。请检查生成的代码。";
+            if (finalContent == null) {
+                finalContent = "达到最大迭代次数，任务可能未完成。";
+            }
 
-        } catch (IOException e) {
-            throw e;
+            return finalContent;
+
         } finally {
+            this.lastTaskUsage = new TaskUsage(
+                    contextManager.getTotalPromptTokens() - startPrompt,
+                    contextManager.getTotalCachedTokens() - startCached,
+                    contextManager.getTotalCompletionTokens() - startCompletion,
+                    contextManager.getApiCallCount() - startCalls,
+                    contextManager.getTotalPrice() - startPrice
+            );
+            if (finalContent != null && contextManager.getCompressionCount() == compressionBefore) {
+                contextManager.mergeSummaryToBase(buildTaskSummary(finalContent));
+            }
+            contextManager.flushRawLog();
             contextManager.printStats();
-
-            contextManager.compressRawLog();
-
+            session.markIdle();
             this.runningThread = null;
         }
     }
 
-    private static String getDisplayResult(String functionName, String result) {
-        String displayResult;
-        if ("read_file".equals(functionName)) {
-            int totalLen = result.length();
-            if (totalLen > 300) {
-                displayResult = result.substring(0, 200) + "... [共 " + totalLen + " 字符，已截断显示]";
-            } else {
-                displayResult = result;
-            }
-        } else {
-            displayResult = result;
-        }
-        return displayResult;
-    }
-
-    // 原有 run(String) 保持兼容
     public String run(String userRequest) throws IOException {
         return run(userRequest, AgentConfig.getDefaultMaxIterations());
     }
 
-    // @anchor: main_stop
+    /**
+     * 兜底摘要生成：当 Agent 未主动压缩时，用它的最终回复作为摘要。
+     * 若未来 Agent 稳定遵守"结束前必须压缩"的约定，此方法调用频率会大幅降低。
+     */
+    private String buildTaskSummary(String finalContent) {
+        if (finalContent == null || finalContent.isBlank()) {
+            return "本轮任务结束（无输出）。";
+        }
+        return finalContent;   // ← 原样返回
+    }
+
+    // ==================== 传输层 ====================
+
+    /**
+     * 通用传输层：发送 requestBody，返回解析后的 JsonNode。
+     * <p>
+     * 只负责 HTTP 传输与 JSON 解析，不关心 body 内容。
+     */
+    public JsonNode sendAndReceive(Map<String, Object> requestBody) throws IOException {
+        String jsonBody = objectMapper.writeValueAsString(requestBody);
+        contextManager.appendRawLog("request", jsonBody);
+
+        checkStop();
+        Request httpRequest = new Request.Builder()
+                .url(AgentConfig.getApiUrl())
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .post(RequestBody.create(jsonBody, MediaType.parse("application/json")))
+                .build();
+
+        String responseBody;
+        try (Response response = httpClient.newCall(httpRequest).execute()) {
+            if (!response.isSuccessful()) {
+                String errBody = response.body() != null ? response.body().string() : "(null)";
+                throw new IOException("API 请求失败: " + response.code() + " | " + errBody);
+            }
+            ResponseBody body = response.body();
+            if (body == null) {
+                throw new IOException("响应体为空");
+            }
+            responseBody = body.string();
+        }
+
+        contextManager.appendRawLog("response", responseBody);
+        return objectMapper.readTree(responseBody);
+    }
+
+    // ==================== 辅助 ====================
+
+    private void recordUsage(JsonNode root, int iteration) {
+        JsonNode usage = root.get("usage");
+        if (usage == null) return;
+
+        long prompt = usage.get("prompt_tokens").asLong(0);
+        long completion = usage.get("completion_tokens").asLong(0);
+        long cached = 0;
+        if (usage.has("prompt_tokens_details")) {
+            JsonNode details = usage.get("prompt_tokens_details");
+            if (details.has("cached_tokens")) {
+                cached = details.get("cached_tokens").asLong(0);
+            }
+        }
+        double cost = contextManager.recordUsage(currentModel, prompt, cached, completion);
+
+        if (iterationListener != null) {
+            iterationListener.onIteration(iteration + 1, prompt, cached, completion, cost);
+        }
+    }
+
+    private static String getDisplayResult(String functionName, String result) {
+        if ("read_file".equals(functionName) && result.length() > 300) {
+            return result.substring(0, 200) + "... [共 " + result.length() + " 字符]";
+        }
+        return result;
+    }
+
+    // ==================== 停止 ====================
+
     public void stop() {
         this.stopRequested = true;
         Thread t = this.runningThread;
@@ -345,23 +374,24 @@ public class Main {
         }
     }
 
-    // @anchor: main_checkStop
     private void checkStop() throws IOException {
         if (stopRequested) {
             throw new IOException("用户手动停止了任务");
         }
     }
 
-    // @anchor: main_logIf
-    public static void logIf(String message) {
-        if (logConsumer != null) {
-            logConsumer.accept(message);
-        } else {
-            logger.info(message);
-        }
+    // ==================== Setter / Getter ====================
+
+    public void setIterationListener(IterationListener listener) {
+        this.iterationListener = listener;
     }
 
-    // @anchor: main_entry
+    public Session getSession() {
+        return session;
+    }
+
+    // ==================== CLI 入口 ====================
+
     public static void main(String[] args) {
         String apiKey = System.getenv("DEEPSEEK_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {
@@ -370,20 +400,13 @@ public class Main {
         }
 
         if (args.length == 0) {
-            System.err.println("⚠️ 请通过命令行参数输入你的需求！");
             System.err.println("用法: java -jar agent.jar \"你的需求描述\"");
-            System.err.println("示例: java -jar agent.jar \"写一个计算器HTML\"");
             System.exit(1);
         }
 
-        String request = args[0];
-        // System.out.println("📝 收到需求: " + request);
-
         Main agent = new Main(ConfigEditor.buildDefault());
         try {
-            String result = agent.run(request);
-            // System.out.println("========== Agent 最终回答 ==========");
-            // System.out.println(result);
+            agent.run(args[0]);
         } catch (IOException e) {
             System.err.println("运行 Agent 时发生错误: " + e.getMessage());
             e.printStackTrace();
