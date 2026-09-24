@@ -111,10 +111,7 @@ public class SessionStorage {
         // 3. 创建 ContextManager 并挂载
         ContextManager cm = new ContextManager(
                 new ObjectMapper(),
-                session::log,
-                config.enableCompression(),
-                config.checkpointMinInterval(),
-                config.checkpointMaxInterval()
+                session::log
         );
         session.attachContextManager(cm);
 

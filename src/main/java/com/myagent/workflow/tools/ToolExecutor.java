@@ -2,7 +2,6 @@ package com.myagent.workflow.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.AgentConfig;
-import com.myagent.workflow.core.ContextManager;
 import com.myagent.workflow.model.FileStructure;
 import com.myagent.workflow.parser.FileStructureFormatter;
 import com.myagent.workflow.parser.StructureParser;
@@ -35,23 +34,19 @@ public class ToolExecutor {
     private final Compiler compiler;
     private final AnchorManager anchorMgr;
     private Consumer<String> logConsumer;
-    private final Consumer<String> modelSwitcher;  // 新增：模型切换回调
     // 字段
-    private final ContextManager contextManager; // 替换原来的 Main main
     private ObjectMapper objectMapper;
 
     private final AgentConfig config;
 
     // @anchor: toolExecutor_constructor
-    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper, Consumer<String> modelSwitcher, ContextManager contextManager) {
+    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper) {
         this.config = config;
         this.compiler = new Compiler(config);
         this.fileOp = new FileOperator();
         this.objectMapper = objectMapper;
         this.anchorMgr = new AnchorManager(objectMapper);
         this.searcher = new CodeSearcher(anchorMgr);
-        this.modelSwitcher = modelSwitcher;  // 初始化
-        this.contextManager = contextManager;
     }
 
     // @anchor: toolExecutor_setLogConsumer
@@ -120,8 +115,6 @@ public class ToolExecutor {
                         args.containsKey("recursive") && (boolean) args.get("recursive"),
                         args.containsKey("depth") ? (Integer) args.get("depth") : 1
                 );
-            case "switch_model":
-                return switchModel(args);
             case "read_between_anchors":
                 return anchorMgr.readBetweenAnchors(
                         (String) args.get("startAnchor"),
@@ -129,10 +122,6 @@ public class ToolExecutor {
                 );
             case "get_file_structure":
                 return getFileStructure((String) args.get("filename"));
-            case "request_checkpoint":
-                String phaseSummary = (String) args.get("phase_summary");
-                String nextPlan = (String) args.get("next_plan");
-                return contextManager.requestCheckpoint(phaseSummary, nextPlan);
             default:
                 return "未知工具: " + functionName;
         }
@@ -242,27 +231,6 @@ public class ToolExecutor {
             logger.warn("❌ 注册表写入失败: {}", e.getMessage());
             e.printStackTrace();
         }
-    }
-
-    // @anchor: toolExecutor_switchModel
-    private String switchModel(Map<String, Object> args) {
-        if (modelSwitcher == null) {
-            return "⚠️ 模型切换功能未启用（回调未设置）";
-        }
-        String target = (String) args.get("target");
-        if (target == null) {
-            return "❌ 缺少参数 'target'，请指定 'pro' 或 'flash'";
-        }
-        String modelName;
-        if ("pro".equalsIgnoreCase(target)) {
-            modelName = "deepseek-v4-pro";
-        } else if ("flash".equalsIgnoreCase(target)) {
-            modelName = "deepseek-v4-flash";
-        } else {
-            return "❌ 不支持的模型类型: " + target + "，请使用 'pro' 或 'flash'";
-        }
-        modelSwitcher.accept(modelName);
-        return "✅ 模型已切换至: " + modelName;
     }
 
     // @anchor: toolExecutor_getFileStructure

@@ -21,17 +21,13 @@ public record AgentConfig(
         String msvcInclude,
         String msvcLib,
         String mingwCompiler,
-        boolean enableSecurityScan,
-        boolean enableCompression,
-        int checkpointMinInterval,
-        int checkpointMaxInterval
+        boolean enableSecurityScan
 ) {
     // ===== 系统级常量（与机器无关，不需要外部化） =====
     private static final String ARCHIVE_VERSION = "v4_2";
     private static final String SANDBOX_DIR     = "./sandbox";
     private static final String API_URL         = "https://api.deepseek.com/chat/completions";
-    private static final String MODEL_FLASH     = "deepseek-v4-flash";
-    private static final String MODEL_PRO       = "deepseek-v4-pro";
+    private static final String MODEL_FLASH     = "deepseek-flash";
     private static final String ANCHOR_INDEX_NAME = ".anchors.json";
 
     // ===== 配置文件定位 =====
@@ -43,15 +39,11 @@ public record AgentConfig(
     private static final boolean DEFAULT_AUTO_OPEN_BROWSER   = false;
     private static final String  DEFAULT_CPP_TYPE            = "mingw";
     private static final boolean DEFAULT_SECURITY_SCAN       = true;
-    private static final boolean DEFAULT_COMPRESSION         = true;
-    private static final int     DEFAULT_MIN_COMPRESS        = 5;
-    private static final int     DEFAULT_MAX_COMPRESS        = 15;
     private static final int     DEFAULT_MAX_ITERATIONS      = 30;
 
     // ========== 公共静态 Getter ==========
 
     public static String getModelFlash()          { return MODEL_FLASH; }
-    public static String getModelPro()            { return MODEL_PRO; }
     public static int    getDefaultMaxIterations(){ return DEFAULT_MAX_ITERATIONS; }
     public static String getSandboxDir()          { return SANDBOX_DIR; }
     public static String getApiUrl()              { return API_URL; }
@@ -67,10 +59,8 @@ public record AgentConfig(
                 // API Key：环境变量优先，其次配置文件
                 firstNonEmpty(System.getenv("DEEPSEEK_API_KEY"),
                         p.getProperty("agent.apiKey")),
-
                 getString(p, "agent.model", DEFAULT_MODEL),
                 getBool  (p, "agent.autoOpenBrowser",   DEFAULT_AUTO_OPEN_BROWSER),
-
                 getString(p, "env.mavenCommand",        ""),
                 getString(p, "env.javaHome",            ""),
                 getString(p, "env.pythonInterpreter",   ""),
@@ -80,11 +70,7 @@ public record AgentConfig(
                 getString(p, "env.msvcInclude",         ""),
                 getString(p, "env.msvcLib",             ""),
                 getString(p, "env.mingwCompiler",       ""),
-
-                getBool  (p, "agent.enableSecurityScan",    DEFAULT_SECURITY_SCAN),
-                getBool  (p, "agent.enableCompression",     DEFAULT_COMPRESSION),
-                getInt   (p, "agent.checkpointMinInterval", DEFAULT_MIN_COMPRESS),
-                getInt   (p, "agent.checkpointMaxInterval", DEFAULT_MAX_COMPRESS)
+                getBool  (p, "agent.enableSecurityScan",    DEFAULT_SECURITY_SCAN)
         );
     }
 

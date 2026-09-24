@@ -23,7 +23,7 @@ public final class ToolDefinitions {
      * @return 工具定义列表
      */
     // @anchor: toolDefinitions_build_single
-    public static List<Map<String, Object>> build(boolean enableCompression) {
+    public static List<Map<String, Object>> build() {
         List<Map<String, Object>> tools = new ArrayList<>();
 
         // @anchor: toolDef_listDirectory
@@ -194,36 +194,10 @@ public final class ToolDefinitions {
                 List.of("functionName")
         ));
 
-        // @anchor: toolDef_switchModel
-        tools.add(defineTool(
-                "switch_model",
-                "切换 DeepSeek 模型。参数 target: 'pro' 或 'flash'。仅在当前任务确实需要更强推理能力时使用（如复杂重构、大型项目分析），一般情况保持 flash 以节省成本。",
-                defineParams()
-                        .prop("target", "string", "目标模型：'pro' 表示 deepseek-v4-pro，'flash' 表示 deepseek-v4-flash")
-                        .build(),
-                List.of("target")
-        ));
-
-
-        // @anchor: toolDef_requestCheckpoint
-        // 仅在启用压缩时添加 request_checkpoint
-        if (enableCompression) {
-            tools.add(defineTool(
-                    "request_checkpoint",
-                    "当完成一个明确的里程碑（如一组文件创建完成、编译通过）后调用。调用后系统将进入压缩模式，下一轮迭代中你需要按系统提示词中的【压缩模式】要求生成 PROJECT_STATE_SNAPSHOT 摘要。",
-                    defineParams()
-                            .prop("phase_summary", "string", "刚刚完成的工作摘要")
-                            .prop("next_plan", "string", "下一步计划（引用 TODO.md 中的下一项任务）")
-                            .build(),
-                    List.of("phase_summary", "next_plan")
-            ));
-        }
-
         return tools;
     }
 
     // ========== 内部构建辅助 ==========
-
     // @anchor: toolDefinitions_defineTool
     private static Map<String, Object> defineTool(String name, String description,
                                                    Map<String, Object> parameters, List<String> required) {

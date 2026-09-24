@@ -88,10 +88,7 @@ public class Main {
         if (session.getContextManager() == null) {
             ContextManager cm = new ContextManager(
                     objectMapper,
-                    session::log,
-                    runConfig.enableCompression(),
-                    runConfig.checkpointMinInterval(),
-                    runConfig.checkpointMaxInterval()
+                    session::log
             );
             session.attachContextManager(cm);
         }
@@ -100,9 +97,7 @@ public class Main {
         // ToolExecutor 绑定日志到 Session
         this.toolExecutor = new ToolExecutor(
                 runConfig,
-                objectMapper,
-                this::switchModel,
-                contextManager
+                objectMapper
         );
         this.toolExecutor.setLogConsumer(session::log);
     }
@@ -152,13 +147,6 @@ public class Main {
         }
     }
 
-    // ==================== 模型切换回调 ====================
-
-    private void switchModel(String newModel) {
-        this.currentModel = newModel;
-        session.log("🔄 [工具] Agent 主动切换模型至: " + newModel);
-    }
-
     // ==================== 运行入口 ====================
 
     /**
@@ -179,17 +167,13 @@ public class Main {
         int startCalls = contextManager.getApiCallCount();
         double startPrice = contextManager.getTotalPrice();
 
-        int compressionBefore = contextManager.getCompressionCount();   // ← 新增：记录基线
         String finalContent = null;
         try {
             // 1. 准备用户消息（内部处理首轮/后续分支，并同步 meta）
-            session.prepareUserMessage(
-                    userRequest,
-                    SystemPrompt.get(runConfig.enableCompression())
-            );
+            session.prepareUserMessage(userRequest, SystemPrompt.get());
 
             // 2. 工具定义
-            List<Map<String, Object>> tools = ToolDefinitions.build(runConfig.enableCompression());
+            List<Map<String, Object>> tools = ToolDefinitions.build();
 
             // 3. 主循环
             for (int iteration = 0; iteration < maxIterations; iteration++) {
@@ -274,7 +258,7 @@ public class Main {
                     contextManager.getApiCallCount() - startCalls,
                     contextManager.getTotalPrice() - startPrice
             );
-            if (finalContent != null && contextManager.getCompressionCount() == compressionBefore) {
+            if (finalContent != null) {
                 contextManager.mergeSummaryToBase(buildTaskSummary(finalContent));
             }
             contextManager.flushRawLog();

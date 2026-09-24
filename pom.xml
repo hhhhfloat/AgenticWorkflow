@@ -36,19 +36,6 @@
             <version>1.5.6</version>
         </dependency>
 
-        <!-- JavaFX 仅测试时使用 -->
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-controls</artifactId>
-            <version>21</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.openjfx</groupId>
-            <artifactId>javafx-fxml</artifactId>
-            <version>21</version>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
@@ -61,7 +48,7 @@
                 <configuration>
                     <source>21</source>
                     <target>21</target>
-                    <encoding>UTF-8</encoding>   <!-- ✅ 强制 javac 使用 GBK -->
+                    <encoding>UTF-8</encoding>
                     <compilerArgs>
                         <arg>--add-modules</arg>
                         <arg>jdk.compiler</arg>
@@ -117,20 +104,6 @@
                         <configuration>
                             <mainClass>com.myagent.workflow.http.HttpServerMain</mainClass>
                             <cleanupDaemonThreads>false</cleanupDaemonThreads>
-                        </configuration>
-                    </execution>
-
-                    <!-- 测试工具 -->
-                    <execution>
-                        <id>test-runner</id>
-                        <configuration>
-                            <mainClass>com.myagent.workflow.testtool.TestRunnerFX</mainClass>
-                            <classpathScope>test</classpathScope>
-                            <cleanupDaemonThreads>false</cleanupDaemonThreads>
-                            <arguments>
-                                <argument>--add-modules</argument>
-                                <argument>javafx.controls,javafx.fxml</argument>
-                            </arguments>
                         </configuration>
                     </execution>
                 </executions>

@@ -74,7 +74,7 @@ public class RunProjectHandler implements HttpHandler {
         try {
             AgentConfig config = ConfigEditor.buildFromRequest(root);
             // contextManager 传 null：本接口是一次性执行，不需要上下文
-            ToolExecutor executor = new ToolExecutor(config, mapper, null, null);
+            ToolExecutor executor = new ToolExecutor(config, mapper);
 
             Map<String, Object> args = new HashMap<>();
             args.put("filename", filename);

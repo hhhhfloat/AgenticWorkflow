@@ -23,14 +23,6 @@ public class UsageTracker {
     private static final double FLASH_OUT_OFF_PEAK = 4.0;
     private static final double FLASH_OUT_PEAK = 8.0;
 
-    // Pro —— DeepSeek-V4-Pro-0813
-    private static final double PRO_IN_HIT_OFF_PEAK = 0.15;
-    private static final double PRO_IN_HIT_PEAK = 0.30;
-    private static final double PRO_IN_NOT_HIT_OFF_PEAK = 4.5;
-    private static final double PRO_IN_NOT_HIT_PEAK = 9.0;
-    private static final double PRO_OUT_OFF_PEAK = 13.5;
-    private static final double PRO_OUT_PEAK = 27.0;
-
     // ===== 累计统计 =====
     private long totalPromptTokens = 0;
     private long totalCachedTokens = 0;
@@ -75,21 +67,18 @@ public class UsageTracker {
     /**
      * 计算单次调用的成本（不累计）。供 Main 算迭代粒度成本用。
      */
+    /**
+     * 计算单次调用的成本（不累计）。供 Main 算迭代粒度成本用。
+     * <p>
+     * 目前只使用 Flash 模型，model 参数保留以兼容调用链与未来扩展。
+     */
     public double calculateCost(String model, long promptTokens, long cachedTokens, long completionTokens) {
-        boolean isPro = AgentConfig.getModelPro().equals(model);
         boolean peak = isPeakHour();
         long uncached = promptTokens - cachedTokens;
 
-        double inHit, inNotHit, out;
-        if (isPro) {
-            inHit = peak ? PRO_IN_HIT_PEAK : PRO_IN_HIT_OFF_PEAK;
-            inNotHit = peak ? PRO_IN_NOT_HIT_PEAK : PRO_IN_NOT_HIT_OFF_PEAK;
-            out = peak ? PRO_OUT_PEAK : PRO_OUT_OFF_PEAK;
-        } else {
-            inHit = peak ? FLASH_IN_HIT_PEAK : FLASH_IN_HIT_OFF_PEAK;
-            inNotHit = peak ? FLASH_IN_NOT_HIT_PEAK : FLASH_IN_NOT_HIT_OFF_PEAK;
-            out = peak ? FLASH_OUT_PEAK : FLASH_OUT_OFF_PEAK;
-        }
+        double inHit = peak ? FLASH_IN_HIT_PEAK : FLASH_IN_HIT_OFF_PEAK;
+        double inNotHit = peak ? FLASH_IN_NOT_HIT_PEAK : FLASH_IN_NOT_HIT_OFF_PEAK;
+        double out = peak ? FLASH_OUT_PEAK : FLASH_OUT_OFF_PEAK;
 
         return (uncached / 1_000_000.0 * inNotHit) +
                 (cachedTokens / 1_000_000.0 * inHit) +

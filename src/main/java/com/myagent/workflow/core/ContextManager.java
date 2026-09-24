@@ -38,14 +38,6 @@ public class ContextManager {
     private final ObjectMapper objectMapper;
     private Consumer<String> logConsumer;
 
-    // ===== 压缩状态 =====
-    private int roundsSinceLastCheckpoint = 0;
-    private final int MIN_INTERVAL;
-    private final int MAX_INTERVAL;
-    private final boolean compressionEnabled;
-    private boolean pendingCompression = false;
-    private int compressionCount = 0;      // ← 新增：本次任务期间压缩发生的次数
-
     private final HistoryRecorder historyRecorder;
     private final UsageTracker usageTracker = new UsageTracker();
 
@@ -54,16 +46,9 @@ public class ContextManager {
     /**
      * 推荐的新构造签名。
      */
-    public ContextManager(ObjectMapper objectMapper,
-                          Consumer<String> logConsumer,
-                          boolean compressionEnabled,
-                          int minInterval,
-                          int maxInterval) {
+    public ContextManager(ObjectMapper objectMapper, Consumer<String> logConsumer) {
         this.objectMapper = objectMapper;
         this.logConsumer = logConsumer;
-        this.compressionEnabled = compressionEnabled;
-        this.MIN_INTERVAL = minInterval;
-        this.MAX_INTERVAL = maxInterval;
         this.historyRecorder = new HistoryRecorder(objectMapper, logConsumer);   // ← 新增
     }
 
@@ -120,7 +105,6 @@ public class ContextManager {
 
         int workingBefore = volatileWorking.size();
         volatileWorking.clear();
-        roundsSinceLastCheckpoint = 0;
 
         log("📌 [系统] 任务摘要已合并到基础区，工作区已清空（原 " + workingBefore + " 条消息）");
         log("📊 [系统] 当前基础区: " + immutableBase.size() + " 条，工作区: 0 条");
@@ -131,68 +115,10 @@ public class ContextManager {
      */
     public void appendToWorking(List<Map<String, Object>> round) {
         if (round == null || round.isEmpty()) return;
-
-        // 压缩提醒注入
-        if (compressionEnabled && roundsSinceLastCheckpoint >= MAX_INTERVAL) {
-            for (int i = round.size() - 1; i >= 0; i--) {
-                Map<String, Object> msg = round.get(i);
-                if ("tool".equals(msg.get("role"))) {
-                    String original = (String) msg.get("content");
-                    String reminder = "\n\n💡 【系统提醒】已达到最大压缩间隔，请在当前里程碑完成后调用 request_checkpoint 压缩上下文。";
-                    msg.put("content", original + reminder);
-                    log("📌 [系统] 已向工具返回结果注入压缩提醒");
-                    break;
-                }
-            }
-        }
-
-        // 追加本轮消息
         volatileWorking.addAll(round);
         for (Map<String, Object> msg : round) {
             historyRecorder.appendMessage(msg);
         }
-        roundsSinceLastCheckpoint++;
-
-        // 检测 Agent 自压缩摘要
-        if (pendingCompression) {
-            String summary = extractSnapshotFromRound(round);
-            if (summary != null && !summary.isBlank()) {
-                historyRecorder.flushRawLog();
-                flushPendingChanges();
-
-                Map<String, Object> summaryMsg = Map.of(
-                        "role", "system",
-                        "content", "【压缩摘要】\n" + summary
-                );
-                immutableBase.add(summaryMsg);                     // ← 修复：之前漏了这行？
-                historyRecorder.appendMessage(summaryMsg);
-
-                int workingBefore = volatileWorking.size();
-                volatileWorking.clear();
-                roundsSinceLastCheckpoint = 0;
-                compressionCount++;                                // ← 新增
-
-                log("📌 [系统] Agent 自压缩摘要已追加到基础区，工作区已清空（原 " + workingBefore + " 条消息）");
-            } else {
-                log("⚠️ [系统] 压缩模式下未检测到摘要，Agent 可能未按指令执行");
-            }
-            pendingCompression = false;
-        }
-    }
-
-    private String extractSnapshotFromRound(List<Map<String, Object>> round) {
-        for (Map<String, Object> msg : round) {
-            String role = (String) msg.get("role");
-            String content = (String) msg.get("content");
-            if ("assistant".equals(role) && content != null
-                    && content.contains("## PROJECT_STATE_SNAPSHOT")) {
-                int startIdx = content.indexOf("## PROJECT_STATE_SNAPSHOT");
-                if (startIdx != -1) {
-                    return content.substring(startIdx);
-                }
-            }
-        }
-        return null;
     }
 
     // ==================== 构建 ====================
@@ -204,27 +130,6 @@ public class ContextManager {
         List<Map<String, Object>> result = new ArrayList<>(immutableBase);
         result.addAll(volatileWorking);
         return result;
-    }
-
-    // ==================== 压缩 ====================
-
-    /**
-     * Agent 主动触发压缩（由 ToolExecutor 调用）。
-     * 标记 pendingCompression，下一轮 Agent 会输出摘要。
-     */
-    public String requestCheckpoint(String phaseSummary, String nextPlan) {
-        if (roundsSinceLastCheckpoint < MIN_INTERVAL) {
-            return "⚠️ 距上次压缩仅过了 " + roundsSinceLastCheckpoint + " 轮（最小间隔 " + MIN_INTERVAL + "），请继续工作。";
-        }
-
-        if (roundsSinceLastCheckpoint > MAX_INTERVAL) {
-            log("⚠️ 警告：已超过最大间隔 " + MAX_INTERVAL + " 轮");
-        }
-
-        log("📌 [系统] 进入压缩模式（距上次压缩已过 " + roundsSinceLastCheckpoint + " 轮）");
-        this.pendingCompression = true;
-
-        return "✅ 已进入压缩模式。下一轮请按系统提示词中的【压缩模式】要求生成摘要，不要进行任何代码修改或工具调用。";
     }
 
     // ==================== 序列化 / 恢复 ====================
@@ -379,10 +284,6 @@ public class ContextManager {
         } else {
             System.out.println(message);
         }
-    }
-
-    public int getCompressionCount() {
-        return compressionCount;
     }
 
     public long getTotalPromptTokens() { return usageTracker.getTotalPromptTokens(); }
