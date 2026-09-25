@@ -39,6 +39,24 @@ public class ToolExecutor {
 
     private final AgentConfig config;
 
+    // 工具名 → 需要做路径检查的参数名
+    private static final Map<String, List<String>> PATH_ARG_MAP = Map.ofEntries(
+            Map.entry("read_file",          List.of("filename")),
+            Map.entry("write_file",         List.of("filename")),
+            Map.entry("delete_file",        List.of("filename")),
+            Map.entry("get_file_structure", List.of("filename")),
+            Map.entry("compile_and_run",    List.of("filename")),
+            Map.entry("list_directory",     List.of("path")),
+            Map.entry("search_text",        List.of("path")),
+            Map.entry("find_references",    List.of("path")),
+            Map.entry("find_callers",       List.of("path")),
+            Map.entry("find_callees",       List.of("path")),
+            Map.entry("list_anchors",       List.of("project_path", "file")),
+            Map.entry("describe_anchors",   List.of("project_path", "file"))
+            // build_anchor_index 不检查（自动构建项目信息，路径本身需要访问 .anchors.json）
+            // read_between_anchors / insert_at_anchor / delete_between_anchors 不检查（无路径参数）
+    );
+
     // @anchor: toolExecutor_constructor
     public ToolExecutor(AgentConfig config, ObjectMapper objectMapper) {
         this.config = config;
@@ -61,9 +79,18 @@ public class ToolExecutor {
      */
     // @anchor: toolExecutor_dispatch_single
     public String dispatch(String functionName, Map<String, Object> args) throws IOException {
+
+        String violation = checkAccess(functionName, args);
+        if(violation!=null)return violation;
+
         switch (functionName) {
             case "write_file":
-                return fileOp.writeFile((String) args.get("filename"), (String) args.get("code"));
+                String writeFilename = (String) args.get("filename");
+                String writeResult = fileOp.writeFile(writeFilename, (String) args.get("code"));
+                if (writeResult != null) {
+                    anchorMgr.markDirtyByFilename(writeFilename);
+                }
+                return writeResult;
             case "compile_and_run":
                 String filename = (String) args.get("filename");
                 String mode = (String) args.getOrDefault("mode", "auto");
@@ -85,7 +112,12 @@ public class ToolExecutor {
             case "build_anchor_index":
                 return anchorMgr.buildAnchorIndex((String) args.get("project_path"));
             case "list_anchors":
-                return anchorMgr.listAnchors((String) args.get("project_path"));
+                String projectPath = (String) args.get("project_path");
+                String file = (String) args.get("file");
+                if (file != null && !file.isBlank()) {
+                    return anchorMgr.listAnchors(projectPath, file);
+                }
+                return anchorMgr.listAnchors(projectPath);
             case "insert_at_anchor":
                 return anchorMgr.insertAtAnchor(
                         (String) args.get("anchor_id"),
@@ -95,6 +127,11 @@ public class ToolExecutor {
                 return anchorMgr.deleteBetweenAnchors(
                         (String) args.get("startAnchor"),
                         (String) args.get("endAnchor")
+                );
+            case "describe_anchors":
+                return anchorMgr.describeAnchors(
+                        (String) args.get("project_path"),
+                        (String) args.get("file")
                 );
             case "find_references":
                 return searcher.findReferences(
@@ -125,6 +162,48 @@ public class ToolExecutor {
             default:
                 return "未知工具: " + functionName;
         }
+    }
+    // @anchor: toolExecutor_checkAccess
+    private String checkAccess(String toolName, Map<String, Object> args) {
+        List<String> pathArgs = PATH_ARG_MAP.get(toolName);
+        if (pathArgs == null) return null;
+
+        for (String argName : pathArgs) {
+            Object val = args.get(argName);
+            if (!(val instanceof String path) || path.isBlank()) continue;
+
+            String err = checkPath(toolName, path);
+            if (err != null) return err;
+        }
+        return null;
+    }
+
+    // @anchor: toolExecutor_checkPath
+    private String checkPath(String toolName, String path) {
+        String normalized = path.replace('\\', '/');
+        String[] segments = normalized.split("/");
+
+        for (String seg : segments) {
+            if ("..".equals(seg)) {
+                return "❌ 路径中不允许出现 \"..\"：" + path;
+            }
+            if (seg.startsWith(".") && !seg.equals(".")) {
+                return "❌ 不允许访问以 . 开头的文件/目录：" + path
+                        + "。如需项目结构信息，请使用 list_anchors / describe_anchors / get_file_structure。";
+            }
+        }
+
+        String fileName = normalized.substring(normalized.lastIndexOf('/') + 1);
+        if ("UPDATE.md".equalsIgnoreCase(fileName)) {
+            return switch (toolName) {
+                case "read_file" -> "❌ UPDATE.md 不支持完整读取。请使用 read_between_anchors 按锚点读取。";
+                case "write_file" -> "❌ UPDATE.md 不支持全量重写。请使用 insert_at_anchor 在锚点处追加。";
+                case "delete_file" -> "❌ UPDATE.md 不允许删除。";
+                default -> null;
+            };
+        }
+
+        return null;
     }
 
     // ==================== 工具 : compile_and_run ====================
@@ -250,6 +329,45 @@ public class ToolExecutor {
         } catch (IOException e) {
             return "❌ 解析文件结构失败: " + e.getMessage();
         }
+    }
+
+    // @anchor: toolExecutor_refreshAllProjectIndexes
+    /**
+     * 遍历沙箱下所有项目，逐个重建 .project_index.json。
+     * 由 Main.run() 的 finally 块调用，一次运行结束刷新一次。
+     */
+    public void refreshAllProjectIndexes() {
+        try {
+            Path sandbox = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
+            if (!Files.isDirectory(sandbox)) return;
+
+            try (var stream = Files.list(sandbox)) {
+                for (Path projectDir : (Iterable<Path>) stream::iterator) {
+                    if (!Files.isDirectory(projectDir)) continue;
+                    String name = projectDir.getFileName().toString();
+                    if (name.startsWith(".")) continue;
+
+                    Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
+                    if (!Files.exists(anchorsFile)) continue;
+
+                    try {
+                        anchorMgr.rebuildProjectIndex(name);
+                    } catch (Exception e) {
+                        logger.warn("刷新项目索引失败: {} -> {}", name, e.getMessage());
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger.warn("刷新所有项目索引失败: {}", e.getMessage());
+        }
+    }
+
+    // @anchor: toolExecutor_flushDirtyAnchors
+    /**
+     * 由 Main 在一轮工具调用结束后触发，批量刷新锚点索引。
+     */
+    public void flushDirtyAnchors() {
+        anchorMgr.flushDirty();
     }
 
 }

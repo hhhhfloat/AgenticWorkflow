@@ -7,7 +7,6 @@ const SETTINGS_STORAGE_KEY = 'agentSettings';
 const DEFAULT_SETTINGS = {
     model: 'deepseek-v4-flash',
     autoOpenBrowser: false,
-    defaultMaxIterations: 30,
     mavenCommand: '',
     javaHome: '',
     pythonInterpreter: '',
@@ -17,10 +16,7 @@ const DEFAULT_SETTINGS = {
     msvcInclude: '',
     msvcLib: '',
     mingwCompiler: '',
-    enableSecurityScan: true,
-    compressionEnabled: true,
-    minInterval: 5,      // 🆕 新增
-    maxInterval: 15
+    enableSecurityScan: true
 };
 
 // 加载配置
@@ -65,9 +61,6 @@ function applySettingsToForm(settings) {
     document.getElementById('setMsvcCompiler').value = settings.msvcCompiler || '';
     document.getElementById('setMingwCompiler').value = settings.mingwCompiler || '';
     document.getElementById('setEnableSecurityScan').checked = settings.enableSecurityScan !== false;
-    document.getElementById('setCompressionEnabled').checked = settings.compressionEnabled !== false;
-    document.getElementById('setMinInterval').value = settings.minInterval ?? 5;
-    document.getElementById('setMaxInterval').value = settings.maxInterval ?? 15;
 }
 
 // 从表单读取配置
@@ -85,9 +78,6 @@ function readSettingsFromForm() {
         msvcLib: '',
         mingwCompiler: document.getElementById('setMingwCompiler').value.trim(),
         enableSecurityScan: document.getElementById('setEnableSecurityScan').checked,
-        compressionEnabled: document.getElementById('setCompressionEnabled').checked,
-        minInterval: parseInt(document.getElementById('setMinInterval').value) || 5,
-        maxInterval: parseInt(document.getElementById('setMaxInterval').value) || 15
     };
 }
 
@@ -95,7 +85,7 @@ function readSettingsFromForm() {
 function getEffectiveSettings() {
     const settings = loadSettings();
     // 主界面的 maxIterations 独立控制，不从表单读取
-    const maxIterations = parseInt(document.getElementById('maxIterations').value) || settings.maxIterations || 20;
+    const maxIterations = parseInt(document.getElementById('maxIterations').value) || settings.maxIterations || 100;
     return { ...settings, maxIterations };
 }
 
@@ -139,11 +129,6 @@ function initSettingsModal() {
     document.getElementById('saveSettingsBtn')?.addEventListener('click', () => {
         const settings = readSettingsFromForm();
         saveSettings(settings);
-
-        const maxIterInput = document.getElementById('maxIterations');
-        if (maxIterInput && settings.maxIterations) {
-            maxIterInput.value = settings.maxIterations;
-        }
 
         // 发送重启请求
         fetch('/restart', { method: 'POST' }).catch(() => {});

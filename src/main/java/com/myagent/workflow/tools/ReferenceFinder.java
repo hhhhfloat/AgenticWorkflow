@@ -23,17 +23,11 @@ import java.util.regex.Pattern;
 public class ReferenceFinder {
     private static final Logger logger = LoggerFactory.getLogger(ReferenceFinder.class);
 
-    private static final List<String> REF_EXCLUDED_DIRS =
-            Arrays.asList("target", "build", ".git", ".idea", "node_modules",
-                    "dist", "out", "bin", "logs");
     private static final List<String> REF_CODE_EXTENSIONS = Arrays.asList(
             ".java", ".js", ".jsx", ".ts", ".tsx", ".css", ".html", ".htm",
             ".py", ".go", ".rs", ".c", ".cpp", ".h", ".hpp", ".php", ".rb",
             ".swift", ".kt", ".scala", ".groovy", ".vue", ".svelte");
 
-    private static final List<String> CALLER_EXCLUDED_DIRS =
-            Arrays.asList("target", "build", ".git", ".idea", "node_modules",
-                    "dist", "out", "bin");
     private static final List<String> CALLER_CODE_EXTENSIONS = Arrays.asList(
             ".java", ".js", ".jsx", ".ts", ".tsx", ".py", ".go", ".rs",
             ".c", ".cpp", ".h", ".php", ".rb", ".kt", ".vue");
@@ -57,7 +51,7 @@ public class ReferenceFinder {
             Map<String, List<Map<String, Object>>> results = new LinkedHashMap<>();
             AtomicInteger totalMatches = new AtomicInteger(0);
 
-            List<Path> files = SearchFileFilter.collectFiles(startPath, REF_EXCLUDED_DIRS);
+            List<Path> files = SearchFileFilter.collectFiles(startPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS, SearchFileFilter.DEFAULT_EXCLUDED_FILES);
             for (Path file : files) {
                 try {
                     String fileName = file.getFileName().toString();
@@ -160,7 +154,7 @@ public class ReferenceFinder {
             Map<String, List<Map<String, Object>>> results = new LinkedHashMap<>();
             AtomicInteger totalCallers = new AtomicInteger(0);
 
-            List<Path> files = SearchFileFilter.collectFiles(startPath, CALLER_EXCLUDED_DIRS);
+            List<Path> files = SearchFileFilter.collectFiles(startPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS, SearchFileFilter.DEFAULT_EXCLUDED_FILES);
             for (Path file : files) {
                 try {
                     String fileName = file.getFileName().toString();

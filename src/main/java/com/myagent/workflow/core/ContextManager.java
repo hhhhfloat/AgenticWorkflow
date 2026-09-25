@@ -30,10 +30,6 @@ public class ContextManager {
     private final List<Map<String, Object>> immutableBase = new ArrayList<>();
     private final List<Map<String, Object>> volatileWorking = new ArrayList<>();
 
-    // ===== 文件变化日志缓冲 =====
-    private final Set<String> pendingDocChanges = new HashSet<>();
-    private boolean projectMdPending = false;
-
     // ===== 依赖（实例级） =====
     private final ObjectMapper objectMapper;
     private Consumer<String> logConsumer;
@@ -94,7 +90,6 @@ public class ContextManager {
 
         // 先合并待提交的文档变更
         historyRecorder.flushRawLog();
-        flushPendingChanges();
 
         Map<String, Object> summaryMsg = Map.of(
                 "role", "system",
@@ -198,73 +193,6 @@ public class ContextManager {
 
     public void printStats() {
         log(usageTracker.formatStats());
-    }
-
-    // ==================== 文档变更合并 ====================
-
-    public String flushPendingChanges() {
-        StringBuilder summary = new StringBuilder();
-
-        // 1. 处理 PROJECT.md 占位
-        if (projectMdPending) {
-            Map<String, Object> placeholderMsg = Map.of(
-                    "role", "system",
-                    "content", "【PROJECT.md 已更新】\n（将在下次压缩时处理）"
-            );
-            immutableBase.add(placeholderMsg);
-            historyRecorder.appendMessage(placeholderMsg);
-            log("📌 [系统] PROJECT.md 变更占位已写入基础区");
-            projectMdPending = false;
-            summary.append("PROJECT.md 已更新。");
-        }
-
-        // 2. 处理普通文档
-        if (pendingDocChanges.isEmpty()) {
-            return summary.toString();
-        }
-
-        summary.append("本次周期内关键文档变动（非 PROJECT.md）：\n");
-        Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
-        int successCount = 0;
-
-        StringBuilder logBuilder = new StringBuilder();
-        logBuilder.append("【本次周期内关键文档变动（非 PROJECT.md）】\n");
-
-        for (String filename : pendingDocChanges) {
-            try {
-                Path filePath = sandboxRoot.resolve(filename).normalize();
-                if (!Files.exists(filePath) || !Files.isRegularFile(filePath)) {
-                    logBuilder.append("- ").append(filename).append(": （文件不存在）\n");
-                    summary.append("- ").append(filename).append(": 已删除\n");
-                    continue;
-                }
-
-                String content = Files.readString(filePath, StandardCharsets.UTF_8);
-                String truncated = content.length() > 2000 ? content.substring(0, 2000) + "\n...（已截断）" : content;
-                logBuilder.append("- ").append(filename).append(":\n");
-                logBuilder.append("```\n").append(truncated).append("\n```\n\n");
-
-                String summaryContent = content.length() > 3000 ? content.substring(0, 3000) + "\n...（已截断）" : content;
-                summary.append("- ").append(filename).append(":\n").append(summaryContent).append("\n\n");
-                successCount++;
-            } catch (IOException e) {
-                logBuilder.append("- ").append(filename).append(": （读取失败: ").append(e.getMessage()).append("）\n");
-                summary.append("- ").append(filename).append(": 读取失败\n");
-            }
-        }
-
-        if (successCount > 0) {
-            Map<String, Object> logMsg = Map.of(
-                    "role", "user",
-                    "content", logBuilder.toString()
-            );
-            immutableBase.add(logMsg);
-            historyRecorder.appendMessage(logMsg);
-            log("📌 [系统] 已合并 " + pendingDocChanges.size() + " 个文档变更");
-        }
-
-        pendingDocChanges.clear();
-        return summary.toString();
     }
 
     // ==================== 日志 ====================

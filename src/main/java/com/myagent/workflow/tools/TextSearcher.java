@@ -23,12 +23,11 @@ import java.util.regex.PatternSyntaxException;
 public class TextSearcher {
     private static final Logger logger = LoggerFactory.getLogger(TextSearcher.class);
 
-    private static final List<String> EXCLUDED_DIRS =
-            Arrays.asList("target", "build", ".git", ".idea", "node_modules");
     private static final List<String> TEXT_EXTENSIONS = Arrays.asList(
             ".java", ".html", ".htm", ".css", ".js", ".jsx", ".ts", ".tsx",
             ".txt", ".xml", ".json", ".md", ".properties", ".yml", ".yaml",
-            ".sh", ".bat", ".gradle", ".sql");
+            ".sh", ".bat", ".gradle", ".sql", ".cpp", ".cc", ".cxx", ".h", ".hpp",
+            ".py", ".pyw");
 
     // @anchor: textSearcher_searchText
     String searchText(String keyword, String filePattern, String path) {
@@ -52,7 +51,7 @@ public class TextSearcher {
             List<String> results = Collections.synchronizedList(new ArrayList<>());
             final int MAX_RESULTS = 30;
 
-            List<Path> files = SearchFileFilter.collectFiles(startPath, EXCLUDED_DIRS);
+            List<Path> files = SearchFileFilter.collectFiles(startPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS, SearchFileFilter.DEFAULT_EXCLUDED_FILES);
             for (Path file : files) {
                 if (resultCount.get() >= MAX_RESULTS) break;
                 try {

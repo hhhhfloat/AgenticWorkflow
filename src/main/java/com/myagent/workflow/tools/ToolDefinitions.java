@@ -194,6 +194,16 @@ public final class ToolDefinitions {
                 List.of("functionName")
         ));
 
+        tools.add(defineTool(
+                "describe_anchors",
+                "返回指定文件中所有功能性锚点及其对应描述。仅返回非 _end 锚点，并额外提供每个锚点的功能描述（来自锚点下方紧邻的注释）。用于快速理解文件中各部分的职责，避免读取整份源码。",
+                defineParams()
+                        .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
+                        .prop("file", "string", "文件相对路径（如 src/main/java/Main.java），需要完整以避免歧义")
+                        .build(),
+                List.of("project_path", "file")
+        ));
+
         return tools;
     }
 

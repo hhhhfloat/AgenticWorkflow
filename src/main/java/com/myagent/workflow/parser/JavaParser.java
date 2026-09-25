@@ -6,6 +6,8 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.tools.*;
 import java.io.IOException;
@@ -17,6 +19,7 @@ import java.util.regex.Pattern;
 
 public class JavaParser implements StructureParser {
 
+    private static final Logger logger = LoggerFactory.getLogger(JavaParser.class);
     private static final Pattern ANCHOR_PATTERN = Pattern.compile(
             "//\\s*@anchor:\\s*(\\w+)|" +
                     "/\\*\\s*@anchor:\\s*(\\w+)\\s*\\*/"
@@ -87,7 +90,7 @@ public class JavaParser implements StructureParser {
             );
         } catch (Exception e) {
             // 打印异常堆栈，便于调试
-            e.printStackTrace();
+            logger.debug("JavaParser AST 解析失败，回退到正则: {} - {}", file, e.getMessage());
             return parseWithRegex(file);
         }
     }
@@ -111,7 +114,7 @@ public class JavaParser implements StructureParser {
         @Override
         public Void visitClass(ClassTree node, Void unused) {
             String name = node.getSimpleName().toString();
-            String type = "class"; // 简化，可后续增强
+            String type = "class";
             String superClass = node.getExtendsClause() != null ? node.getExtendsClause().toString() : null;
             List<String> interfaces = new ArrayList<>();
             if (node.getImplementsClause() != null) {
@@ -125,14 +128,18 @@ public class JavaParser implements StructureParser {
             int startLine = getLineNumber(startPos);
             int endLine = getLineNumber(endPos);
 
-            currentClassBuilder = new ClassDefinitionBuilder(name, type, superClass, interfaces, startLine, endLine);
+            // 保存外层 builder（若有），处理完恢复——支持内部类/嵌套类
+            ClassDefinitionBuilder previous = currentClassBuilder;
+            ClassDefinitionBuilder builder = new ClassDefinitionBuilder(
+                    name, type, superClass, interfaces, startLine, endLine);
+            currentClassBuilder = builder;
 
             for (Tree member : node.getMembers()) {
                 member.accept(this, null);
             }
 
-            classes.add(currentClassBuilder.build());
-            currentClassBuilder = null;
+            classes.add(builder.build());
+            currentClassBuilder = previous;
             return null;
         }
 

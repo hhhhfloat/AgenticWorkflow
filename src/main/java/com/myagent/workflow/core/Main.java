@@ -240,6 +240,8 @@ public class Main {
 
                     session.log("工具 [" + functionName + "] 结果: " + getDisplayResult(functionName, result));
                 }
+                // 一轮工具执行完毕，统一刷新锚点索引
+                toolExecutor.flushDirtyAnchors();
 
                 contextManager.appendToWorking(currentRound);
             }
@@ -260,6 +262,11 @@ public class Main {
             );
             if (finalContent != null) {
                 contextManager.mergeSummaryToBase(buildTaskSummary(finalContent));
+            }
+            try {
+                toolExecutor.refreshAllProjectIndexes();
+            } catch (Exception e) {
+                logger.warn("刷新项目索引失败", e);
             }
             contextManager.flushRawLog();
             contextManager.printStats();

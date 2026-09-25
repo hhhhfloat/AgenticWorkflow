@@ -39,9 +39,6 @@ function buildRunConfig(settings) {
         msvcInclude: '',
         msvcLib: '',
         mingwCompiler: settings.mingwCompiler || '',
-        enableSecurityScan: settings.enableSecurityScan !== false,
-        compressionEnabled: settings.compressionEnabled !== false,
-        minInterval: settings.minInterval ?? 5,
-        maxInterval: settings.maxInterval ?? 15
+        enableSecurityScan: settings.enableSecurityScan !== false
     };
 }

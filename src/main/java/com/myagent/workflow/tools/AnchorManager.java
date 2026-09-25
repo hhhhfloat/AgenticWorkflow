@@ -1,6 +1,7 @@
 package com.myagent.workflow.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myagent.workflow.core.AgentConfig;
 import com.myagent.workflow.model.AnchorLocation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,8 +10,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 // @anchor: anchorManager_class
 /**
@@ -22,6 +22,8 @@ import java.util.List;
 public class AnchorManager {
     private static final Logger logger = LoggerFactory.getLogger(AnchorManager.class);
     private final AnchorIndex anchorIndex;
+
+    private final Map<String, Set<String>> dirtyFiles = new LinkedHashMap<>();
 
     // @anchor: anchorManager_constructor
     public AnchorManager(ObjectMapper objectMapper) {
@@ -68,7 +70,7 @@ public class AnchorManager {
             }
 
             Files.write(filePath, lines, StandardCharsets.UTF_8);
-            anchorIndex.rebuild(loc.projectPath);
+            markDirty(loc.projectPath, loc.filePath);
             return "✅ 已在 " + loc.filePath + " 的锚点 [" + anchorId + "] " + position + " 插入代码";
 
         } catch (IOException e) {
@@ -114,7 +116,7 @@ public class AnchorManager {
             }
 
             Files.write(filePath, newLines, StandardCharsets.UTF_8);
-            anchorIndex.rebuild(startLoc.projectPath);
+            markDirty(startLoc.projectPath, startLoc.filePath);
 
             int deletedLines = (endLine - startLine) - 1;
             return "✅ 已删除从 [" + startAnchor + "] 到 [" + endAnchor + "] 之间的 " + deletedLines + " 行代码";
@@ -191,6 +193,65 @@ public class AnchorManager {
         }
     }
 
+    // @anchor: anchorManager_markDirty
+    private void markDirty(String projectPath, String fileRelPath) {
+        dirtyFiles.computeIfAbsent(projectPath, k -> new LinkedHashSet<>()).add(fileRelPath);
+    }
+
+    // @anchor: anchorManager_markDirtyByFilename
+    /**
+     * 从沙箱相对路径推导 (projectPath, fileRelPath)，标记为脏文件。
+     * 只在项目含 .anchors.json 时标记。
+     */
+    void markDirtyByFilename(String filename) {
+        if (filename == null || filename.isBlank()) return;
+
+        String normalized = filename.replace('\\', '/');
+        if(normalized.startsWith("./")) normalized = normalized.substring(2);
+        int slash = normalized.indexOf('/');
+        if (slash <= 0) return;
+
+        String projectPath = normalized.substring(0, slash);
+        String fileRelPath = normalized.substring(slash + 1);
+
+        try {
+            Path projectDir = PathUtils.safeResolve(projectPath);
+            if (!Files.isDirectory(projectDir)) return;   // 项目目录不存在，跳过
+        } catch (IOException e) {
+            return;
+        }
+
+        markDirty(projectPath, fileRelPath);
+    }
+
+    // @anchor: anchorManager_flushDirty
+    /**
+     * 批量刷新所有脏文件。由 ToolExecutor 在一轮工具调用结束后触发。
+     */
+    public void flushDirty() {
+        if (dirtyFiles.isEmpty()) return;
+        Set<String> fullRebuiltProjects = new HashSet<>();
+        for (Map.Entry<String, Set<String>> e : dirtyFiles.entrySet()) {
+            String project = e.getKey();
+            for (String file : e.getValue()) {
+                try {
+                    Path projectDir = PathUtils.safeResolve(project);
+                    Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
+                    if (!Files.exists(anchorsFile)) {
+                        if (fullRebuiltProjects.contains(project)) continue;
+                        anchorIndex.rebuild(project);
+                        fullRebuiltProjects.add(project);
+                    } else {
+                        anchorIndex.rebuildFile(project, file);
+                    }
+                } catch (Exception ex) {
+                    logger.warn("刷新脏文件失败: {}/{} - {}", project, file, ex.getMessage());
+                }
+            }
+        }
+        dirtyFiles.clear();
+    }
+
     // ===== 转发：查找锚点 =====
 
     // @anchor: anchorManager_findAnchor
@@ -201,5 +262,19 @@ public class AnchorManager {
      */
     AnchorLocation findAnchor(String projectPath, String anchorId) {
         return anchorIndex.find(projectPath, anchorId);
+    }
+
+    // @anchor: anchorManager_rebuildProjectIndex
+    String rebuildProjectIndex(String projectPath) {
+        return anchorIndex.rebuildProjectIndex(projectPath);
+    }
+
+    // @anchor: anchorManager_describeAnchors
+    String describeAnchors(String projectPath, String filePath) {
+        return anchorIndex.describe(projectPath, filePath);
+    }
+
+    String rebuildFile(String projectPath, String fileRelPath) {
+        return anchorIndex.rebuildFile(projectPath, fileRelPath);
     }
 }
