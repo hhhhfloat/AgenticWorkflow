@@ -134,3 +134,33 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
     startHeartbeat();
 });
+
+// @anchor: modules_mobileLockDetect
+// 检测并展示手机独占锁提示条
+function initMobileLockDetection() {
+    fetch('/lock-status')
+        .then(r => r.json())
+        .then(data => {
+        if (data.mobileLocked && !data.youAreMobile) showMobileLockBanner();
+    })
+        .catch(() => {});
+
+    const originalFetch = window.fetch;
+    window.fetch = async function(...args) {
+        const res = await originalFetch.apply(this, args);
+        if (res.status === 403) {
+            try {
+                const clone = res.clone();
+                const data = await clone.json();
+                if (data.code === 'mobile-locked') showMobileLockBanner();
+            } catch (e) {}
+        }
+        return res;
+    };
+}
+initMobileLockDetection();
+
+function showMobileLockBanner() {
+    const banner = document.getElementById('mobileLockBanner');
+    if (banner) banner.style.display = 'block';
+}

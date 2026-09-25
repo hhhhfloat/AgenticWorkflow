@@ -7,6 +7,7 @@ import com.myagent.workflow.core.ConfigEditor;
 import com.myagent.workflow.core.Main;
 import com.myagent.workflow.http.handlers.*;
 import com.myagent.workflow.session.SessionManager;
+import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
@@ -43,6 +44,27 @@ public class HttpServerMain {
     private static volatile boolean apiKeyClearedByUser = false;
     private static volatile boolean heartbeatMonitorRunning = false;
 
+    // @anchor: httpServerMain_mobileLock
+    /** 手机独占锁：一旦手机发起请求即置位，服务重启才清除 */
+    private static volatile boolean mobileLocked = false;
+
+    public static void lockForMobile() { mobileLocked = true; }
+    public static boolean isMobileLocked() { return mobileLocked; }
+
+    // @anchor: httpServerMain_reg
+    /**
+     * 注册路由并包装设备保护。
+     * protect=true：手机锁定期间，来自桌面端的请求返回 403。
+     */
+    private static void reg(HttpServer server, String path, HttpHandler handler, boolean protect) {
+        server.createContext(path, new GuardedHandler(handler, protect));
+    }
+
+    /** 默认绑定：仅本机可访问 */
+    public static final String DEFAULT_BIND = "127.0.0.1";
+    /** 环境变量 key：设置后覆盖默认绑定地址（例如 Tailscale IP） */
+    public static final String BIND_ENV_KEY = "AGENT_BIND";
+
     public static SessionManager getSessionManager() {
         return sessionManager;
     }
@@ -57,6 +79,18 @@ public class HttpServerMain {
 
     public static void markApiKeyCleared() {
         apiKeyClearedByUser = true;
+    }
+
+    // @anchor: httpServerMain_resolveBindAddress
+    /**
+     * 解析 HTTP 服务绑定地址：
+     * - 环境变量 AGENT_BIND 优先（如 Tailscale 的 100.x.x.x）
+     * - 未设置时默认 127.0.0.1（仅本机可访问）
+     */
+    private static String resolveBindAddress() {
+        String v = System.getenv(BIND_ENV_KEY);
+        if (v == null || v.isBlank()) return DEFAULT_BIND;
+        return v.trim();
     }
 
     // ==================== 入口 ====================
@@ -96,12 +130,13 @@ public class HttpServerMain {
         // 5. 启动 HTTP 服务
         HttpServer server;
         try {
-            server = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
+            String bindAddr = resolveBindAddress();
+            server = HttpServer.create(new InetSocketAddress(bindAddr, PORT), 0);
             registerRoutes(server);
             server.setExecutor(Executors.newCachedThreadPool());
             server.start();
 
-            openBrowser();
+            openBrowser(bindAddr);
             System.out.println("🚀 Agent 服务已启动（按 Enter 停止...）");
             startHeartbeatMonitor();
             System.in.read();
@@ -118,55 +153,59 @@ public class HttpServerMain {
     // @anchor: httpServerMain_registerRoutes
     // 注册全部 HTTP 路由：会话、任务、项目、系统、静态资源与外部目录
     private static void registerRoutes(HttpServer server) {
-        // ── 会话管理 ──
-        server.createContext("/session/create", new SessionCreateHandler());
-        server.createContext("/session/list", new SessionListHandler());
-        server.createContext("/session/close", new SessionCloseHandler());
-        server.createContext("/session/history", new SessionHistoryHandler());
-        server.createContext("/session/rename", new SessionRenameHandler());
+        // ── 会话管理（写：保护） ──
+        reg(server, "/session/create", new SessionCreateHandler(), true);
+        reg(server, "/session/close",  new SessionCloseHandler(), true);
+        reg(server, "/session/rename", new SessionRenameHandler(), true);
+        // ── 会话管理（读：放行） ──
+        reg(server, "/session/list",    new SessionListHandler(), false);
+        reg(server, "/session/history", new SessionHistoryHandler(), false);
 
         // ── 任务执行 ──
-        server.createContext("/run", new RunHandler());
-        server.createContext("/stop", new StopHandler());
-        server.createContext("/heartbeat", new HeartbeatHandler());
-        server.createContext("/status", new StatusHandler());
+        reg(server, "/run",  new RunHandler(), true);
+        reg(server, "/stop", new StopHandler(), true);
 
-        // ── 项目操作（保留原有语义） ──
-        server.createContext("/runProject", new RunProjectHandler());
-        server.createContext("/project-meta", new ProjectMetaHandler());
+        // ── 心跳 / 状态（放行） ──
+        reg(server, "/heartbeat", new HeartbeatHandler(), false);
+        reg(server, "/status",    new StatusHandler(), false);
+        reg(server, "/lock-status", new LockStatusHandler(), false);   // 新增
 
-        // ── 系统操作 ──
-        server.createContext("/restart", new RestartHandler());
-        server.createContext("/clear-api-key", new ClearApiKeyHandler());
-        server.createContext("/config", new ConfigHandler());
+        // ── 项目操作 ──
+        reg(server, "/runProject",   new RunProjectHandler(), true);
+        reg(server, "/project-meta", new ProjectMetaHandler(), false);
 
-        // ── 项目/文件管理（原有） ──
-        server.createContext("/projects", new ProjectsHandler());
-        server.createContext("/browse", new BrowseHandler());
-        server.createContext("/archive", new ArchiveHandler());
-        server.createContext("/upload", new UploadHandler());
-        server.createContext("/createProject", new CreateProjectHandler());
-        server.createContext("/openFolder", new OpenFolderHandler());
+        // ── 系统操作（保护） ──
+        reg(server, "/restart",       new RestartHandler(), true);
+        reg(server, "/clear-api-key", new ClearApiKeyHandler(), true);
+        reg(server, "/config",        new ConfigHandler(), true);
 
-        // ── 静态资源 + 外部目录 ──
-        server.createContext("/", new StaticHandler());
-        server.createContext("/TestProjects",
-                new ExternalFileHandler(Paths.get("./TestProjects"), "/TestProjects"));
-        server.createContext("/sandbox",
-                new ExternalFileHandler(Paths.get("./sandbox"), "/sandbox"));
+        // ── 项目/文件管理（保护） ──
+        reg(server, "/projects",      new ProjectsHandler(), false);
+        reg(server, "/browse",        new BrowseHandler(), false);
+        reg(server, "/archive",       new ArchiveHandler(), true);
+        reg(server, "/upload",        new UploadHandler(), true);
+        reg(server, "/createProject", new CreateProjectHandler(), true);
+        reg(server, "/openFolder",    new OpenFolderHandler(), true);
+
+        // ── 静态资源（放行） ──
+        reg(server, "/", new StaticHandler(), false);
+        reg(server, "/TestProjects",
+                new ExternalFileHandler(Paths.get("./TestProjects"), "/TestProjects"), false);
+        reg(server, "/sandbox",
+                new ExternalFileHandler(Paths.get("./sandbox"), "/sandbox"), false);
     }
 
     // @anchor: httpServerMain_openBrowser
     // 启动后尝试用系统默认浏览器打开首页，失败则提示手动访问
-    private static void openBrowser() {
+    private static void openBrowser(String bindAddr) {
         try {
-            String url = "http://localhost:" + PORT;
+            String url = "http://" + bindAddr + ":" + PORT;
             if (java.awt.Desktop.isDesktopSupported()) {
                 java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
                 System.out.println("🌐 已自动打开浏览器: " + url);
             }
         } catch (Exception e) {
-            System.out.println("⚠️ 自动打开浏览器失败，请手动访问 http://localhost:" + PORT);
+            System.out.println("⚠️ 自动打开浏览器失败，请手动访问 http://" + bindAddr + ":" + PORT);
         }
     }
 

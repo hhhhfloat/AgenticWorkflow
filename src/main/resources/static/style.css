@@ -858,3 +858,17 @@ html, body {
 .usage-panel span {
     white-space: nowrap;
 }
+
+#mobileLockBanner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: #b8860b;
+    color: #fff;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 13px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}

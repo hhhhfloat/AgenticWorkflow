@@ -29,7 +29,7 @@ let heartbeatInterval = null;
 const MAX_HISTORY = 30;
 const STORAGE_KEY = 'promptHistory';
 const HEARTBEAT_INTERVAL_MS = 3000;
-const BASE_URL = 'http://localhost:8080';
+const BASE_URL = '';
 
 // ===== 统一构建运行配置 =====
 function buildRunConfig(settings) {

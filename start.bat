@@ -4,9 +4,30 @@ setlocal EnableDelayedExpansion
 title Agentic Workflow v4.0
 
 :: -r / --reset-config  强制重新探测环境，覆盖 agent-config.properties
+:: -m / --mobile        绑定 Tailscale IP，供手机远程访问
 set RESET_CONFIG=0
-if /I "%~1"=="-r"             set RESET_CONFIG=1
-if /I "%~1"=="--reset-config" set RESET_CONFIG=1
+set MOBILE_MODE=0
+
+:parse_args
+if "%~1"=="" goto :args_done
+if /I "%~1"=="-r"             goto :arg_reset
+if /I "%~1"=="--reset-config" goto :arg_reset
+if /I "%~1"=="-m"             goto :arg_mobile
+if /I "%~1"=="--mobile"       goto :arg_mobile
+shift
+goto :parse_args
+
+:arg_reset
+set RESET_CONFIG=1
+shift
+goto :parse_args
+
+:arg_mobile
+set MOBILE_MODE=1
+shift
+goto :parse_args
+
+:args_done
 
 set CONFIG_FILE=agent-config.properties
 
@@ -101,12 +122,37 @@ echo.
 echo ✅ API Key 已保存
 echo.
 
-REM ============================================================
-REM  5. 启动
-REM ============================================================
 :start
-echo 🚀 启动中 ... 工作目录: %cd%
-echo 🌐 http://localhost:8080  （关闭窗口即停止服务）
+
+REM ============================================================
+REM  5.5 解析绑定地址
+REM ============================================================
+if "%MOBILE_MODE%"=="1" (
+    echo 📱 移动模式：获取 Tailscale IP ...
+    set "AGENT_BIND="
+    set "TS_EXE=C:\Program Files\Tailscale\tailscale.exe"
+    if not exist "!TS_EXE!" set "TS_EXE=tailscale"
+
+    for /f "delims=" %%i in ('""!TS_EXE!" ip -4" 2^>nul') do (
+        if not defined AGENT_BIND set "AGENT_BIND=%%i"
+    )
+
+    if not defined AGENT_BIND (
+        echo.
+        echo [错误] 未能获取 Tailscale IP
+        echo.
+        echo 请检查：
+        echo   1. Tailscale 客户端已启动
+        echo   2. 已登录账号
+        echo   3. 或者手动设置：set AGENT_BIND=100.x.x.x
+        echo.
+        pause
+        exit /b 1
+    )
+    echo ✅ Tailscale IP: !AGENT_BIND!
+) else (
+    set "AGENT_BIND=127.0.0.1"
+)
 echo.
 
 java --add-modules jdk.compiler ^
