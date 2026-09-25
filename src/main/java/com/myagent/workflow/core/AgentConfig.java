@@ -39,7 +39,7 @@ public record AgentConfig(
     private static final boolean DEFAULT_AUTO_OPEN_BROWSER   = false;
     private static final String  DEFAULT_CPP_TYPE            = "mingw";
     private static final boolean DEFAULT_SECURITY_SCAN       = true;
-    private static final int     DEFAULT_MAX_ITERATIONS      = 30;
+    private static final int     DEFAULT_MAX_ITERATIONS      = 100;
 
     // ========== 公共静态 Getter ==========
 

@@ -40,7 +40,7 @@ runBtn.addEventListener('click', () => {
         alert('请输入需求');
         return;
     }
-    const maxIterations = parseInt(document.getElementById('maxIterations').value) || 20;
+    const maxIterations = parseInt(document.getElementById('maxIterations').value) || 100;
     runAgent(prompt, maxIterations);
     addToHistory(prompt);
 
