@@ -197,7 +197,6 @@ public class ToolExecutor {
         if ("UPDATE.md".equalsIgnoreCase(fileName)) {
             return switch (toolName) {
                 case "read_file" -> "❌ UPDATE.md 不支持完整读取。请使用 read_between_anchors 按锚点读取。";
-                case "write_file" -> "❌ UPDATE.md 不支持全量重写。请使用 insert_at_anchor 在锚点处追加。";
                 case "delete_file" -> "❌ UPDATE.md 不允许删除。";
                 default -> null;
             };

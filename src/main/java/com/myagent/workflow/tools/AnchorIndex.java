@@ -342,10 +342,22 @@ class AnchorIndex {
 
     // @anchor: anchorIndex_rebuildFile
     /**
-     * 增量重建单个文件的锚点索引，只重扫一个文件。
+     * 单文件全刷：先刷新位置，再刷新 desc/symbol。
      * 索引文件不存在时退化为全量 rebuild。
      */
     String rebuildFile(String projectPath, String fileRelPath) {
+        String r1 = refreshAnchorsFile(projectPath, fileRelPath);
+        String r2 = refreshProjectIndexFile(projectPath, fileRelPath);
+        return r1 + " | " + r2;
+    }
+
+// @anchor: anchorIndex_refreshAnchorsFile
+    /**
+     * 只刷新 .anchors.json 里该文件的位置（id + line + preview）。
+     * 供编辑操作后立即调用，不跑 AST 解析，快速保证行号准确。
+     * 索引文件不存在时退化为全量 rebuild。
+     */
+    String refreshAnchorsFile(String projectPath, String fileRelPath) {
         try {
             Path projectDir = PathUtils.safeResolve(projectPath);
             Path anchorsFile = getIndexPath(projectPath);
@@ -357,7 +369,6 @@ class AnchorIndex {
             Map<String, List<Map<String, Object>>> projectAnchors =
                     objectMapper.readValue(content, new TypeReference<>() {});
 
-            // 收集其他文件的锚点 ID
             Set<String> seenIds = new HashSet<>();
             for (Map.Entry<String, List<Map<String, Object>>> e : projectAnchors.entrySet()) {
                 if (e.getKey().equals(fileRelPath)) continue;
@@ -372,7 +383,6 @@ class AnchorIndex {
                 anchors = scanAnchorsFromFile(file, seenIds);
             }
 
-            // 更新 .anchors.json
             if (anchors.isEmpty()) {
                 projectAnchors.remove(fileRelPath);
             } else {
@@ -380,14 +390,39 @@ class AnchorIndex {
             }
             Files.writeString(anchorsFile,
                     objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(projectAnchors));
-
-            // 更新 .project_index.json 里该文件的条目
-            updateProjectIndexForFile(projectDir, fileRelPath, anchors);
-            return "✅ 已增量更新 " + fileRelPath + "（" + anchors.size() + " 个锚点）";
+            return "✅ 已刷新位置 " + fileRelPath + "（" + anchors.size() + " 个锚点）";
 
         } catch (IOException e) {
-            logger.error("增量重建失败", e);
-            return "❌ 增量重建失败: " + e.getMessage();
+            logger.error("刷新锚点位置失败", e);
+            return "❌ 刷新锚点位置失败: " + e.getMessage();
+        }
+    }
+
+// @anchor: anchorIndex_refreshProjectIndexFile
+    /**
+     * 只刷新 .project_index.json 里该文件的条目（desc + symbol）。
+     * 供 flushDirty 一轮结束统一调用，代价是 AST 解析，较慢。
+     */
+    String refreshProjectIndexFile(String projectPath, String fileRelPath) {
+        try {
+            Path projectDir = PathUtils.safeResolve(projectPath);
+            Path anchorsFile = getIndexPath(projectPath);
+            if (anchorsFile == null || !Files.exists(anchorsFile)) {
+                return "⏭ 无锚点索引，跳过";
+            }
+
+            String content = Files.readString(anchorsFile, StandardCharsets.UTF_8);
+            Map<String, List<Map<String, Object>>> projectAnchors =
+                    objectMapper.readValue(content, new TypeReference<>() {});
+
+            List<Map<String, Object>> anchors = projectAnchors.get(fileRelPath);
+            updateProjectIndexForFile(projectDir, fileRelPath,
+                    anchors == null ? List.of() : anchors);
+            return "✅ 已刷新描述 " + fileRelPath;
+
+        } catch (IOException e) {
+            logger.error("刷新项目索引失败", e);
+            return "❌ 刷新项目索引失败: " + e.getMessage();
         }
     }
 

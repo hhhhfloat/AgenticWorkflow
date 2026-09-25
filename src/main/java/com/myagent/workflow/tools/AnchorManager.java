@@ -70,7 +70,7 @@ public class AnchorManager {
             }
 
             Files.write(filePath, lines, StandardCharsets.UTF_8);
-            markDirty(loc.projectPath, loc.filePath);
+            onFileModified(loc.projectPath, loc.filePath);
             return "✅ 已在 " + loc.filePath + " 的锚点 [" + anchorId + "] " + position + " 插入代码";
 
         } catch (IOException e) {
@@ -116,7 +116,7 @@ public class AnchorManager {
             }
 
             Files.write(filePath, newLines, StandardCharsets.UTF_8);
-            markDirty(startLoc.projectPath, startLoc.filePath);
+            onFileModified(startLoc.projectPath, startLoc.filePath);
 
             int deletedLines = (endLine - startLine) - 1;
             return "✅ 已删除从 [" + startAnchor + "] 到 [" + endAnchor + "] 之间的 " + deletedLines + " 行代码";
@@ -221,7 +221,7 @@ public class AnchorManager {
             return;
         }
 
-        markDirty(projectPath, fileRelPath);
+        onFileModified(projectPath, fileRelPath);
     }
 
     // @anchor: anchorManager_flushDirty
@@ -242,7 +242,7 @@ public class AnchorManager {
                         anchorIndex.rebuild(project);
                         fullRebuiltProjects.add(project);
                     } else {
-                        anchorIndex.rebuildFile(project, file);
+                        anchorIndex.refreshProjectIndexFile(project, file);
                     }
                 } catch (Exception ex) {
                     logger.warn("刷新脏文件失败: {}/{} - {}", project, file, ex.getMessage());
@@ -276,5 +276,15 @@ public class AnchorManager {
 
     String rebuildFile(String projectPath, String fileRelPath) {
         return anchorIndex.rebuildFile(projectPath, fileRelPath);
+    }
+
+    // @anchor: anchorManager_onFileModified
+    /**
+     * 文件被改动后的统一处理：立即刷新锚点位置（保证同轮后续编辑使用新行号），
+     * 标记为脏文件等待本批工具结束后刷新 desc/symbol。
+     */
+    private void onFileModified(String projectPath, String fileRelPath) {
+        anchorIndex.refreshAnchorsFile(projectPath, fileRelPath);
+        markDirty(projectPath, fileRelPath);
     }
 }
