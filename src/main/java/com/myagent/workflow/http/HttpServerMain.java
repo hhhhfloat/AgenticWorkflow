@@ -123,6 +123,7 @@ public class HttpServerMain {
         server.createContext("/session/list", new SessionListHandler());
         server.createContext("/session/close", new SessionCloseHandler());
         server.createContext("/session/history", new SessionHistoryHandler());
+        server.createContext("/session/rename", new SessionRenameHandler());
 
         // ── 任务执行 ──
         server.createContext("/run", new RunHandler());

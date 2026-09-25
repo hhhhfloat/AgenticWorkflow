@@ -600,7 +600,9 @@ html, body {
     flex: 1;
 }
 .session-item {
+    position: relative;
     padding: 8px 10px;
+    pending-right: 34px;
     border-bottom: 1px solid #2a2a2a;
     cursor: pointer;
     transition: background 0.15s;
@@ -629,6 +631,37 @@ html, body {
     text-align: center;
     color: #666;
     font-size: 12px;
+}
+.session-rename-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+    font-size: 12px;
+    padding: 2px 4px;
+    transition: opacity 0.15s;
+}
+
+.session-item:hover .session-rename-btn {
+    opacity: 0.7;
+}
+
+.session-rename-btn:hover {
+    opacity: 1 !important;
+}
+.session-title-input {
+    width: 100%;
+    font-size: 13px;
+    color: #ddd;
+    background: #1a1a1a;
+    border: 1px solid #4a8aff;
+    border-radius: 2px;
+    padding: 2px 4px;
+    outline: none;
+    box-sizing: border-box;
 }
 /* @anchor: style_mainColumn */
 /* 主区域纵向布局：底部固定输入区 */

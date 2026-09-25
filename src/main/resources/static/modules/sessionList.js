@@ -45,11 +45,97 @@ function renderSessionList(sessions) {
         time.className = 'session-time';
         time.textContent = formatRelativeTime(session.lastActiveAt);
 
+        const renameBtn = document.createElement('button');
+        renameBtn.className = 'session-rename-btn';
+        renameBtn.textContent = '✏️';
+        renameBtn.title = '重命名';
+        renameBtn.addEventListener('click', (e) => {
+            e.stopPropagation();   // 阻止触发切换会话
+            startRenameSession(item, session);
+        });
+
         item.appendChild(title);
         item.appendChild(time);
+        item.appendChild(renameBtn);
         item.addEventListener('click', () => switchToSession(session.sessionId));
         container.appendChild(item);
     });
+}
+
+/**
+ * 让会话条目的标题进入编辑态。
+ * 回车提交、ESC 取消、失焦提交。
+ */
+function startRenameSession(item, session) {
+    const titleEl = item.querySelector('.session-title');
+    if (!titleEl) return;
+
+    const oldTitle = session.title || '新会话';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'session-title-input';
+    input.value = oldTitle;
+    input.maxLength = 100;
+
+    let committed = false;
+
+    const finish = async (save) => {
+        if (committed) return;
+        committed = true;
+
+        const newTitle = input.value.trim();
+        if (!save || !newTitle || newTitle === oldTitle) {
+            titleEl.textContent = oldTitle;
+            return;
+        }
+
+        // 乐观更新
+        titleEl.textContent = newTitle;
+
+        try {
+            const res = await fetch(BASE_URL + '/session/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: session.sessionId, title: newTitle })
+            });
+            const data = await res.json();
+            if (!res.ok || data.status !== 'ok') {
+                titleEl.textContent = oldTitle;
+                alert('重命名失败：' + (data.message || res.status));
+                return;
+            }
+            // 更新本地 session 对象，避免下次渲染回退
+            session.title = newTitle;
+        } catch (err) {
+            titleEl.textContent = oldTitle;
+            alert('重命名失败：' + err.message);
+        }
+    };
+
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            finish(true);
+            input.replaceWith(titleEl);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            finish(false);
+            input.replaceWith(titleEl);
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        // 输入框被移出 DOM 时 blur 也会触发，用 committed 去重
+        if (!committed) {
+            finish(true);
+            input.replaceWith(titleEl);
+        }
+    });
+
+    titleEl.replaceWith(input);
+    input.focus();
+    input.select();
 }
 
 /**

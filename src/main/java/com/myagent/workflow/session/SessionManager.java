@@ -152,6 +152,22 @@ public class SessionManager {
         }
     }
 
+    // @anchor: sessionManager_rename
+    // 重命名会话：更新内存 meta 并立即落盘
+    /**
+     * 重命名会话。
+     * 会话不在内存时先从磁盘加载；改名后立即落盘。
+     * 返回 true 表示成功。
+     */
+    public boolean rename(String sessionId, String newTitle, AgentConfig config) {
+        if (newTitle == null || newTitle.isBlank()) return false;
+        Session session = get(sessionId, config);
+        if (session == null) return false;
+        session.rename(newTitle);
+        save(session);
+        return true;
+    }
+
     // @anchor: sessionManager_close
     // 关闭会话：运行中先停止、压缩日志并等待空闲，然后落盘并从内存移除
     /**

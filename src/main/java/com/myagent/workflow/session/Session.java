@@ -107,6 +107,17 @@ public class Session {
         this.meta = meta.withLastActiveAt(now);
     }
 
+    // @anchor: session_rename
+    // 更新会话标题，不改变活跃时间戳
+    /**
+     * 更新会话标题。
+     * 只修改 meta.title，不触碰 lastActiveAt（重命名不算“活跃”操作）。
+     */
+    public void rename(String newTitle) {
+        if (newTitle == null || newTitle.isBlank()) return;
+        this.meta = meta.withTitle(newTitle.trim());
+    }
+
     // @anchor: session_prepareUserMessage
     // 处理用户消息的首轮 init / 后续 append 分支，并同步更新元数据计数
     /**
