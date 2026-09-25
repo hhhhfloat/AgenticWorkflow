@@ -21,11 +21,11 @@ import java.util.*;
 import java.util.function.Consumer;
 
 /**
- * @anchor: toolExecutor_class
  * 工具执行器 —— 实现所有 Agent 可调用工具的具体逻辑。
  * 从 Main.java 中独立出来，Main 仅保留工作流编排。
  */
-// @anchor: toolExecutor_class_single
+// @anchor: toolExecutor_class
+// 工具执行器：实现全部 Agent 可调用工具的逻辑、路径校验与结果回填
 public class ToolExecutor {
     private static final Logger logger = LoggerFactory.getLogger(ToolExecutor.class);
 
@@ -58,6 +58,7 @@ public class ToolExecutor {
     );
 
     // @anchor: toolExecutor_constructor
+    // 构造：注入配置与 ObjectMapper，并装配各工具组件
     public ToolExecutor(AgentConfig config, ObjectMapper objectMapper) {
         this.config = config;
         this.compiler = new Compiler(config);
@@ -68,16 +69,17 @@ public class ToolExecutor {
     }
 
     // @anchor: toolExecutor_setLogConsumer
+    // 设置日志回调，把工具执行输出实时推送给 UI
     public void setLogConsumer(Consumer<String> consumer) {
         this.logConsumer = consumer;
     }
 
     // ==================== 工具调度入口 ====================
     /**
-     * @anchor: toolExecutor_dispatch
      * 根据工具名和参数分发执行，返回结果字符串。
      */
-    // @anchor: toolExecutor_dispatch_single
+    // @anchor: toolExecutor_dispatch
+    // 工具调度入口：按工具名分发到具体实现，返回结果字符串
     public String dispatch(String functionName, Map<String, Object> args) throws IOException {
 
         String violation = checkAccess(functionName, args);
@@ -168,6 +170,7 @@ public class ToolExecutor {
         }
     }
     // @anchor: toolExecutor_checkAccess
+    // 按工具类型校验其路径参数，违规时返回错误消息
     private String checkAccess(String toolName, Map<String, Object> args) {
         List<String> pathArgs = PATH_ARG_MAP.get(toolName);
         if (pathArgs == null) return null;
@@ -183,6 +186,7 @@ public class ToolExecutor {
     }
 
     // @anchor: toolExecutor_checkPath
+    // 沙箱路径校验：拒绝 ".." 穿越、点开头路径与 UPDATE.md 危险读取/删除
     private String checkPath(String toolName, String path) {
         String normalized = path.replace('\\', '/');
         String[] segments = normalized.split("/");
@@ -212,6 +216,7 @@ public class ToolExecutor {
     // ==================== 工具 : compile_and_run ====================
 
     // @anchor: toolExecutor_compileAndRun
+    // 编译并运行：先安全扫描，再按模式调度编译器，成功后写入口注册表
     private String compileAndRun(String filename, String mode, boolean run) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -285,6 +290,7 @@ public class ToolExecutor {
 
     // 辅助判断：检查结果是否包含错误标识
     // @anchor: toolExecutor_isError
+    // 判断编译/运行结果字符串是否表示失败
     private boolean isErrorResult(String result) {
         if (result == null) return true;
         // 不再检查 "error"，因为编译输出可能包含它但编译是成功的
@@ -297,6 +303,7 @@ public class ToolExecutor {
 
     // 写入注册表
     // @anchor: toolExecutor_writeEntry
+    // 把最近一次成功运行的入口信息写入 .agent_entry.json
     private void writeEntryFile(Path projectDir, String filename, String mode) {
         try {
             Path entryFile = projectDir.resolve(".agent_entry.json");
@@ -316,6 +323,7 @@ public class ToolExecutor {
     }
 
     // @anchor: toolExecutor_getFileStructure
+    // 解析文件并用格式化器输出精简的代码结构
     private String getFileStructure(String filename) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -334,11 +342,12 @@ public class ToolExecutor {
         }
     }
 
-    // @anchor: toolExecutor_refreshAllProjectIndexes
     /**
      * 遍历沙箱下所有项目，逐个重建 .project_index.json。
      * 由 Main.run() 的 finally 块调用，一次运行结束刷新一次。
      */
+    // @anchor: toolExecutor_refreshAllProjectIndexes
+    // 一次运行结束后遍历沙箱各项目，重建其 .project_index.json
     public void refreshAllProjectIndexes() {
         try {
             Path sandbox = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
@@ -365,10 +374,11 @@ public class ToolExecutor {
         }
     }
 
-    // @anchor: toolExecutor_flushDirtyAnchors
     /**
      * 由 Main 在一轮工具调用结束后触发，批量刷新锚点索引。
      */
+    // @anchor: toolExecutor_flushDirtyAnchors
+    // 一轮工具调用结束后批量刷新锚点索引中的脏文件
     public void flushDirtyAnchors() {
         anchorMgr.flushDirty();
     }

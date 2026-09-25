@@ -26,12 +26,13 @@ public class AnchorManager {
     private final Map<String, Set<String>> dirtyFiles = new LinkedHashMap<>();
 
     // @anchor: anchorManager_constructor
-// 构造：绑定项目根路径
+// 构造：创建内部 AnchorIndex
     public AnchorManager(ObjectMapper objectMapper) {
         this.anchorIndex = new AnchorIndex(objectMapper);
     }
 
     // ===== 转发：索引构建 =====
+
 
     // @anchor: anchorManager_buildIndex
 // 重建锚点索引
@@ -324,9 +325,12 @@ public class AnchorManager {
         return anchorIndex.describe(projectPath, filePath);
     }
 
+    // @anchor: anchorManager_rebuildFile
+// 单文件转发：刷新该文件的位置与描述
     String rebuildFile(String projectPath, String fileRelPath) {
         return anchorIndex.rebuildFile(projectPath, fileRelPath);
     }
+
 
     // @anchor: anchorManager_onFileModified
     /**

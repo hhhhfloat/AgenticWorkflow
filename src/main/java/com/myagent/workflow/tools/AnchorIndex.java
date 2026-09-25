@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
  * 锚点索引 —— 负责索引文件的构建、查询、格式化。
  * <p>
  * 职责：
- * - 扫描项目源码，提取 @anchor 注释，写入 .anchors.json
+ * - 扫描项目源码，提取 @anchor 注释，写入 .anchors.json 与 .project_index.json
  * - 从索引中查询锚点位置
  * - 全局查找锚点（遍历所有项目）
  * - 格式化锚点列表供 Agent 消费
@@ -32,7 +32,7 @@ import java.util.regex.Pattern;
  * 由 AnchorManager 持有。不涉及文件内容修改。
  */
 // @anchor: anchorIndex_class
-// 锚点索引：维护 .anchors.json 的读写与查询
+// 锚点索引：构建并查询 .anchors.json（坐标）与 .project_index.json（描述+符号）
 class AnchorIndex {
     private static final Logger logger = LoggerFactory.getLogger(AnchorIndex.class);
     private final ObjectMapper objectMapper;
@@ -56,7 +56,7 @@ class AnchorIndex {
             "target", "node_modules", ".git", "classes", "build", "dist", "out");
 
     // @anchor: anchorIndex_constructor
-// 构造：绑定项目路径与索引文件
+// 构造：注入 ObjectMapper
     AnchorIndex(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
@@ -78,7 +78,7 @@ class AnchorIndex {
     // ===== 旧索引迁移 =====
 
     // @anchor: anchorIndex_migrateOldIndex
-// 旧索引迁移：兼容历史格式
+// 把旧的 .anchor_index.json 迁移为各项目的 .anchors.json 并备份原文件
     private synchronized void migrateOldIndexIfNeeded() {
         if (migrationAttempted) return;
         migrationAttempted = true;
@@ -132,11 +132,12 @@ class AnchorIndex {
 
     // ===== 构建索引 =====
 
-    // @anchor: anchorIndex_rebuild
     /**
-     * 重建锚点索引：扫描项目下的所有源文件，提取 @anchor 注释，写入 .anchors.json。
-     * 原 AnchorManager.buildAnchorIndex。
+     * 重建锚点索引：扫描项目下的所有源文件，提取 @anchor 注释，
+     * 重写 .anchors.json（坐标）与 .project_index.json（描述+符号）。
      */
+    // @anchor: anchorIndex_rebuild
+    // 全量重建：扫描项目全部文本文件，重写两份索引文件
     String rebuild(String projectPath) {
         migrateOldIndexIfNeeded();
 
@@ -193,6 +194,8 @@ class AnchorIndex {
         }
     }
 
+    // @anchor: anchorIndex_scanAnchorsFromFile
+// 扫描单个文件，提取全部 @anchor 的行号、预览与紧邻描述
     private List<Map<String, Object>> scanAnchorsFromFile(Path file) throws IOException {
         String fileName = file.getFileName().toString();
         String ext = "";
@@ -246,6 +249,8 @@ class AnchorIndex {
         return lean;
     }
 
+    // @anchor: anchorIndex_buildIndexEntries
+// 把锚点列表转为项目索引条目（id/line/desc/symbol），跳过 _end 锚点
     private List<Map<String, Object>> buildIndexEntries(Path file, List<Map<String, Object>> anchors) {
         StructureParserRegistry registry = StructureParserRegistry.getInstance();
         List<MethodDefinition> methods = parseMethods(file, registry);
@@ -269,9 +274,11 @@ class AnchorIndex {
 
     /**
      * 从锚点行的下一行开始，提取紧邻的注释作为描述。
-     * 支持 //、#、/* * /、<!-- -->。
+     * 支持 //、#、块注释、<!-- -->。
      * 取不到则返回空字符串。
      */
+    // @anchor: anchorIndex_extractDesc
+    // 从锚点下一行紧邻注释提取描述
     private String extractDesc(List<String> lines, int anchorLineIdx) {
         int next = anchorLineIdx + 1;
         if (next >= lines.size()) return "";
@@ -331,6 +338,8 @@ class AnchorIndex {
     /**
      * 将锚点结果（含 desc）写入 .project_index.json。
      */
+    // @anchor: anchorIndex_writeProjectIndex
+    // 把锚点结果（含描述）写入 .project_index.json
     private void writeProjectIndex(String projectPath, Map<String, List<Map<String, Object>>> projectAnchors) throws IOException {
         Path projectDir = PathUtils.safeResolve(projectPath);
         Map<String, List<Map<String, Object>>> index = new LinkedHashMap<>();
@@ -427,6 +436,8 @@ class AnchorIndex {
         }
     }
 
+    // @anchor: anchorIndex_updateProjectIndexForFile
+// 更新 .project_index.json 中单个文件的条目（无锚点时移除）
     private void updateProjectIndexForFile(Path projectDir, String fileRelPath,
                                            List<Map<String, Object>> anchors) throws IOException {
         Path indexFile = projectDir.resolve(PROJECT_INDEX_NAME);
@@ -452,6 +463,8 @@ class AnchorIndex {
      * 用 StructureParser 解析文件，返回其中的全部方法定义（含类方法）。
      * 解析器不支持该文件或解析失败时返回空列表。
      */
+    // @anchor: anchorIndex_parseMethods
+    // 用语言解析器取出文件内全部方法定义（含类方法）
     private List<MethodDefinition> parseMethods(Path file, StructureParserRegistry registry) {
         StructureParser parser = registry.getParser(file);
         if (parser == null) return List.of();
@@ -479,6 +492,8 @@ class AnchorIndex {
      *   2. 否则取锚点行之后 startLine 最近的方法
      *   3. 都没有则返回 null
      */
+    // @anchor: anchorIndex_findSymbolForAnchor
+    // 为锚点行匹配所属或最近的方法符号
     private String findSymbolForAnchor(int anchorLine, List<MethodDefinition> methods) {
         if (methods == null || methods.isEmpty()) return null;
 
@@ -506,6 +521,8 @@ class AnchorIndex {
     /**
      * 单独重建 .project_index.json。供外部一行调用。
      */
+    // @anchor: anchorIndex_rebuildProjectIndex
+    // 重建项目的 .project_index.json（缺 .anchors.json 时退化为全量重建）
     String rebuildProjectIndex(String projectPath) {
         migrateOldIndexIfNeeded();
         try {
@@ -598,7 +615,7 @@ class AnchorIndex {
     }
 
     // @anchor: anchorIndex_appendAnchorLines
-// 提取锚点行及其下方描述并写入索引
+// 把锚点列表按 id 与行号逐行追加到输出缓冲区
     private void appendAnchorLines(StringBuilder sb, List<Map<String, Object>> anchors) {
         for (Map<String, Object> anchor : anchors) {
             String id = (String) anchor.get("id");
@@ -611,6 +628,8 @@ class AnchorIndex {
      * 描述指定文件的锚点：返回 id + line + desc。
      * 如果 file 匹配多个文件，返回冲突提示并列出全部路径。
      */
+    // @anchor: anchorIndex_describe
+    // 返回指定文件各锚点的行号、描述与所属符号
     String describe(String projectPath, String filePath) {
         if (filePath == null || filePath.isBlank()) {
             return "❌ 必须指定 file 参数";
@@ -717,7 +736,7 @@ class AnchorIndex {
     }
 
     // @anchor: anchorIndex_findGlobally
-    // 跨项目全局查找锚点
+    // 跨项目查找首个同名锚点
     AnchorLocation findGlobally(String anchorId) {
         migrateOldIndexIfNeeded();
 

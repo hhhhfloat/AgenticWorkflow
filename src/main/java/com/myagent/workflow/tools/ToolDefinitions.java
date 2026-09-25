@@ -6,12 +6,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @anchor: toolDefinitions_class
  * 工具定义构建器 —— 生成 DeepSeek Function Calling 所需的 tools 列表。
  * 从 Main.java 中独立出来，便于单独维护工具 Schema。
  */
-// @anchor: toolDefinitions_class_single
-// 工具定义类：集中注册可暴露给 Agent 的工具 schema
+// @anchor: toolDefinitions_class
+// 工具定义构建器：集中声明可暴露给 Agent 的全部工具 schema
 public final class ToolDefinitions {
 
     private ToolDefinitions() {
@@ -19,12 +18,11 @@ public final class ToolDefinitions {
     }
 
     /**
-     * @anchor: toolDefinitions_build
      * 构建全部工具定义（符合 DeepSeek Function Calling 规范）。
      * @return 工具定义列表
      */
-    // @anchor: toolDefinitions_build_single
-// 构建工具定义列表（压缩模式开启时追加 request_checkpoint）
+    // @anchor: toolDefinitions_build
+    // 构建全部工具 schema 列表（DeepSeek Function Calling 规范）
     public static List<Map<String, Object>> build() {
         List<Map<String, Object>> tools = new ArrayList<>();
 
@@ -214,6 +212,8 @@ public final class ToolDefinitions {
                 List.of("functionName")
         ));
 
+        // @anchor: toolDef_describeAnchors
+// 工具：describe_anchors 列出锚点及其职责描述
         tools.add(defineTool(
                 "describe_anchors",
                 "返回指定文件中所有功能性锚点及其对应描述。仅返回非 _end 锚点，并额外提供每个锚点的功能描述（来自锚点下方紧邻的注释）。用于快速理解文件中各部分的职责，避免读取整份源码。",

@@ -54,6 +54,8 @@ public class CallGraphAnalyzer {
             "clearTimeout", "clearInterval", "print", "len", "range"
     );
 
+    // @anchor: callGraphAnalyzer_primitives
+// 原生类型与常用内建类集合：同样不计入调用图
     /** 原生类型与常用内建类，不计入调用图 */
     private static final Set<String> PRIMITIVES = Set.of(
             "String", "Number", "Boolean", "Array", "Object", "Function",
@@ -63,6 +65,8 @@ public class CallGraphAnalyzer {
             "HashMap", "HashSet", "Optional", "Stream"
     );
 
+    // @anchor: callGraphAnalyzer_constructor
+// 构造：注入锚点管理器
     public CallGraphAnalyzer(AnchorManager anchorMgr) {
         this.anchorMgr = anchorMgr;
     }
@@ -120,8 +124,12 @@ public class CallGraphAnalyzer {
 
     // ===== 索引构建 =====
 
+    // @anchor: callGraphAnalyzer_functionRef
+// 函数引用记录：函数名 + 所在文件 + 起止行
     private record FunctionRef(String name, Path file, int startLine, int endLine) {}
 
+    // @anchor: callGraphAnalyzer_buildFunctionIndex
+// 全项目扫描建立「函数名 → 定义位置」索引（走 StructureParser）
     private Map<String, FunctionRef> buildFunctionIndex(Path startPath) throws IOException {
         Map<String, FunctionRef> index = new HashMap<>();
         List<Path> files = SearchFileFilter.collectFiles(
@@ -158,6 +166,8 @@ public class CallGraphAnalyzer {
 
     // ===== 入口解析 =====
 
+    // @anchor: callGraphAnalyzer_resolveEntry
+// 解析入口：函数名优先，锚点 ID 兜底取其后最近函数
     private FunctionRef resolveEntry(String nameOrAnchor, Path startPath, Map<String, FunctionRef> functionIndex) {
         // 1. 函数名优先
         FunctionRef ref = functionIndex.get(nameOrAnchor);
@@ -219,6 +229,8 @@ public class CallGraphAnalyzer {
 
     // ===== 递归分析 =====
 
+    // @anchor: callGraphAnalyzer_analyzeFunctionCalls
+// 递归解析函数体内的调用，构建被调用图
     private void analyzeFunctionCalls(String functionName,
                                       Map<String, FunctionRef> functionIndex,
                                       Map<String, Set<String>> calleesMap,
@@ -266,7 +278,7 @@ public class CallGraphAnalyzer {
     }
 
     // @anchor: callGraphAnalyzer_findFunctionEnd
-// 定位函数的结束位置
+// 定位函数的结束位置（大括号法）
     private int findFunctionEnd(List<String> lines, int startLine, Path file) {
         String name = file.getFileName().toString().toLowerCase();
         if (name.endsWith(".py") || name.endsWith(".pyw")) {
