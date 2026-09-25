@@ -154,7 +154,12 @@ public class HistoryRecorder {
         if (!Files.exists(rawFile)) return;
 
         try {
-            Path gzFile = rawFile.getParent().resolve(rawFile.getFileName().toString() + ".gz");
+            String ts = LocalDateTime.now().format(TIME_FMT);
+            String rawName = rawFile.getFileName().toString();
+            String gzName = rawName.endsWith(".jsonl")
+                    ? rawName.substring(0,rawName.length() - ".jsonl".length()) + "_" + ts + ".jsonl.gz"
+                    : rawName + "_" + ts + ".gz";
+            Path gzFile = rawFile.getParent().resolve(gzName);
             try (InputStream in = Files.newInputStream(rawFile);
                  OutputStream out = new GZIPOutputStream(Files.newOutputStream(gzFile))) {
                 byte[] buffer = new byte[8192];

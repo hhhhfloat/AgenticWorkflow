@@ -34,6 +34,7 @@ function appendLog(msg) {
             if (msg.startsWith('[完成] ')) {
                 cleanMsg = msg.substring(4);
             }
+            cleanMsg = linkifySandboxPaths(cleanMsg);
             renderedContent = marked.parse(cleanMsg, { gfm: true, breaks: true });
         } catch (e) {
             renderedContent = escapeHtml(msg);
@@ -88,4 +89,13 @@ function appendMessage(role, content) {
     wrap.appendChild(body);
     output.appendChild(wrap);
     output.scrollTop = output.scrollHeight;
+}
+
+// @anchor: modules_log_linkifySandbox
+// 将 /sandbox/xxx.html 形式的相对路径转为 Markdown 链接，供浏览器点击预览
+function linkifySandboxPaths(text) {
+    return text.replace(
+        /(?<![("'\[])(\/sandbox\/[\w\-./]+\.html?)/g,
+        (m) => `[${m}](${m})`
+    );
 }

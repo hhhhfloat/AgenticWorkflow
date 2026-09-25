@@ -209,7 +209,8 @@
         <li><strong>多轮对话</strong>：支持创建会话，并在该会话下多轮运行。前端仅显示用户输入以及最终输出的简报，实际完整内容有文件保存。</li>
         <li><strong>锚点升级</strong>：自动解析锚点后紧跟的注释（description）与方法签名，生成索引，agent可按锚点读取。</li>
         <li><strong>项目文档</strong>：PROJECT.md仅简记记录架构与功能信息。其余具体信息由agent自行使用description读取</li>
-        <li>修复了若干小 bug</li>
+        <li><strong>远程连接</strong>：使用 <i>tailscale</i> 连接，通过 start-mobile.bat 启动手机端服务。目前页面没有专门设计，建议仅使用纯html类项目生成。</li>
+        <li>修复了若干小 bug 和锚点系统的大 bug</li>
     </ul>
 
     <h2>📝 v4 更新回顾</h2>
@@ -223,7 +224,10 @@
         <li><code>sandbox/</code> → Agent 生成的所有代码与运行沙箱</li>
         <li><code>TestProjects/</code> → 归档的完整项目</li>
         <li><code>HistoryOutput/</code> → 每次运行的日志文件（自动保留 3000 天）</li>
-        <li>以上文件夹会在 <code>.jar</code> 文件同级自动生成</li>
+        <li><code>sessions/</code> → 对话记录</li>
+        <li><code>temp/</code> → 完整上下文记录，生成时压缩成gz</li>
+        <li><code>agent-config.properties</code> → 程序找到的编译工具位置</li>
+        <li>以上文件(夹)会在 <code>.jar</code> 文件同级自动生成</li>
     </ul>
 
     <h2>⚠️ 注意事项</h2>

@@ -178,6 +178,7 @@ public class HttpServerMain {
         reg(server, "/restart",       new RestartHandler(), true);
         reg(server, "/clear-api-key", new ClearApiKeyHandler(), true);
         reg(server, "/config",        new ConfigHandler(), true);
+        reg(server, "/switch-to-local", new SwitchToLocalHandler(), false);
 
         // ── 项目/文件管理（保护） ──
         reg(server, "/projects",      new ProjectsHandler(), false);
@@ -199,7 +200,8 @@ public class HttpServerMain {
     // 启动后尝试用系统默认浏览器打开首页，失败则提示手动访问
     private static void openBrowser(String bindAddr) {
         try {
-            String url = "http://" + bindAddr + ":" + PORT;
+            String path = "127.0.0.1".equals(bindAddr) ? "/" : "/qr.html";
+            String url = "http://" + bindAddr + ":" + PORT + path;
             if (java.awt.Desktop.isDesktopSupported()) {
                 java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
                 System.out.println("🌐 已自动打开浏览器: " + url);

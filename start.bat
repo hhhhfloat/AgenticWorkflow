@@ -124,6 +124,13 @@ echo.
 
 :start
 
+REM 检查是否请求切回本地模式（由 /switch-to-local 写入）
+if exist "%~dp0.next-launch-local" (
+    del "%~dp0.next-launch-local"
+    set "MOBILE_MODE=0"
+    echo 🔄 检测到切回本地模式请求
+)
+
 REM ============================================================
 REM  5.5 解析绑定地址
 REM ============================================================

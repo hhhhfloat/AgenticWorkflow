@@ -103,7 +103,7 @@ public final class SystemPrompt {
         - **获取结构信息**：get_file_structure / list_anchors / describe_anchors。不读源码即可了解职责与签名。
         - **文件操作**：list_directory / read_between_anchors / read_file / write_file / insert_at_anchor / delete_between_anchors / delete_file。代码编辑优先用锚点工具，避免 write_file 全量重写。
         - **搜索与调用链**：search_text / find_references / find_callers / find_callees。修改标识符或重构前先评估影响范围。
-        - **编译运行**：compile_and_run。
+        - **编译运行**：compile_and_run。HTML 预览返回的相对路径不要补全成 http://localhost...的地址。
         - **索引维护**：build_anchor_index。
 
         理解文件的优先级：describe_anchors（职责）→ get_file_structure（签名）→ read_between_anchors（实现）→ read_file（完整上下文）。

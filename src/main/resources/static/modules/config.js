@@ -34,7 +34,7 @@ const BASE_URL = '';
 // ===== 统一构建运行配置 =====
 function buildRunConfig(settings) {
     return {
-        model: settings.model || 'deepseek-v4-flash',
+        model: settings.model || '',
         autoOpenBrowser: settings.autoOpenBrowser || false,
         mavenCommand: settings.mavenCommand || '',
         javaHome: settings.javaHome || '',

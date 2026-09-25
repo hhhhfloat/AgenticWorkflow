@@ -763,27 +763,15 @@ public final class EnvDetector {
     }
 
     // @anchor: envDetector_render
-    // 把探测结果渲染为带注释分区的 agent-config.properties 文本
+// 只渲染本机工具链路径；其余配置由 AgentConfig 内置默认值提供
     private static String render(Map<String, String> env) {
         String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         StringBuilder sb = new StringBuilder();
         sb.append("# ============================================================\n");
         sb.append("# Agent Workflow 本机环境配置\n");
         sb.append("# 由 EnvDetector 自动生成（").append(ts).append("）\n");
-        sb.append("# 修改后重启程序即可生效\n");
+        sb.append("# 只记录本机工具链路径；API Key、模型、安全扫描等由代码内置默认值提供\n");
         sb.append("# ============================================================\n\n");
-
-        sb.append("# ---------- LLM ----------\n");
-        sb.append("# 留空则读取环境变量 DEEPSEEK_API_KEY\n");
-        sb.append("agent.apiKey=\n");
-        sb.append("agent.model=deepseek-v4-flash\n");
-        sb.append("agent.autoOpenBrowser=false\n\n");
-
-        sb.append("# ---------- 安全 / 压缩 / 检查点 ----------\n");
-        sb.append("agent.enableSecurityScan=true\n");
-        sb.append("agent.enableCompression=true\n");
-        sb.append("agent.checkpointMinInterval=5\n");
-        sb.append("agent.checkpointMaxInterval=15\n\n");
 
         sb.append("# ---------- 本机工具链路径 ----------\n");
         sb.append("env.mavenCommand=").append(esc(env.get("mavenCommand"))).append('\n');

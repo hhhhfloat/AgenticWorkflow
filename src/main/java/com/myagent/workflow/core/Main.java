@@ -281,6 +281,7 @@ public class Main {
                 logger.warn("刷新项目索引失败", e);
             }
             contextManager.flushRawLog();
+            contextManager.compressRawLog();
             contextManager.printStats();
             session.markIdle();
             this.runningThread = null;

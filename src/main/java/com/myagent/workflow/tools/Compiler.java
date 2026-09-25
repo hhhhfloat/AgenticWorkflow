@@ -92,7 +92,7 @@ public class Compiler {
         if (relativePath.startsWith("/sandbox/")) {
             relativePath = relativePath.substring("/sandbox/".length());
         }
-        String url = "http://localhost:8080/sandbox/" + relativePath;
+        String url = "/sandbox/" + relativePath;
 
         if (autoOpenBrowser && Desktop.isDesktopSupported()) {
             Desktop.getDesktop().browse(filePath.toFile().toURI());

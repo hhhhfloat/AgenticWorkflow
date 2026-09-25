@@ -8,7 +8,7 @@
 - **tools + parser + model**：能力层。`ToolExecutor` 按名分发工具并做沙箱校验，`FileOperator`/`PathUtils` 安全读写，`CodeSearcher` 检索，`Compiler` 编译运行，`AnchorManager`/`AnchorIndex` 维护锚点索引；`parser` 解析各语言文件结构，`model` 承载结构与锚点数据模型。
 - **security**：编译前安全扫描。按语言解析出有效代码行后，以命令执行/文件路径规则判定，并做白名单与上下文过滤。
 - **session**：会话容器。`SessionManager`（内存映射 + 信号量限流）管理 `Session` 生命周期，`SessionStorage` 落盘 `./sessions`。
-- **http + static**：Web 层。`HttpServerMain` 注册路由，handlers 处理会话/任务/项目/系统请求；前端为纯静态页面（SSE 流式渲染）。
+- **http + static**：Web 层。`HttpServerMain` 注册路由，handlers 处理会话/任务/项目/系统请求；前端为纯静态页面（SSE 流式渲染）。在 `tailscale` 连接的时候可以使用手机服务。
 
 关键数据流：浏览器 → handler → `Session`/`SessionManager` → `Main` → DeepSeek API ⇄ `ToolExecutor` → 沙箱文件系统；每轮结束刷新锚点/项目索引。
 依赖方向：http → session → core → tools →（parser / model / security），下层不反向依赖上层。
@@ -35,6 +35,7 @@
 - **安全扫描误伤**：源码含 `ProcessBuilder`/绝对工具链路径，整树 `compile_and_run` 可能被自身规则拦下。
 - **退出码**：10=无/无效 API Key，42=清除 API Key，43=配置变更重启，12=端口占用/重复启动。
 - **任务串行**：并发请求会排队（N=1）。
+- **前端缺陷**：页面设计以及使用仍然与电脑端一致。
 
 ## 启动方式
 - 环境：本机需具备目标语言工具链（JDK/Maven/Python/Node/MinGW/MSVC）；配置缺失时 `AgentConfig` 自动调用 `EnvDetector` 探测生成 `agent-config.properties`。

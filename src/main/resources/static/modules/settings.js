@@ -7,7 +7,7 @@ const SETTINGS_STORAGE_KEY = 'agentSettings';
 
 // 默认配置（与 ConfigEditor.buildDefault() 保持一致）
 const DEFAULT_SETTINGS = {
-    model: 'deepseek-v4-flash',
+    model: '',
     autoOpenBrowser: false,
     mavenCommand: '',
     javaHome: '',
@@ -53,7 +53,7 @@ function saveSettings(settings) {
 
 // 将配置渲染到表单
 function applySettingsToForm(settings) {
-    document.getElementById('setModel').value = settings.model || 'deepseek-v4-flash';
+    document.getElementById('setModel').value = settings.model || '';
     document.getElementById('setAutoOpenBrowser').checked = !!settings.autoOpenBrowser;
     document.getElementById('setMavenCommand').value = settings.mavenCommand || '';
     document.getElementById('setJavaHome').value = settings.javaHome || '';
