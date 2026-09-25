@@ -235,7 +235,7 @@ public class CallGraphAnalyzer {
         try {
             List<String> lines = Files.readAllLines(ref.file(), StandardCharsets.UTF_8);
             int startLine = Math.max(0, ref.startLine() - 1);
-            int endLine = ref.endLine() > 0 ? ref.endLine() : findFunctionEnd(lines, startLine);
+            int endLine = (ref.endLine()>ref.startLine())?ref.endLine():findFunctionEnd(lines, startLine, ref.file());
 
             Set<String> callees = new HashSet<>();
             Pattern callPattern = Pattern.compile("\\b(\\w+)\\s*\\(");
@@ -267,7 +267,12 @@ public class CallGraphAnalyzer {
 
     // @anchor: callGraphAnalyzer_findFunctionEnd
 // 定位函数的结束位置
-    private int findFunctionEnd(List<String> lines, int startLine) {
+    private int findFunctionEnd(List<String> lines, int startLine, Path file) {
+        String name = file.getFileName().toString().toLowerCase();
+        if (name.endsWith(".py") || name.endsWith(".pyw")) {
+            return findPythonFunctionEnd(lines, startLine);
+        }
+        // 大括号法（Java/JS/TS/C/C++）
         int braceCount = 0;
         boolean started = false;
         for (int i = startLine; i < lines.size(); i++) {
@@ -280,6 +285,25 @@ public class CallGraphAnalyzer {
                 }
             }
             if (!started && line.contains("{") && line.contains("}")) return i + 1;
+        }
+        return lines.size();
+    }
+
+    // @anchor: callGraphAnalyzer_findPythonFunctionEnd
+    /**
+    * 按缩进查找 Python 函数结束行。
+    * 从 def 行的下一行开始，遇到缩进 <= def 行缩进的非空行即结束。
+    */
+    private int findPythonFunctionEnd(List<String> lines, int startLine) {
+        if (startLine >= lines.size()) return lines.size();
+        String defLine = lines.get(startLine);
+        int defIndent = defLine.length() - defLine.stripLeading().length();
+
+        for (int i = startLine + 1; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (line.trim().isEmpty()) continue;
+            int indent = line.length() - line.stripLeading().length();
+            if (indent <= defIndent) return i;
         }
         return lines.size();
     }

@@ -95,6 +95,7 @@ public final class ToolDefinitions {
                 defineParams()
                         .prop("startAnchor", "string", "起始锚点 ID")
                         .prop("endAnchor", "string", "结束锚点 ID")
+                        .prop("file", "string", "可选。锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
                         .build(),
                 List.of("startAnchor", "endAnchor")
         ));
@@ -155,6 +156,7 @@ public final class ToolDefinitions {
                         .prop("anchor_id", "string", "锚点 ID")
                         .prop("content", "string", "要插入的代码内容")
                         .prop("position", "string", "'before' 或 'after'，默认 'after'")
+                        .prop("file", "string", "可选。锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
                         .build(),
                 List.of("anchor_id", "content")
         ));
@@ -167,6 +169,7 @@ public final class ToolDefinitions {
                 defineParams()
                         .prop("startAnchor", "string", "起始锚点 ID")
                         .prop("endAnchor", "string", "结束锚点 ID")
+                        .prop("file", "string", "可选。锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
                         .build(),
                 List.of("startAnchor", "endAnchor")
         ));

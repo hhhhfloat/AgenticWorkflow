@@ -147,7 +147,6 @@ class AnchorIndex {
             }
 
             Map<String, List<Map<String, Object>>> projectAnchors = new LinkedHashMap<>();
-            Set<String> seenIds = new HashSet<>();
 
             Files.walk(projectDir)
                     .filter(Files::isRegularFile)
@@ -163,7 +162,7 @@ class AnchorIndex {
                             if (relPath.getNameCount() > 0 && EXCLUDED_DIRS.contains(relPath.getName(0).toString())) return;
 
                             String rel = projectDir.relativize(file).toString().replace('\\', '/');
-                            List<Map<String, Object>> anchors = scanAnchorsFromFile(file, seenIds);
+                            List<Map<String, Object>> anchors = scanAnchorsFromFile(file);
                             if (!anchors.isEmpty()) projectAnchors.put(rel, anchors);
                         } catch (IOException ignored) {}
                     });
@@ -173,35 +172,19 @@ class AnchorIndex {
             if (indexFile == null) {
                 return "❌ 项目路径无效: " + projectPath;
             }
-            Map<String, List<Map<String, Object>>> leanAnchors = new LinkedHashMap<>();
-            for (Map.Entry<String, List<Map<String, Object>>> e : projectAnchors.entrySet()) {
-                List<Map<String, Object>> lean = new ArrayList<>();
-                for (Map<String, Object> a : e.getValue()) {
-                    Map<String, Object> m = new LinkedHashMap<>();
-                    m.put("id", a.get("id"));
-                    m.put("line", a.get("line"));
-                    m.put("preview", a.get("preview"));
-                    lean.add(m);
-                }
-                leanAnchors.put(e.getKey(), lean);
-            }
-            Files.writeString(indexFile,
-                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(leanAnchors));
+
+            Files.writeString(indexFile, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(leanize(projectAnchors)));
 
             // 写 .project_index.json（精简版：id + line + desc）
             writeProjectIndex(projectPath, projectAnchors);
 
             int totalFiles = projectAnchors.size();
             int totalAnchors = projectAnchors.values().stream().mapToInt(List::size).sum();
-            int duplicatesFixed = totalAnchors - seenIds.size();
 
             StringBuilder result = new StringBuilder();
             result.append("✅ 锚点索引已重建：").append(projectPath)
                     .append(" 中找到 ").append(totalAnchors).append(" 个锚点")
                     .append("，分布在 ").append(totalFiles).append(" 个文件中。");
-            if (duplicatesFixed > 0) {
-                result.append(" (自动修正 ").append(duplicatesFixed).append(" 个重名)");
-            }
             return result.toString();
 
         } catch (IOException e) {
@@ -210,7 +193,7 @@ class AnchorIndex {
         }
     }
 
-    private List<Map<String, Object>> scanAnchorsFromFile(Path file, Set<String> seenIds) throws IOException {
+    private List<Map<String, Object>> scanAnchorsFromFile(Path file) throws IOException {
         String fileName = file.getFileName().toString();
         String ext = "";
         int dotIdx = fileName.lastIndexOf('.');
@@ -219,6 +202,7 @@ class AnchorIndex {
 
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
         List<Map<String, Object>> anchors = new ArrayList<>();
+        Set<String> localSeen = new HashSet<>();   // ← 文件内去重
         for (int i = 0; i < lines.size(); i++) {
             java.util.regex.Matcher matcher = ANCHOR_PATTERN.matcher(lines.get(i));
             if (!matcher.find()) continue;
@@ -230,8 +214,8 @@ class AnchorIndex {
             if (id == null) continue;
             String finalId = id;
             int suffix = 2;
-            while (seenIds.contains(finalId)) finalId = id + "_" + suffix++;
-            seenIds.add(finalId);
+            while (localSeen.contains(finalId)) finalId = id + "_" + suffix++;
+            localSeen.add(finalId);
 
             Map<String, Object> anchor = new LinkedHashMap<>();
             anchor.put("id", finalId);
@@ -241,6 +225,25 @@ class AnchorIndex {
             anchors.add(anchor);
         }
         return anchors;
+    }
+
+    // @anchor: anchorIndex_leanize
+    // 将锚点列表精简为 id + line + preview（.anchors.json 专用格式）
+    private Map<String, List<Map<String, Object>>> leanize(
+            Map<String, List<Map<String, Object>>> projectAnchors) {
+        Map<String, List<Map<String, Object>>> lean = new LinkedHashMap<>();
+        for (Map.Entry<String, List<Map<String, Object>>> e : projectAnchors.entrySet()) {
+            List<Map<String, Object>> list = new ArrayList<>();
+            for (Map<String, Object> a : e.getValue()) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", a.get("id"));
+                m.put("line", a.get("line"));
+                m.put("preview", a.get("preview"));
+                list.add(m);
+            }
+            lean.put(e.getKey(), list);
+        }
+        return lean;
     }
 
     private List<Map<String, Object>> buildIndexEntries(Path file, List<Map<String, Object>> anchors) {
@@ -373,18 +376,13 @@ class AnchorIndex {
             Map<String, List<Map<String, Object>>> projectAnchors =
                     objectMapper.readValue(content, new TypeReference<>() {});
 
-            Set<String> seenIds = new HashSet<>();
-            for (Map.Entry<String, List<Map<String, Object>>> e : projectAnchors.entrySet()) {
-                if (e.getKey().equals(fileRelPath)) continue;
-                for (Map<String, Object> a : e.getValue()) seenIds.add((String) a.get("id"));
-            }
 
             Path file = projectDir.resolve(fileRelPath);
             List<Map<String, Object>> anchors;
             if (!Files.exists(file) || !Files.isRegularFile(file)) {
                 anchors = List.of();
             } else {
-                anchors = scanAnchorsFromFile(file, seenIds);
+                anchors = scanAnchorsFromFile(file);
             }
 
             if (anchors.isEmpty()) {
@@ -392,8 +390,7 @@ class AnchorIndex {
             } else {
                 projectAnchors.put(fileRelPath, anchors);
             }
-            Files.writeString(anchorsFile,
-                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(projectAnchors));
+            Files.writeString(anchorsFile, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(leanize(projectAnchors)));
             return "✅ 已刷新位置 " + fileRelPath + "（" + anchors.size() + " 个锚点）";
 
         } catch (IOException e) {
@@ -720,24 +717,20 @@ class AnchorIndex {
     }
 
     // @anchor: anchorIndex_findGlobally
-// 跨项目全局查找锚点
+    // 跨项目全局查找锚点
     AnchorLocation findGlobally(String anchorId) {
         migrateOldIndexIfNeeded();
 
         try {
             Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
-            Path anchorRoot = sandboxRoot.resolve(".anchors");
+            try (var stream = Files.list(sandboxRoot)) {
+                for (Path projectDir : (Iterable<Path>) stream::iterator) {
+                    if (!Files.isDirectory(projectDir)) continue;
+                    String projectName = projectDir.getFileName().toString();
+                    if (projectName.startsWith("."))continue;
 
-            if (!Files.exists(anchorRoot)) {
-                try (var stream = Files.list(sandboxRoot)) {
-                    for (Path projectDir : (Iterable<Path>) stream::iterator) {
-                        if (!Files.isDirectory(projectDir)) continue;
-                        String projectName = projectDir.getFileName().toString();
-                        if (projectName.startsWith(".")) continue;
-
-                        AnchorLocation loc = find(projectName, anchorId);
-                        if (loc != null) return loc;
-                    }
+                    AnchorLocation loc = find(projectName, anchorId);
+                    if (loc != null) return loc;
                 }
             }
             return null;
@@ -746,4 +739,125 @@ class AnchorIndex {
             return null;
         }
     }
+
+    // @anchor: anchorIndex_findAllInProject
+    /**
+     * 在指定项目中查找所有同名锚点。
+     */
+    List<AnchorLocation> findAllInProject(String projectPath, String anchorId) {
+        List<AnchorLocation> results = new ArrayList<>();
+        try {
+            Path indexFile = getIndexPath(projectPath);
+            if (indexFile == null || !Files.exists(indexFile)) return results;
+
+            String content = Files.readString(indexFile);
+            Map<String, List<Map<String, Object>>> projectAnchors =
+                    objectMapper.readValue(content, new TypeReference<>() {});
+
+            for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
+                String filePath = fileEntry.getKey();
+                for (Map<String, Object> anchor : fileEntry.getValue()) {
+                    String id = (String) anchor.get("id");
+                    if (anchorId.equals(id)) {
+                        AnchorLocation loc = new AnchorLocation();
+                        loc.projectPath = projectPath;
+                        loc.filePath = filePath;
+                        loc.line = (int) anchor.get("line");
+                        loc.id = id;
+                        loc.preview = (String) anchor.get("preview");
+                        results.add(loc);
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger.error("查找锚点失败", e);
+        }
+        return results;
+    }
+
+// @anchor: anchorIndex_findAllGlobally
+    /**
+     * 跨项目全局查找所有同名锚点。
+     */
+    List<AnchorLocation> findAllGlobally(String anchorId) {
+        migrateOldIndexIfNeeded();
+        List<AnchorLocation> results = new ArrayList<>();
+        try {
+            Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
+            try (var stream = Files.list(sandboxRoot)) {
+                for (Path projectDir : (Iterable<Path>) stream::iterator) {
+                    if (!Files.isDirectory(projectDir)) continue;
+                    String projectName = projectDir.getFileName().toString();
+                    if (projectName.startsWith(".")) continue;
+                    results.addAll(findAllInProject(projectName, anchorId));
+                }
+            }
+        } catch (IOException e) {
+            logger.error("全局查找锚点失败", e);
+        }
+        return results;
+    }
+
+// @anchor: anchorIndex_findInFile
+    /**
+     * 按 file 提示查找锚点，仅用于消歧。
+     * fileHint 匹配规则（与 describe 一致）：
+     *   - 完整沙箱相对路径（含项目名）精确匹配
+     *   - 项目内相对路径精确匹配
+     *   - 任意后缀匹配
+     * 唯一命中时返回；多命中或无命中时返回 null。
+     */
+    AnchorLocation findInFile(String anchorId, String fileHint) {
+        migrateOldIndexIfNeeded();
+        try {
+            Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
+            AnchorLocation found = null;
+            int matchCount = 0;
+
+            try (var stream = Files.list(sandboxRoot)) {
+                for (Path projectDir : (Iterable<Path>) stream::iterator) {
+                    if (!Files.isDirectory(projectDir)) continue;
+                    String projectName = projectDir.getFileName().toString();
+                    if (projectName.startsWith(".")) continue;
+
+                    Path indexFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
+                    if (!Files.exists(indexFile)) continue;
+
+                    String content = Files.readString(indexFile);
+                    Map<String, List<Map<String, Object>>> projectAnchors =
+                            objectMapper.readValue(content, new TypeReference<>() {});
+
+                    for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
+                        String filePath = fileEntry.getKey();
+                        String fullRel = projectName + "/" + filePath;
+                        boolean matches = fullRel.equals(fileHint)
+                                || filePath.equals(fileHint)
+                                || fullRel.endsWith("/" + fileHint);
+                        if (!matches) continue;
+
+                        for (Map<String, Object> anchor : fileEntry.getValue()) {
+                            String id = (String) anchor.get("id");
+                            if (anchorId.equals(id)) {
+                                AnchorLocation loc = new AnchorLocation();
+                                loc.projectPath = projectName;
+                                loc.filePath = filePath;
+                                loc.line = (int) anchor.get("line");
+                                loc.id = id;
+                                loc.preview = (String) anchor.get("preview");
+                                found = loc;
+                                matchCount++;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return matchCount == 1 ? found : null;
+        } catch (IOException e) {
+            logger.error("按文件查找锚点失败", e);
+            return null;
+        }
+    }
+
+
 }

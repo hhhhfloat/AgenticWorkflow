@@ -1,14 +1,14 @@
 package com.myagent.workflow.tools;
 
-import com.myagent.workflow.core.AgentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -30,13 +30,54 @@ public class FileOperator {
         try {
             Path filePath = PathUtils.safeResolve(filename);
             Files.createDirectories(filePath.getParent());
-            try (FileWriter writer = new FileWriter(filePath.toFile())) {
-                writer.write(code);
-            }
+            writeAtomic(filePath,code);
             return "✅ " + filename;
         } catch (IOException e) {
             logger.error("写入文件失败", e);
             return "写入文件失败: " + e.getMessage();
+        }
+    }
+
+    // @anchor: fileOperator_writeAtomic
+    /**
+     * 原子写入：先写临时文件，再 ATOMIC_MOVE 覆盖目标。
+     * 避免写入过程中进程被 kill 导致原文件被截断。
+     */
+    public static void writeAtomic(Path filePath, String content) throws IOException {
+        Path tmp = filePath.resolveSibling(filePath.getFileName() + ".tmp");
+        try {
+            Files.writeString(tmp, content, StandardCharsets.UTF_8);
+            try {
+                Files.move(tmp, filePath,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
+            throw e;
+        }
+    }
+
+// @anchor: fileOperator_writeLinesAtomic
+    /**
+     * 原子写入行列表，行为与 Files.write(path, lines) 一致。
+     */
+    public static void writeLinesAtomic(Path filePath, List<String> lines) throws IOException {
+        Path tmp = filePath.resolveSibling(filePath.getFileName() + ".tmp");
+        try {
+            Files.write(tmp, lines, StandardCharsets.UTF_8);
+            try {
+                Files.move(tmp, filePath,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
+            throw e;
         }
     }
 

@@ -57,9 +57,12 @@ public class AnchorManager {
 
     // @anchor: anchorManager_insertAtAnchor
 // 在锚点前/后插入代码，并标记文件为脏
-    String insertAtAnchor(String anchorId, String content, String position) {
-        AnchorLocation loc = anchorIndex.findGlobally(anchorId);
-        if (loc == null) return "❌ 锚点不存在: " + anchorId;
+    String insertAtAnchor(String anchorId, String content, String position, String file) {
+        if(!"before".equals(position) && !"after".equals(position)){
+            return "❌ position 必须是 'before' 或 'after'，收到: " + position;
+        }
+        AnchorLocation loc = resolveAnchor(anchorId,file);
+        if (loc == null) return buildResolveError(anchorId, file);
 
         try {
             Path filePath = PathUtils.safeResolve(loc.projectPath, loc.filePath);
@@ -74,7 +77,7 @@ public class AnchorManager {
                 lines.add(targetLine + 1, content);
             }
 
-            Files.write(filePath, lines, StandardCharsets.UTF_8);
+            FileOperator.writeLinesAtomic(filePath, lines);
             onFileModified(loc.projectPath, loc.filePath);
             return "✅ 已在 " + loc.filePath + " 的锚点 [" + anchorId + "] " + position + " 插入代码";
 
@@ -86,11 +89,11 @@ public class AnchorManager {
 
     // @anchor: anchorManager_deleteBetweenAnchors
 // 删除两锚点之间的内容
-    String deleteBetweenAnchors(String startAnchor, String endAnchor) {
-        AnchorLocation startLoc = anchorIndex.findGlobally(startAnchor);
-        AnchorLocation endLoc = anchorIndex.findGlobally(endAnchor);
-        if (startLoc == null) return "❌ 起始锚点不存在: " + startAnchor;
-        if (endLoc == null) return "❌ 结束锚点不存在: " + endAnchor;
+    String deleteBetweenAnchors(String startAnchor, String endAnchor, String file) {
+        AnchorLocation startLoc = resolveAnchor(startAnchor, file);
+        if (startLoc == null) return buildResolveError(startAnchor, file);
+        AnchorLocation endLoc = resolveAnchor(endAnchor, file);
+        if (endLoc == null) return buildResolveError(endAnchor, file);
 
         if (!startLoc.projectPath.equals(endLoc.projectPath)) {
             return "❌ 两个锚点不在同一个项目中";
@@ -121,7 +124,7 @@ public class AnchorManager {
                 newLines.add(lines.get(i));
             }
 
-            Files.write(filePath, newLines, StandardCharsets.UTF_8);
+            FileOperator.writeLinesAtomic(filePath, newLines);
             onFileModified(startLoc.projectPath, startLoc.filePath);
 
             int deletedLines = (endLine - startLine) - 1;
@@ -135,11 +138,11 @@ public class AnchorManager {
 
     // @anchor: anchorManager_readBetweenAnchors
 // 读取两锚点之间的代码
-    String readBetweenAnchors(String startAnchor, String endAnchor) {
-        AnchorLocation startLoc = anchorIndex.findGlobally(startAnchor);
-        AnchorLocation endLoc = anchorIndex.findGlobally(endAnchor);
-        if (startLoc == null) return "❌ 起始锚点不存在: " + startAnchor;
-        if (endLoc == null) return "❌ 结束锚点不存在: " + endAnchor;
+    String readBetweenAnchors(String startAnchor, String endAnchor, String file) {
+        AnchorLocation startLoc = resolveAnchor(startAnchor, file);
+        if (startLoc == null) return buildResolveError(startAnchor, file);
+        AnchorLocation endLoc = resolveAnchor(endAnchor, file);
+        if (endLoc == null) return buildResolveError(endAnchor, file);
 
         if (!startLoc.projectPath.equals(endLoc.projectPath)) {
             return "❌ 两个锚点不在同一个项目中\n" +
@@ -258,6 +261,43 @@ public class AnchorManager {
             }
         }
         dirtyFiles.clear();
+    }
+
+// @anchor: anchorManager_resolveAnchor
+    /**
+     * 解析锚点。
+     * - fileHint 为空：全局查找，唯一命中才返回；多命中或无命中返回 null。
+     * - fileHint 非空：按文件过滤，唯一命中才返回。
+     */
+    private AnchorLocation resolveAnchor(String anchorId, String fileHint) {
+        if (fileHint == null || fileHint.isBlank()) {
+            List<AnchorLocation> all = anchorIndex.findAllGlobally(anchorId);
+            return all.size() == 1 ? all.get(0) : null;
+        }
+        return anchorIndex.findInFile(anchorId, fileHint);
+    }
+
+// @anchor: anchorManager_buildResolveError
+    /**
+     * 生成消歧失败时的错误信息。
+     */
+    private String buildResolveError(String anchorId, String fileHint) {
+        if (fileHint != null && !fileHint.isBlank()) {
+            return "❌ 在文件 " + fileHint + " 中未找到唯一锚点: " + anchorId;
+        }
+        List<AnchorLocation> all = anchorIndex.findAllGlobally(anchorId);
+        if (all.isEmpty()) return "❌ 锚点不存在: " + anchorId;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("❌ 锚点 '").append(anchorId).append("' 在 ")
+                .append(all.size()).append(" 个文件中出现：\n");
+        for (AnchorLocation loc : all) {
+            sb.append("   - ").append(loc.projectPath).append("/").append(loc.filePath)
+                    .append(" (L").append(loc.line).append(")\n");
+        }
+        sb.append("请在 file 参数中指定目标文件。\n");
+        sb.append("建议：后续避免跨文件使用相同锚点 ID。");
+        return sb.toString();
     }
 
     // ===== 转发：查找锚点 =====

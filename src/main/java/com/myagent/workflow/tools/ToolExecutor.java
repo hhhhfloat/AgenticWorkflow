@@ -122,11 +122,14 @@ public class ToolExecutor {
                 return anchorMgr.insertAtAnchor(
                         (String) args.get("anchor_id"),
                         (String) args.get("content"),
-                        (String) args.getOrDefault("position", "after"));
+                        (String) args.getOrDefault("position", "after"),
+                        (String) args.get("file")
+                );
             case "delete_between_anchors":
                 return anchorMgr.deleteBetweenAnchors(
                         (String) args.get("startAnchor"),
-                        (String) args.get("endAnchor")
+                        (String) args.get("endAnchor"),
+                        (String) args.get("file")
                 );
             case "describe_anchors":
                 return anchorMgr.describeAnchors(
@@ -155,7 +158,8 @@ public class ToolExecutor {
             case "read_between_anchors":
                 return anchorMgr.readBetweenAnchors(
                         (String) args.get("startAnchor"),
-                        (String) args.get("endAnchor")
+                        (String) args.get("endAnchor"),
+                        (String) args.get("file")
                 );
             case "get_file_structure":
                 return getFileStructure((String) args.get("filename"));
