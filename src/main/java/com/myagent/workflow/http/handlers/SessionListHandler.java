@@ -1,3 +1,5 @@
+// @anchor: sessionListHandler_tot_desc
+// 会话列表处理器：GET /session/list，返回全部会话元数据（按最近活跃排序）
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -14,6 +16,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+// @anchor: sessionListHandler_class
+// 会话列表处理器：汇总磁盘与内存中的会话元数据供侧边栏渲染
 /**
  * GET /session/list
  * <p>
@@ -35,6 +39,8 @@ public class SessionListHandler implements HttpHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    // @anchor: sessionListHandler_handle
+    // 处理列表请求：读取全部会话元数据并序列化为 JSON
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -62,6 +68,8 @@ public class SessionListHandler implements HttpHandler {
         writeJson(exchange, 200, mapper.writeValueAsString(response));
     }
 
+    // @anchor: sessionListHandler_writeJson
+    // 发送 UTF-8 JSON 响应（含 CORS 头）
     private void writeJson(HttpExchange exchange, int code, String json) throws IOException {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");

@@ -1,5 +1,5 @@
 /* @anchor: style_reset */
-/* ===== 全局样式 ===== */
+/* 全局基础样式：页面底色、等宽字体与内边距 */
 body {
     font-family: 'Courier New', monospace;
     background: #1e1e1e;
@@ -8,6 +8,7 @@ body {
 }
 
 /* @anchor: style_textarea */
+/* 多行输入框：深色背景、白色文字、固定高度 */
 textarea {
     width: 100%;
     height: 80px;
@@ -19,6 +20,7 @@ textarea {
 }
 
 /* @anchor: style_buttons */
+/* 按钮基础样式：主题色、悬停与禁用态 */
 button {
     background: #0e639c;
     color: white;
@@ -36,6 +38,7 @@ button:disabled {
 }
 
 /* @anchor: style_output */
+/* 日志输出面板：固定高度、纵向滚动 */
 #output {
     background: #1e1e1e;
     border: 1px solid #444;
@@ -46,6 +49,7 @@ button:disabled {
 }
 
 /* @anchor: style_logEntry */
+/* 日志行：保留换行、长词断行 */
 .log-entry {
     margin: 2px 0;
     padding: 0;
@@ -55,12 +59,14 @@ button:disabled {
 }
 
 /* @anchor: style_logColors */
+/* 日志级别配色：info/error/success/system */
 .log-info    { color: #9cdcfe; }
 .log-error   { color: #f44747; }
 .log-success { color: #4ec9b0; }
 .log-system  { color: #d4d4d4; }
 
 /* @anchor: style_mdTable */
+/* Markdown 表格渲染样式 */
 .log-entry table {
     border-collapse: collapse;
     margin: 6px 0;
@@ -86,6 +92,7 @@ button:disabled {
 }
 
 /* @anchor: style_mdCode */
+/* Markdown 行内代码与代码块样式 */
 .log-entry code {
     background: #2d2d2d;
     padding: 1px 4px;
@@ -109,6 +116,7 @@ button:disabled {
 }
 
 /* @anchor: style_mdHeading */
+/* Markdown 标题/分割线/引用/列表样式 */
 .log-entry h1, .log-entry h2, .log-entry h3, .log-entry h4 {
     margin: 6px 0 4px 0;
     color: #4ec9b0;
@@ -131,11 +139,13 @@ button:disabled {
 }
 
 /* @anchor: style_systemPre */
+/* 系统日志预格式化：保留空白 */
 .log-system .log-entry {
     white-space: pre;
 }
 
 /* @anchor: style_logTip */
+/* 灰色斜体提示文本 */
 .log-tip {
     color: #6a6a6a;
     font-style: italic;
@@ -145,11 +155,8 @@ button:disabled {
     margin-top: 2px;
 }
 
-/* ============================================================
-   @anchor: style_layout
-   侧边栏 + 主工作区 Flex 布局
-   ============================================================ */
-
+/* @anchor: style_layout */
+/* 侧边栏 + 主工作区 Flex 布局 */
 html, body {
     height: 100%;
     margin: 0;
@@ -162,6 +169,8 @@ html, body {
     overflow: hidden;
 }
 
+/* @anchor: style_sidebar */
+/* 侧边栏容器、折叠态与头部 */
 /* ===== 侧边栏 ===== */
 #sidebar {
     width: 280px;
@@ -221,6 +230,8 @@ html, body {
     padding: 8px 0;
 }
 
+/* @anchor: style_tree */
+/* 文件树根节点、子节点与操作按钮占位 */
 /* ===== 树根节点 ===== */
 .tree-root {
     padding: 6px 12px;
@@ -263,6 +274,8 @@ html, body {
     padding-left: 16px;
 }
 
+/* @anchor: style_main */
+/* 主工作区布局：内容纵向排列、可滚动 */
 /* ===== 主工作区 ===== */
 #main {
     flex: 1;
@@ -282,6 +295,7 @@ html, body {
 }
 
 /* @anchor: style_iterationControl */
+/* 迭代次数控制行：标签与数字输入框 */
 .iteration-control {
     display: flex;
     align-items: center;
@@ -329,6 +343,7 @@ html, body {
 }
 
 /* @anchor: style_archiveBtn */
+/* 归档按钮：悬停文件项时显示 */
 .archive-btn {
     display: none;
     background: transparent;
@@ -350,6 +365,7 @@ html, body {
 }
 
 /* @anchor: style_treeActions */
+/* 文件树操作按钮：悬停时显示 */
 .tree-action-btn {
     display: none;
     background: transparent;
@@ -377,6 +393,8 @@ html, body {
     background: #666;
 }
 
+/* @anchor: style_modal */
+/* 配置弹窗遮罩、内容面板与头/体/脚 */
 /* ===== 配置弹窗 ===== */
 .modal {
     position: fixed;
@@ -442,6 +460,8 @@ html, body {
     font-size: 13px;
 }
 
+/* @anchor: style_settings */
+/* 配置行：固定标签宽度与表单控件样式 */
 /* ===== 配置行样式（统一对齐） ===== */
 .setting-row {
     display: flex;
@@ -513,6 +533,8 @@ html, body {
     font-size: 12px;
 }
 
+/* @anchor: style_sidebarToolbar */
+/* 侧边栏顶部视图切换按钮组 */
 /* ===== 侧边栏顶部工具栏 ===== */
 #sidebarToolbar {
     display: flex;
@@ -539,6 +561,8 @@ html, body {
     background: #333;
 }
 
+/* @anchor: style_projectSelector */
+/* 工作项目选择占位区 */
 /* ===== 工作项目占位 ===== */
 #projectSelector {
     padding: 6px 10px;
@@ -550,6 +574,8 @@ html, body {
     color: #666;
 }
 
+/* @anchor: style_sessionView */
+/* 会话列表视图、新建按钮与列表项 */
 /* ===== 会话视图 ===== */
 .session-header {
     padding: 6px;
@@ -604,6 +630,8 @@ html, body {
     color: #666;
     font-size: 12px;
 }
+/* @anchor: style_mainColumn */
+/* 主区域纵向布局：底部固定输入区 */
 /* ===== 主区域纵向布局 ===== */
 #main {
     display: flex;
@@ -637,6 +665,8 @@ html, body {
     scroll-behavior: smooth;
 }
 
+/* @anchor: style_inputArea */
+/* 底部输入区与提示词输入框 */
 /* ===== 输入区（底部固定） ===== */
 #inputArea {
     flex-shrink: 0;
@@ -669,6 +699,8 @@ html, body {
     gap: 8px;
 }
 
+/* @anchor: style_runDetail */
+/* 本轮运行详情折叠块（details/summary） */
 /* ===== 本轮运行详情折叠块 ===== */
 .run-detail {
     margin: 10px 0;
@@ -708,6 +740,8 @@ html, body {
     overflow-y: auto;
 }
 
+/* @anchor: style_messages */
+/* 对话消息气泡：用户/Agent/系统三种样式 */
 /* ===== 对话消息样式（微信式） ===== */
 .msg {
     display: flex;
@@ -778,6 +812,8 @@ html, body {
     position: absolute;
     /* 用 border 代替，避免伪元素定位麻烦 */
 }
+/* @anchor: style_usagePanel */
+/* 用量面板：按会话展示 Token 与成本 */
 .usage-panel {
     display: flex;
     gap: 16px;

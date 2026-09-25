@@ -1,3 +1,5 @@
+// @anchor: historyRecorder_tot_desc
+// 会话历史落盘器：消息流水账实时追加，原始 API 日志周期缓存后刷盘并可压缩归档
 package com.myagent.workflow.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +29,8 @@ import java.util.zip.GZIPOutputStream;
  * <p>
  * 由 ContextManager 持有。职责独立：只处理 I/O，不关心上下文语义。
  */
+// @anchor: historyRecorder_class
+// 历史记录器：管理 history.jsonl / raw.jsonl 的写入与压缩
 public class HistoryRecorder {
 
     private static final DateTimeFormatter TIME_FMT = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
@@ -41,12 +45,16 @@ public class HistoryRecorder {
     private String pendingRawRequest = null;
     private String pendingRawResponse = null;
 
+    // @anchor: historyRecorder_constructor
+    // 创建实例并初始化本次会话的 history.jsonl 文件
     public HistoryRecorder(ObjectMapper objectMapper, Consumer<String> logConsumer) {
         this.objectMapper = objectMapper;
         this.logConsumer = logConsumer;
         initHistoryFile();
     }
 
+    // @anchor: historyRecorder_initHistoryFile
+    // 在 ./temp 下按「时间戳_uuid」命名创建空的 history.jsonl
     private void initHistoryFile() {
         try {
             String timestamp = LocalDateTime.now().format(TIME_FMT);
@@ -65,6 +73,8 @@ public class HistoryRecorder {
         }
     }
 
+    // @anchor: historyRecorder_appendMessage
+    // 追加一条消息到 history.jsonl 并记录其偏移量
     /**
      * 追加一条消息到 history.jsonl。
      */
@@ -80,6 +90,8 @@ public class HistoryRecorder {
         }
     }
 
+    // @anchor: historyRecorder_cacheRawLog
+    // 缓存本周期最新的 request 或 response 原文（覆盖写，暂不落盘）
     /**
      * 缓存当前周期的 request 或 response（覆盖写）。
      */
@@ -91,6 +103,8 @@ public class HistoryRecorder {
         }
     }
 
+    // @anchor: historyRecorder_flushRawLog
+    // 把缓存中的 request/response 追加写入 raw.jsonl 并清空缓存
     /**
      * 把当前周期缓存的 request/response 落盘，然后清空缓存。
      * 在压缩发生、任务结束、或异常退出时调用。
@@ -128,6 +142,8 @@ public class HistoryRecorder {
         }
     }
 
+    // @anchor: historyRecorder_compress
+    // 把 raw.jsonl 压缩为 .gz 并删除原文件（会话归档时调用）
     /**
      * 把 raw.jsonl 压缩为 .gz 并删除原文件。会话归档时调用。
      */
@@ -156,6 +172,8 @@ public class HistoryRecorder {
 
     // ==================== 辅助 ====================
 
+    // @anchor: historyRecorder_rawFilePath
+    // 由 history 文件名推导出配套的 raw.jsonl 路径
     private Path rawFilePath() {
         String historyFileName = historyFile.getFileName().toString();
         String basePrefix = historyFileName.replace("_history.jsonl", "");

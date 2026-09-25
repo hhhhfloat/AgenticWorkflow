@@ -1,3 +1,5 @@
+// @anchor: openFolderHandler_tot_desc
+// 打开文件夹处理器：GET /openFolder，白名单内调用系统资源管理器
 package com.myagent.workflow.http.handlers;
 
 import com.sun.net.httpserver.HttpExchange;
@@ -12,7 +14,11 @@ import java.nio.file.Paths;
 import java.util.Map;
 import java.util.Set;
 
+// @anchor: openFolderHandler_class
+// 打开文件夹处理器：仅允许打开 sandbox/TestProjects/HistoryOutput
 public class OpenFolderHandler implements HttpHandler {
+    // @anchor: openFolderHandler_handle
+    // 处理打开请求：白名单校验与存在性检测后调用桌面 API 打开目录
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {

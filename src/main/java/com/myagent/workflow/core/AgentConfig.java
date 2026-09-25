@@ -1,3 +1,5 @@
+// @anchor: agentConfig_tot_desc
+// 运行配置模型（record）：外部化工具链字段 + 系统级常量 + 配置加载与默认值兜底
 package com.myagent.workflow.core;
 
 import java.io.IOException;
@@ -7,6 +9,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Properties;
 
+// @anchor: agentConfig_class
+// Agent 运行配置：API Key/模型/各语言工具链路径/是否启用安全扫描
 public record AgentConfig(
         // ===== 用户可配置字段（实例） =====
         String apiKey,
@@ -24,6 +28,8 @@ public record AgentConfig(
         boolean enableSecurityScan
 ) {
     // ===== 系统级常量（与机器无关，不需要外部化） =====
+    // @anchor: agentConfig_constants
+    // 系统级常量：沙箱目录、API 地址、模型名、锚点索引文件名等
     private static final String ARCHIVE_VERSION = "v4_2";
     private static final String SANDBOX_DIR     = "./sandbox";
     private static final String API_URL         = "https://api.deepseek.com/chat/completions";
@@ -43,6 +49,8 @@ public record AgentConfig(
 
     // ========== 公共静态 Getter ==========
 
+    // @anchor: agentConfig_staticGetters
+    // 暴露系统常量：模型名、默认最大迭代数、沙箱目录、API 地址、索引名
     public static String getModelFlash()          { return MODEL_FLASH; }
     public static int    getDefaultMaxIterations(){ return DEFAULT_MAX_ITERATIONS; }
     public static String getSandboxDir()          { return SANDBOX_DIR; }
@@ -52,6 +60,8 @@ public record AgentConfig(
 
     // ========== 工厂方法 ==========
 
+    // @anchor: agentConfig_buildDefaultConfig
+    // 合成默认配置：环境变量与配置文件取值覆盖内置默认值
     public static AgentConfig buildDefaultConfig() {
         Properties p = loadProperties();
 
@@ -76,6 +86,8 @@ public record AgentConfig(
 
     // ========== 配置加载 ==========
 
+    // @anchor: agentConfig_loadProperties
+    // 按环境变量→工作目录→classpath 顺序查找配置，缺失则自动探测生成
     /**
      * 查找顺序：
      *   1) 环境变量 AGENT_CONFIG 指向的文件
@@ -127,6 +139,8 @@ public record AgentConfig(
         return props;
     }
 
+    // @anchor: agentConfig_tryLoad
+    // 读取 properties 文件到对象并打印加载结果
     private static boolean tryLoad(Properties props, Path path) {
         try (InputStream in = Files.newInputStream(path)) {
             props.load(in);

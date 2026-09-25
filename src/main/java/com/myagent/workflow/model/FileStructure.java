@@ -2,6 +2,8 @@ package com.myagent.workflow.model;
 
 import java.util.List;
 
+// @anchor: fileStructure_class
+// 文件结构 record：解析产物顶层容器（包/导入/类/函数/字段/锚点）
 public record FileStructure(
         String filePath,
         String language,

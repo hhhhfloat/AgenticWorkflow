@@ -1,3 +1,5 @@
+// @anchor: sessionCreateHandler_tot_desc
+// 会话创建处理器：POST /session/create，显式创建一个空会话
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +14,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+// @anchor: sessionCreateHandler_class
+// 会话创建处理器：用全局配置创建会话并返回其 ID/标题/创建时间
 /**
  * POST /session/create
  * <p>
@@ -26,6 +30,8 @@ public class SessionCreateHandler implements HttpHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    // @anchor: sessionCreateHandler_handle
+    // 处理创建请求：用全局配置创建会话并回传元信息
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -53,6 +59,8 @@ public class SessionCreateHandler implements HttpHandler {
         writeJson(exchange, 200, mapper.writeValueAsString(response));
     }
 
+    // @anchor: sessionCreateHandler_writeJson
+    // 发送 UTF-8 JSON 响应（含 CORS 头）
     private void writeJson(HttpExchange exchange, int code, String json) throws IOException {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");

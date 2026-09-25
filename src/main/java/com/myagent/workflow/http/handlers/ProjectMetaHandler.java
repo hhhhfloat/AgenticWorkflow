@@ -1,3 +1,5 @@
+// @anchor: projectMetaHandler_tot_desc
+// 项目元信息处理器：GET /project-meta，读取项目入口注册表 .agent_entry.json
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -13,6 +15,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
 
+// @anchor: projectMetaHandler_class
+// 项目元信息处理器：返回入口文件与编译模式，供前端自动填充运行参数
 /**
  * GET /project-meta?path=sandbox/xxx
  * <p>
@@ -25,6 +29,8 @@ public class ProjectMetaHandler implements HttpHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    // @anchor: projectMetaHandler_handle
+    // 处理元信息请求：路径安全校验后读取并回传入口 JSON
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -68,6 +74,8 @@ public class ProjectMetaHandler implements HttpHandler {
         }
     }
 
+    // @anchor: projectMetaHandler_writeJson
+    // 发送 UTF-8 JSON 响应（含 CORS 头）
     private void writeJson(HttpExchange exchange, int code, String json) throws IOException {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");

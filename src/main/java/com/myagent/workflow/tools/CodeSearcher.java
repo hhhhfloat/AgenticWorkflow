@@ -1,6 +1,7 @@
 package com.myagent.workflow.tools;
 
 // @anchor: codeSearcher_class
+// 代码检索门面：组合全文/引用/调用链检索
 /**
  * 代码搜索门面（Facade）：对外提供统一的搜索工具入口，
  * 内部委托给三个职责单一的模块：
@@ -21,6 +22,7 @@ public class CodeSearcher {
     }
 
     // @anchor: codeSearcher_searchText
+// 全文检索：转发到 TextSearcher
     /**
      * 全文正则搜索
      */
@@ -29,6 +31,7 @@ public class CodeSearcher {
     }
 
     // @anchor: codeSearcher_findReferences
+// 查找符号引用：转发到 ReferenceFinder
     /**
      * 查找符号引用
      */
@@ -37,6 +40,7 @@ public class CodeSearcher {
     }
 
     // @anchor: codeSearcher_findCallers
+// 查找调用者：转发到 CallGraphAnalyzer
     /**
      * 查找函数调用点
      */
@@ -45,6 +49,7 @@ public class CodeSearcher {
     }
 
     // @anchor: codeSearcher_findCallees
+// 查找被调用者：转发到 CallGraphAnalyzer
     /**
      * 分析函数调用依赖（支持递归与深度限制）
      */

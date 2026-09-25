@@ -1,3 +1,5 @@
+// @anchor: cssParser_tot_desc
+// CSS 结构解析器：提取锚点注释、@import 与选择器列表
 package com.myagent.workflow.parser;
 
 import com.myagent.workflow.model.*;
@@ -9,8 +11,12 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 
+// @anchor: cssParser_class
+// CSS 解析器：把样式表拆解为锚点、导入与选择器结构信息
 public class CssParser implements StructureParser {
 
+    // @anchor: cssParser_patterns
+    // CSS 锚点注释、选择器与 @import 的匹配正则集合
     private static final Pattern ANCHOR_PATTERN = Pattern.compile(
             "/\\*\\s*@anchor:\\s*(\\w+)\\s*\\*/"
     );
@@ -25,12 +31,16 @@ public class CssParser implements StructureParser {
             "^\\s*@import\\s+[^;]+;"
     );
 
+    // @anchor: cssParser_supports
+    // 仅识别 .css 文件
     @Override
     public boolean supports(Path file) {
         String name = file.getFileName().toString().toLowerCase();
         return name.endsWith(".css");
     }
 
+    // @anchor: cssParser_parse
+    // 逐行解析 CSS：收集锚点、@import 与选择器（以“函数”形式表示）
     @Override
     public FileStructure parse(Path file) throws IOException {
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
@@ -87,6 +97,8 @@ public class CssParser implements StructureParser {
     }
 
     // ==================== 字符串/注释清理 ====================
+    // @anchor: cssParser_stripStringsOnly
+    // 移除引号内字符串内容，保留可用于锚点检测的代码骨架
     @Override
     public String stripStringsOnly(String rawLine) {
         // CSS 字符串：url("...") 或 '...' 或 "..."
@@ -133,6 +145,8 @@ public class CssParser implements StructureParser {
         return result.toString();
     }
 
+    // @anchor: cssParser_cleanLine
+    // 去掉 /* */ 块注释，返回可用于解析的纯代码行
     @Override
     public String cleanLine(String rawLine) {
         // CSS 注释：/* ... */

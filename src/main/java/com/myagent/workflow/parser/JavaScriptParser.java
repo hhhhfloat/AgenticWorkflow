@@ -1,3 +1,5 @@
+// @anchor: javaScriptParser_tot_desc
+// JavaScript/TypeScript 结构解析器：提取锚点、导入、类、方法、字段与顶层函数
 package com.myagent.workflow.parser;
 
 import com.myagent.workflow.model.*;
@@ -9,8 +11,12 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 
+// @anchor: javaScriptParser_class
+// JS/TS 解析器：按花括号深度识别类、方法、字段与顶层函数
 public class JavaScriptParser implements StructureParser {
 
+    // @anchor: javaScriptParser_patterns
+    // JS/TS 锚点、导入、类、方法、构造函数与字段的匹配正则集合
     private static final Pattern ANCHOR_PATTERN = Pattern.compile(
             "//\\s*@anchor:\\s*(\\w+)|" +
                     "/\\*\\s*@anchor:\\s*(\\w+)\\s*\\*/"
@@ -51,6 +57,8 @@ public class JavaScriptParser implements StructureParser {
     private static final Pattern OPEN_BRACE = Pattern.compile("\\{");
     private static final Pattern CLOSE_BRACE = Pattern.compile("\\}");
 
+    // @anchor: javaScriptParser_supports
+    // 识别 .js/.jsx/.ts/.tsx/.mjs/.cjs 等 JavaScript 系文件
     @Override
     public boolean supports(Path file) {
         String name = file.getFileName().toString().toLowerCase();
@@ -59,6 +67,8 @@ public class JavaScriptParser implements StructureParser {
                 name.endsWith(".mjs") || name.endsWith(".cjs");
     }
 
+    // @anchor: javaScriptParser_parse
+    // 逐行按花括号深度解析：收集锚点、导入、类成员与顶层函数
     @Override
     public FileStructure parse(Path file) throws IOException {
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
@@ -250,6 +260,8 @@ public class JavaScriptParser implements StructureParser {
     }
 
     // ==================== 字符串/注释清理 ====================
+    // @anchor: javaScriptParser_stripStringsOnly
+    // 移除单/双引号及模板字符串内容，保留注释与代码
     @Override
     public String stripStringsOnly(String rawLine) {
         StringBuilder result = new StringBuilder();
@@ -313,6 +325,8 @@ public class JavaScriptParser implements StructureParser {
         return result.toString();
     }
 
+    // @anchor: javaScriptParser_cleanLine
+    // 去掉行注释与块注释，返回干净代码行
     @Override
     public String cleanLine(String rawLine) {
         String noStrings = stripStringsOnly(rawLine);
@@ -349,6 +363,8 @@ public class JavaScriptParser implements StructureParser {
 
     // ==================== 辅助方法 ====================
 
+    // @anchor: javaScriptParser_parseParameters
+    // 把逗号分隔的形参串拆成参数名列表
     private List<String> parseParameters(String params) {
         List<String> result = new ArrayList<>();
         if (params == null || params.trim().isEmpty()) return result;
@@ -360,6 +376,8 @@ public class JavaScriptParser implements StructureParser {
         return result;
     }
 
+    // @anchor: javaScriptParser_builder
+    // 类定义构建器：暂存类名/父类/行号并累积方法与字段
     private static class ClassDefinitionBuilder {
         private final String name;
         private final String type;

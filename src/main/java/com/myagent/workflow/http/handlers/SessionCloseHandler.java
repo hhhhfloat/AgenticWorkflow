@@ -1,3 +1,5 @@
+// @anchor: sessionCloseHandler_tot_desc
+// 会话关闭处理器：POST /session/close，停止并归档会话后从内存卸载
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,6 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+// @anchor: sessionCloseHandler_class
+// 会话关闭处理器：先停任务再落盘，最后从内存移除（历史仍在磁盘）
 /**
  * POST /session/close
  * <p>
@@ -30,6 +34,8 @@ public class SessionCloseHandler implements HttpHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    // @anchor: sessionCloseHandler_handle
+    // 处理关闭请求：校验 sessionId 后委托 SessionManager 关闭会话
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -69,10 +75,14 @@ public class SessionCloseHandler implements HttpHandler {
         writeJson(exchange, 200, mapper.writeValueAsString(response));
     }
 
+    // @anchor: sessionCloseHandler_error
+    // 组装标准错误响应 JSON
     private String error(String msg) throws IOException {
         return mapper.writeValueAsString(Map.of("status", "error", "message", msg));
     }
 
+    // @anchor: sessionCloseHandler_writeJson
+    // 发送 UTF-8 JSON 响应（含 CORS 头）
     private void writeJson(HttpExchange exchange, int code, String json) throws IOException {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");

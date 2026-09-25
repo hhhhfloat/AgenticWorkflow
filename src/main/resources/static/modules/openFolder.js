@@ -1,4 +1,6 @@
 // @anchor: modules_openFolder
+// 请求后端在系统文件管理器中打开指定目录
+
 // ===== 打开文件夹 =====
 async function openFolder(path) {
     try {

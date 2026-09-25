@@ -1,3 +1,5 @@
+// @anchor: genericParser_tot_desc
+// 通用兜底解析器：仅提取锚点并粗略判断语言，不解析结构
 package com.myagent.workflow.parser;
 
 import com.myagent.workflow.model.AnchorSummary;
@@ -14,8 +16,12 @@ import java.util.regex.Pattern;
  * 通用解析器：仅提取文件中的锚点，不解析结构
  * 作为未支持语言的兜底
  */
+// @anchor: genericParser_class
+// 通用解析器：兜底支持所有文件类型，仅收集锚点
 public class GenericParser implements StructureParser {
 
+    // @anchor: genericParser_pattern
+    // 识别四种跨语言单行锚点写法的正则
     private static final Pattern ANCHOR_PATTERN = Pattern.compile(
             "//\\s*@anchor:\\s*(\\w+)|" +
                     "/\\*\\s*@anchor:\\s*(\\w+)\\s*\\*/|" +
@@ -23,11 +29,15 @@ public class GenericParser implements StructureParser {
                     "#\\s*@anchor:\\s*(\\w+)"
     );
 
+    // @anchor: genericParser_supports
+    // 兜底解析器默认支持所有文件
     @Override
     public boolean supports(Path file) {
         return true; // 默认支持所有文件
     }
 
+    // @anchor: genericParser_parse
+    // 逐行收集锚点并按扩展名粗略判定语言，其余结构留空
     @Override
     public FileStructure parse(Path file) throws IOException {
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);

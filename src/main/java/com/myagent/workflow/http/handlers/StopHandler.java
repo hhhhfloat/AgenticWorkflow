@@ -1,3 +1,5 @@
+// @anchor: stopHandler_tot_desc
+// 停止处理器：POST /stop，向指定会话发送停止信号
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,6 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+// @anchor: stopHandler_class
+// 停止处理器：根据会话状态返回 not_found/idle/stopped 并触发停止
 /**
  * POST /stop
  * 请求体：{ "sessionId": "xxx" }
@@ -22,6 +26,8 @@ public class StopHandler implements HttpHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    // @anchor: stopHandler_handle
+    // 处理停止请求：定位会话并按运行状态决定是否停止任务
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -62,10 +68,14 @@ public class StopHandler implements HttpHandler {
         writeJson(exchange, 200, mapper.writeValueAsString(response));
     }
 
+    // @anchor: stopHandler_error
+    // 组装标准错误响应 JSON
     private String error(String msg) throws IOException {
         return mapper.writeValueAsString(Map.of("status", "error", "message", msg));
     }
 
+    // @anchor: stopHandler_writeJson
+    // 发送 UTF-8 JSON 响应（含 CORS 头）
     private void writeJson(HttpExchange exchange, int code, String json) throws IOException {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");

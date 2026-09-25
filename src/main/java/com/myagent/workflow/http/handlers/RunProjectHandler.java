@@ -1,3 +1,5 @@
+// @anchor: runProjectHandler_tot_desc
+// 手动运行处理器：POST /runProject，一次性执行 compile_and_run 并返回结果
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,6 +17,8 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+// @anchor: runProjectHandler_class
+// 手动运行处理器：直接调用工具执行器编译运行，不进入 Agent 循环与会话
 /**
  * POST /runProject
  * <p>
@@ -31,6 +35,8 @@ public class RunProjectHandler implements HttpHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    // @anchor: runProjectHandler_handle
+    // 处理运行请求：解析参数、构建配置、分派 compile_and_run 工具并回传输出
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -96,10 +102,14 @@ public class RunProjectHandler implements HttpHandler {
         }
     }
 
+    // @anchor: runProjectHandler_error
+    // 组装标准错误响应 JSON
     private String error(String msg) throws IOException {
         return mapper.writeValueAsString(Map.of("status", "error", "message", msg));
     }
 
+    // @anchor: runProjectHandler_writeJson
+    // 发送 UTF-8 JSON 响应（含 CORS 头）
     private void writeJson(HttpExchange exchange, int code, String json) throws IOException {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");

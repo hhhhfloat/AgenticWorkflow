@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 // @anchor: referenceFinder_class
+// 符号引用查找实现
 /**
  * 引用查找模块：负责 findReferences / findCallers / extractContext 三个工具的逻辑。
  * 文件收集 / 排除目录 / 扩展名过滤复用 SearchFileFilter 基础设施。
@@ -33,6 +34,7 @@ public class ReferenceFinder {
             ".c", ".cpp", ".h", ".php", ".rb", ".kt", ".vue");
 
     // @anchor: referenceFinder_findReferences
+// 查找某符号在项目内的所有引用位置
     String findReferences(String symbol, String path, String filePattern) {
         try {
             Path startPath = PathUtils.safeResolve(path != null ? path : ".");
@@ -127,6 +129,7 @@ public class ReferenceFinder {
     }
 
     // @anchor: referenceFinder_findCallers
+// 查找某函数的调用点及上下文
     String findCallers(String functionName, String path, String filePattern) {
         try {
             Path startPath = PathUtils.safeResolve(path != null ? path : ".");
@@ -243,6 +246,7 @@ public class ReferenceFinder {
     // ===== 内部辅助 =====
 
     // @anchor: referenceFinder_extractContext
+// 抽取命中行周围的上下文代码
     private String extractContext(List<String> lines, int lineIndex) {
         // 向上查找最近的函数定义
         int searchLimit = Math.max(0, lineIndex - 20);

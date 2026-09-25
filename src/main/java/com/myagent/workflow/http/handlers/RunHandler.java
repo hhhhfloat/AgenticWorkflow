@@ -1,3 +1,5 @@
+// @anchor: runHandler_tot_desc
+// 运行处理器：POST /run，以 SSE 流式执行 Agent 任务并回传日志与用量
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -22,6 +24,8 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+// @anchor: runHandler_class
+// 运行处理器：解析请求、获取/创建会话、并发控制并以 SSE 推送执行日志
 /**
  * POST /run
  * <p>
@@ -45,6 +49,8 @@ public class RunHandler implements HttpHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
+    // @anchor: runHandler_handle
+    // 处理运行请求：鉴权/预检、解析参数、会话并发控制、建立 SSE 并异步执行
     @Override
     public void handle(HttpExchange exchange) throws IOException {
 
@@ -224,6 +230,8 @@ public class RunHandler implements HttpHandler {
 
     // ==================== 辅助方法 ====================
 
+    // @anchor: runHandler_sendEvent
+    // 以 SSE 单行 data 形式发送一条事件（换行转义）
     /**
      * SSE 事件发送。所有换行转为 \n 转义，保证单行 data。
      */
@@ -233,6 +241,8 @@ public class RunHandler implements HttpHandler {
         out.flush();
     }
 
+    // @anchor: runHandler_appendHistory
+    // 把用户请求追加到全局历史文件 history.jsonl
     /**
      * 追加用户请求到全局历史文件（会话级历史由 SessionStorage 单独保存）。
      */
@@ -253,6 +263,8 @@ public class RunHandler implements HttpHandler {
         }
     }
 
+    // @anchor: runHandler_writeJsonError
+    // 未建立 SSE 前以 JSON 返回错误响应
     /**
      * 以 JSON 形式返回错误（未建立 SSE 连接时使用）。
      */

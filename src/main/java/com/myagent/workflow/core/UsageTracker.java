@@ -1,3 +1,5 @@
+// @anchor: usageTracker_tot_desc
+// 用量与成本追踪：累计 Token 消耗，按峰谷时段计算价格并输出统计文本
 package com.myagent.workflow.core;
 
 import java.time.DayOfWeek;
@@ -12,9 +14,13 @@ import java.time.ZoneId;
  * 定价来源：DeepSeek 官方定价页，更新于 2026-09-17。
  * 高峰时段：北京时间 周一至周五 9:00-12:00、14:00-18:00；其余为空闲。
  */
+// @anchor: usageTracker_class
+// 用量追踪器：持有价格常量与累计计数，负责计费与统计
 public class UsageTracker {
 
     // ===== 价格常量（元/百万 tokens） =====
+    // @anchor: usageTracker_priceConstants
+    // Flash 模型峰谷时段的输入（命中/未命中缓存）与输出单价
     // Flash —— DeepSeek-V4.1-Flash
     private static final double FLASH_IN_HIT_OFF_PEAK = 0.02;
     private static final double FLASH_IN_HIT_PEAK = 0.04;
@@ -30,6 +36,8 @@ public class UsageTracker {
     private int apiCallCount = 0;
     private double price = 0;
 
+    // @anchor: usageTracker_record
+    // 记录一次 API 调用的用量，累计计数并返回本次成本
     /**
      * 记录一次 API 调用的用量，并返回本次成本。
      */
@@ -45,6 +53,8 @@ public class UsageTracker {
         return cost;
     }
 
+    // @anchor: usageTracker_formatStats
+    // 生成成本统计文本（调用次数、输入/输出 Token、命中率、总成本）
     /**
      * 生成统计文本（供日志输出）。
      */
@@ -64,6 +74,8 @@ public class UsageTracker {
                 "\n\n==================================";
     }
 
+    // @anchor: usageTracker_calculateCost
+    // 按当前时段单价计算单次调用成本（不累计）
     /**
      * 计算单次调用的成本（不累计）。供 Main 算迭代粒度成本用。
      */
@@ -85,6 +97,8 @@ public class UsageTracker {
                 (completionTokens / 1_000_000.0 * out);
     }
 
+    // @anchor: usageTracker_isPeakHour
+    // 判断当前是否处于工作日高峰时段（北京时间，周末与夜间为空闲）
     private boolean isPeakHour() {
         ZonedDateTime now = ZonedDateTime.now(ZoneId.of("Asia/Shanghai"));
         DayOfWeek dow = now.getDayOfWeek();

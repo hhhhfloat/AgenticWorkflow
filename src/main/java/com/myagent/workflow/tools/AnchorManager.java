@@ -26,6 +26,7 @@ public class AnchorManager {
     private final Map<String, Set<String>> dirtyFiles = new LinkedHashMap<>();
 
     // @anchor: anchorManager_constructor
+// 构造：绑定项目根路径
     public AnchorManager(ObjectMapper objectMapper) {
         this.anchorIndex = new AnchorIndex(objectMapper);
     }
@@ -33,6 +34,7 @@ public class AnchorManager {
     // ===== 转发：索引构建 =====
 
     // @anchor: anchorManager_buildIndex
+// 重建锚点索引
     String buildAnchorIndex(String projectPath) {
         return anchorIndex.rebuild(projectPath);
     }
@@ -40,11 +42,13 @@ public class AnchorManager {
     // ===== 转发：锚点列表 =====
 
     // @anchor: anchorManager_listAnchors
+// 列出锚点（可选按文件过滤）
     String listAnchors(String projectPath) {
         return anchorIndex.list(projectPath, null);
     }
 
     // @anchor: anchorManager_listAnchorsByFile
+// 按文件列出锚点
     String listAnchors(String projectPath, String filePath) {
         return anchorIndex.list(projectPath, filePath);
     }
@@ -52,6 +56,7 @@ public class AnchorManager {
     // ===== 文件内容操作 =====
 
     // @anchor: anchorManager_insertAtAnchor
+// 在锚点前/后插入代码，并标记文件为脏
     String insertAtAnchor(String anchorId, String content, String position) {
         AnchorLocation loc = anchorIndex.findGlobally(anchorId);
         if (loc == null) return "❌ 锚点不存在: " + anchorId;
@@ -80,6 +85,7 @@ public class AnchorManager {
     }
 
     // @anchor: anchorManager_deleteBetweenAnchors
+// 删除两锚点之间的内容
     String deleteBetweenAnchors(String startAnchor, String endAnchor) {
         AnchorLocation startLoc = anchorIndex.findGlobally(startAnchor);
         AnchorLocation endLoc = anchorIndex.findGlobally(endAnchor);
@@ -128,6 +134,7 @@ public class AnchorManager {
     }
 
     // @anchor: anchorManager_readBetweenAnchors
+// 读取两锚点之间的代码
     String readBetweenAnchors(String startAnchor, String endAnchor) {
         AnchorLocation startLoc = anchorIndex.findGlobally(startAnchor);
         AnchorLocation endLoc = anchorIndex.findGlobally(endAnchor);
@@ -194,6 +201,7 @@ public class AnchorManager {
     }
 
     // @anchor: anchorManager_markDirty
+// 标记某文件为脏，待批量刷新索引
     private void markDirty(String projectPath, String fileRelPath) {
         dirtyFiles.computeIfAbsent(projectPath, k -> new LinkedHashSet<>()).add(fileRelPath);
     }
@@ -265,11 +273,13 @@ public class AnchorManager {
     }
 
     // @anchor: anchorManager_rebuildProjectIndex
+// 重建整个项目的锚点索引文件
     String rebuildProjectIndex(String projectPath) {
         return anchorIndex.rebuildProjectIndex(projectPath);
     }
 
     // @anchor: anchorManager_describeAnchors
+// 返回各锚点及其紧邻描述
     String describeAnchors(String projectPath, String filePath) {
         return anchorIndex.describe(projectPath, filePath);
     }

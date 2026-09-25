@@ -1,4 +1,6 @@
 // @anchor: modules_sidebar
+// 侧边栏整体折叠 / 展开切换
+
 // ===== 侧边栏折叠切换 =====
 const sidebar = document.getElementById('sidebar');
 const toggleBtn = document.getElementById('toggleSidebarBtn');

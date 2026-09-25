@@ -1,5 +1,9 @@
+// @anchor: sessionState_tot_desc
+// 会话状态枚举：描述会话的空闲/运行/挂起/归档四种状态
 package com.myagent.workflow.session;
 
+// @anchor: sessionState_class
+// 会话状态枚举：IDLE 空闲、RUNNING 运行、PAUSED 挂起（预留）、ARCHIVED 归档
 /**
  * 会话状态。
  * <p>

@@ -1,3 +1,5 @@
+// @anchor: pythonParser_tot_desc
+// Python 结构解析器：基于缩进识别锚点、导入、类、方法与类变量
 package com.myagent.workflow.parser;
 
 import com.myagent.workflow.model.*;
@@ -9,8 +11,12 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 
+// @anchor: pythonParser_class
+// Python 解析器：用缩进层级区分类体与顶层定义，收集导入/方法/字段
 public class PythonParser implements StructureParser {
 
+    // @anchor: pythonParser_patterns
+    // Python 锚点、类、def、import 与类变量赋值的匹配正则集合
     private static final Pattern ANCHOR_PATTERN = Pattern.compile(
             "#\\s*@anchor:\\s*(\\w+)"  // Python 注释风格
     );
@@ -28,11 +34,15 @@ public class PythonParser implements StructureParser {
             "^\\s*(\\w+)\\s*=\\s*(.+)$"  // 简单类变量赋值
     );
 
+    // @anchor: pythonParser_supports
+    // 仅识别 .py 文件
     @Override
     public boolean supports(Path file) {
         return file.getFileName().toString().toLowerCase().endsWith(".py");
     }
 
+    // @anchor: pythonParser_parse
+    // 逐行按缩进解析：收集锚点、导入、类及其方法/类变量
     @Override
     public FileStructure parse(Path file) throws IOException {
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
@@ -194,6 +204,8 @@ public class PythonParser implements StructureParser {
         );
     }
 
+    // @anchor: pythonParser_parseParameters
+    // 把逗号分隔的形参串拆成参数名列表（含默认值原样保留）
     /**
      * 解析参数字符串为列表（形如 "self, a, b=1" -> ["self", "a", "b=1"]）
      */
@@ -209,6 +221,8 @@ public class PythonParser implements StructureParser {
         return result;
     }
 
+    // @anchor: pythonParser_stripStringsOnly
+    // 移除单/双引号及三引号字符串内容，保留注释与代码
     /**
      * 去除字符串（包括三引号）和字符常量，保留注释和代码。
      * Python 字符串语法：'...', "...", '''...''', """..."""
@@ -294,6 +308,8 @@ public class PythonParser implements StructureParser {
         return result.toString();
     }
 
+    // @anchor: pythonParser_cleanLine
+    // 去掉 # 行注释，返回干净代码行
     @Override
     public String cleanLine(String rawLine) {
         String noStrings = stripStringsOnly(rawLine);
@@ -314,6 +330,8 @@ public class PythonParser implements StructureParser {
         return result.toString();
     }
 
+    // @anchor: pythonParser_builder
+    // 类定义构建器：累积类名/父类/行号以及方法与字段
     /**
      * 辅助类：构建 ClassDefinition（复用 JavaParser 中的同名内部类）
      */

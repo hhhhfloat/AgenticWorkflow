@@ -1,20 +1,18 @@
+// @anchor: systemPrompt_tot_desc
+// 系统提示词仓库：集中存放交给 Agent 的行为规范与工作流程说明
 package com.myagent.workflow.core;
 
-/**
- * @anchor: systemPrompt_class
- * 系统提示词 —— 定义 Agent 的行为规则。
- * 从 Main.java 中独立出来，便于单独维护和版本管理。
- */
+// @anchor: systemPrompt_class
+// 系统提示词 —— 定义 Agent 的行为规则。
+// 从 Main.java 中独立出来，便于单独维护和版本管理。
 public final class SystemPrompt {
 
     private SystemPrompt() {
         // 工具类，禁止实例化
     }
 
-    /**
-     * @anchor: systemPrompt_get
-     * @return Agent 系统提示词全文
-     */
+    // @anchor: systemPrompt_get
+    // 返回 Agent 系统提示词全文
     public static String get() {
         return PROMPT;
     }
@@ -65,7 +63,7 @@ public final class SystemPrompt {
 
         规则：
         - 锚点行下方必须紧跟一行（或多行）描述注释，否则索引中该锚点将无描述。
-        - 可以在文件开头使用单独锚点+紧邻注释，对文件整体进行描述，如一行// @anchor: filename_tot_desc后接一行或多行对该文件整体的精简描述。
+        - 可以在文件开头使用单独锚点+紧邻注释，对文件整体进行描述，如一行// @anchor: 文件名_tot_desc后接一行或多行对该文件整体的精简描述。
         - _end 锚点仅作区间标记，无需描述。
         - 描述写"做什么"而非"怎么做"：写"渲染棋盘和棋子"，不写"循环遍历二维数组"。
         - 锚点命名：模块_功能，如 braille_encode_start。

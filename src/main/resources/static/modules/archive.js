@@ -1,4 +1,6 @@
 // @anchor: modules_archive
+// 把沙箱项目归档到 TestProjects（含覆盖确认）并刷新目录树
+
 // ===== 归档功能 =====
 
 async function archiveProject(projectName) {
@@ -44,7 +46,9 @@ async function archiveProject(projectName) {
     }
 }
 
-// @anchor: modules_archive
+// @anchor: modules_refreshRoot
+// 保持展开状态刷新指定根目录的子树
+
 // ===== 归档功能 =====
 
 let refreshLock = false;  // ← 添加全局锁
@@ -201,6 +205,8 @@ async function refreshSidebar() {
 }
 
 // @anchor: modules_createProject
+// 在 sandbox 下创建新项目文件夹并刷新目录树
+
 // ===== 创建项目 =====
 async function createProject(projectName) {
     if (!/^[a-zA-Z0-9\-_]+$/.test(projectName)) {
@@ -228,6 +234,8 @@ async function createProject(projectName) {
 }
 
 // @anchor: modules_upload
+// 向指定项目上传文件（含重名覆盖确认）并刷新目录树
+
 // ===== 文件上传 =====
 async function uploadFiles(projectName, fileList) {
     if (!fileList || fileList.length === 0) return;
@@ -274,4 +282,3 @@ async function uploadFiles(projectName, fileList) {
         appendLog(`[系统] ❌ 上传失败: ${err.message}`);
     }
 }
-

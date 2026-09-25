@@ -1,3 +1,5 @@
+// @anchor: clearApiKeyHandler_tot_desc
+// 清除 API Key 处理器：POST /clear-api-key，标记后异步退出进程
 package com.myagent.workflow.http.handlers;
 
 import com.myagent.workflow.http.HttpServerMain;
@@ -8,6 +10,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
+// @anchor: clearApiKeyHandler_class
+// 清除 API Key 处理器：标记已清除并延时退出（退出码 42），由外部脚本决定是否重启
 /**
  * POST /clear-api-key
  * <p>
@@ -20,6 +24,8 @@ import java.nio.charset.StandardCharsets;
  */
 public class ClearApiKeyHandler implements HttpHandler {
 
+    // @anchor: clearApiKeyHandler_handle
+    // 处理清除请求：先标记状态并回复，再异步延时退出进程
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {

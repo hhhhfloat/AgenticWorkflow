@@ -1,4 +1,6 @@
 // @anchor: modules_log_utils
+// 日志辅助：判断文本是否 Markdown、HTML 转义
+
 // ===== 日志输出工具函数 =====
 function isMarkdown(text) {
     return /(\|\s*[-:]+[\s|]+\||^#{1,6}\s|\n```|\n\s*[-*]\s|\n>\s|^---\s*$|\n---\s*$)/m.test(text);
@@ -11,6 +13,8 @@ function escapeHtml(text) {
 }
 
 // @anchor: modules_log_append
+// 将消息按类型着色渲染到 #output，支持对话气泡与迭代提示
+
 // ===== 日志输出模块（整合迭代提示） =====
 function appendLog(msg) {
     let color = 'log-info';

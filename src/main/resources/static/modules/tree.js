@@ -1,4 +1,6 @@
 // @anchor: modules_tree
+// 文件树核心：目录浏览、节点渲染与项目操作按钮注入
+
 // ===== 文件树核心逻辑 =====
 
 /**
@@ -346,6 +348,8 @@ function showErrorMessage(container, msg) {
 }
 
 // @anchor: modules_loadConfig
+// 从后端 /config 读取最大迭代次数并回填输入框
+
 // ===== 从后端加载配置 =====
 async function loadConfig() {
     try {
@@ -363,6 +367,8 @@ async function loadConfig() {
 }
 
 // @anchor: modules_clearCache
+// 递归清除文件树各级节点的加载缓存标记
+
 // ===== 缓存清除工具 =====
 function clearCacheRecursively(container) {
     const nodes = container.querySelectorAll('.tree-node');
@@ -376,6 +382,8 @@ function clearCacheRecursively(container) {
 }
 
 // @anchor: modules_tree_helpers
+// 文件树刷新辅助：收集展开路径、逐级展开、后台预加载缓存
+
 // ===== 树刷新状态保持辅助函数 =====
 
 /**
@@ -487,6 +495,8 @@ async function preloadPaths(path, targetPaths, cache) {
 }
 
 // @anchor: modules_tree_sync
+// 同步渲染版本：由预加载缓存一次性渲染树节点及操作按钮
+
 // ===== 同步渲染版本（用于预加载一次性渲染） =====
 
 /**

@@ -1,3 +1,5 @@
+// @anchor: restartHandler_tot_desc
+// 重启处理器：POST /restart，回复后退出进程（退出码 43）等待外部拉起
 package com.myagent.workflow.http.handlers;
 
 import com.myagent.workflow.http.HttpServerMain;
@@ -8,6 +10,8 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 
+// @anchor: restartHandler_class
+// 重启处理器：配置保存后退出进程，由外部脚本负责重新启动
 /**
  * POST /restart
  * <p>
@@ -16,6 +20,8 @@ import java.nio.charset.StandardCharsets;
  */
 public class RestartHandler implements HttpHandler {
 
+    // @anchor: restartHandler_handle
+    // 处理重启请求：回复成功后异步延时退出进程
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {

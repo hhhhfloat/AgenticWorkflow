@@ -20,6 +20,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 // @anchor: callGraphAnalyzer_class
+// 调用链分析器：解析函数的调用者/被调用者
 /**
  * 调用图分析模块：负责 findCallees 工具的逻辑。
  * 函数定位走 StructureParser 索引（语言无关），锚点 ID 作为兜底入口。
@@ -34,6 +35,7 @@ public class CallGraphAnalyzer {
             ".cpp", ".cc", ".cxx", ".c", ".h", ".hpp");
 
     // @anchor: callGraphAnalyzer_keywords
+// 语言关键字集合：用于过滤调用图噪声
     /** 各语言通用关键字，不计入调用图 */
     private static final Set<String> KEYWORDS = Set.of(
             // 控制流
@@ -66,6 +68,7 @@ public class CallGraphAnalyzer {
     }
 
     // @anchor: callGraphAnalyzer_findCallees
+// 查找函数内部直接调用的其它函数
     String findCallees(String nameOrAnchor, String path, boolean recursive, Integer depth) {
         try {
             Path startPath = PathUtils.safeResolve(path != null ? path : ".");
@@ -185,6 +188,7 @@ public class CallGraphAnalyzer {
     }
 
     // @anchor: callGraphAnalyzer_findAnchorInScope
+// 在函数作用域内定位锚点位置
     private AnchorLocation findAnchorInScope(Path startPath, String anchorId) {
         Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
         Path normalizedStart = startPath.toAbsolutePath().normalize();
@@ -262,6 +266,7 @@ public class CallGraphAnalyzer {
     }
 
     // @anchor: callGraphAnalyzer_findFunctionEnd
+// 定位函数的结束位置
     private int findFunctionEnd(List<String> lines, int startLine) {
         int braceCount = 0;
         boolean started = false;
@@ -282,11 +287,13 @@ public class CallGraphAnalyzer {
     // ===== 关键字/原语过滤 =====
 
     // @anchor: callGraphAnalyzer_isKeyword
+// 判断标识符是否为语言关键字
     private boolean isKeyword(String word) {
         return KEYWORDS.contains(word);
     }
 
     // @anchor: callGraphAnalyzer_isPrimitive
+// 判断标识符是否为基本类型
     private boolean isPrimitive(String word) {
         return PRIMITIVES.contains(word);
     }

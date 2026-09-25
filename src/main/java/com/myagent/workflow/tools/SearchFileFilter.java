@@ -109,7 +109,6 @@ public class SearchFileFilter {
      * @return 文件路径列表
      * @throws IOException 遍历失败时抛出
      */
-    // @anchor: searchFilter_collectFiles
     public static List<Path> collectFiles(Path startPath,
                                           List<String> excludedDirs,
                                           List<String> excludedFiles) throws IOException {

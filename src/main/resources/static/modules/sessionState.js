@@ -1,4 +1,6 @@
 // @anchor: modules_sessionState
+// 当前会话 ID 的本地存储读写与草稿态判断
+
 // ===== 当前会话 ID 的本地存储 =====
 
 const CURRENT_SESSION_KEY = 'currentSessionId';

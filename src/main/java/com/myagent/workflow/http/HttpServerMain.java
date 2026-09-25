@@ -1,3 +1,5 @@
+// @anchor: httpServerMain_tot_desc
+// HTTP 服务入口：校验 API Key、初始化配置与会话、注册路由并启动服务
 package com.myagent.workflow.http;
 
 import com.myagent.workflow.core.AgentConfig;
@@ -14,15 +16,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.concurrent.Executors;
 
-/**
- * @anchor: httpserver_class
- * HTTP 服务入口 —— 仅负责启动服务器、注册路由、维护全局单例。
- * <p>
- * v5.0 重构：
- * - 移除全部内部 Handler 类，拆分为独立文件
- * - 引入 SessionManager 作为会话容器
- * - 所有 handler 通过静态方法获取 SessionManager / AgentConfig
- */
+// @anchor: httpServerMain_class
+// HTTP 服务主类：维护会话管理器/全局配置单例，注册全部路由与心跳监控
 public class HttpServerMain {
 
     // ==================== 端口与超时 ====================
@@ -41,6 +36,8 @@ public class HttpServerMain {
 
     // ==================== 全局单例 ====================
 
+    // @anchor: httpServerMain_singletons
+    // 全局单例与运行标志：会话管理器、配置、API Key 清除状态、心跳监控开关
     private static volatile SessionManager sessionManager;
     private static volatile AgentConfig globalConfig;
     private static volatile boolean apiKeyClearedByUser = false;
@@ -64,6 +61,8 @@ public class HttpServerMain {
 
     // ==================== 入口 ====================
 
+    // @anchor: httpServerMain_main
+    // 服务主流程：校验 API Key、建运行时目录、初始化会话并启动 HTTP 服务
     public static void main(String[] args) throws IOException {
         // 1. 校验 API Key
         String apiKey = System.getenv("DEEPSEEK_API_KEY");
@@ -116,6 +115,8 @@ public class HttpServerMain {
 
     // ==================== 路由注册 ====================
 
+    // @anchor: httpServerMain_registerRoutes
+    // 注册全部 HTTP 路由：会话、任务、项目、系统、静态资源与外部目录
     private static void registerRoutes(HttpServer server) {
         // ── 会话管理 ──
         server.createContext("/session/create", new SessionCreateHandler());
@@ -154,6 +155,8 @@ public class HttpServerMain {
                 new ExternalFileHandler(Paths.get("./sandbox"), "/sandbox"));
     }
 
+    // @anchor: httpServerMain_openBrowser
+    // 启动后尝试用系统默认浏览器打开首页，失败则提示手动访问
     private static void openBrowser() {
         try {
             String url = "http://localhost:" + PORT;
@@ -168,6 +171,8 @@ public class HttpServerMain {
 
     // ==================== 心跳监控 ====================
 
+    // @anchor: httpServerMain_startHeartbeatMonitor
+    // 启动心跳监控线程：超时会话自动停止任务
     private static void startHeartbeatMonitor() {
         if (heartbeatMonitorRunning) return;
         heartbeatMonitorRunning = true;

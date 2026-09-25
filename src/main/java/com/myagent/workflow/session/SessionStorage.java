@@ -1,3 +1,5 @@
+// @anchor: sessionStorage_tot_desc
+// 会话磁盘存储：负责 Session 的持久化（meta/jsonl/索引）与加载还原
 package com.myagent.workflow.session;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,6 +17,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+// @anchor: sessionStorage_class
+// 会话存储类：只负责“存”与“取”，不做并发控制与状态判断
 /**
  * 会话磁盘存储 —— 负责 Session 的持久化与加载。
  * <p>
@@ -34,15 +38,21 @@ import java.util.stream.Stream;
  */
 public class SessionStorage {
 
+    // @anchor: sessionStorage_constants
+    // sessions 根目录与各类持久化文件名常量
     private static final Path SESSIONS_DIR = Paths.get("./sessions");
     private static final String INDEX_FILE = "index.json";
     private static final String META_FILE = "meta.json";
     private static final String BASE_FILE = "immutable_base.jsonl";
     private static final String WORKING_FILE = "volatile_working.jsonl";
 
+    // @anchor: sessionStorage_mappers
+    // 元数据/索引用的缩进 JSON 映射器与 JSONL 单行映射器
     private final ObjectMapper objectMapper;
     private final ObjectMapper jsonlMapper;
 
+    // @anchor: sessionStorage_constructor
+    // 初始化两个 JSON 映射器并确保 sessions 目录存在
     public SessionStorage() {
         this.objectMapper = new ObjectMapper();
         this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
@@ -50,6 +60,8 @@ public class SessionStorage {
         ensureSessionsDir();
     }
 
+    // @anchor: sessionStorage_ensureSessionsDir
+    // 确保 sessions 根目录存在，不存在则创建，失败抛出运行时异常
     private void ensureSessionsDir() {
         try {
             if (!Files.exists(SESSIONS_DIR)) {
@@ -62,6 +74,8 @@ public class SessionStorage {
 
     // ==================== 保存 ====================
 
+    // @anchor: sessionStorage_save
+    // 保存会话：写 meta.json、覆盖写两份 jsonl 快照并增量更新索引
     /**
      * 保存单个会话到磁盘。
      * <p>
@@ -91,6 +105,8 @@ public class SessionStorage {
 
     // ==================== 加载 ====================
 
+    // @anchor: sessionStorage_load
+    // 从磁盘加载会话：读 meta、重建 Session、挂载 ContextManager 并恢复上下文快照
     /**
      * 从磁盘加载一个会话。
      * 返回的 Session 已挂载 ContextManager 并恢复了上下文快照。
@@ -130,6 +146,8 @@ public class SessionStorage {
 
     // ==================== 列表 ====================
 
+    // @anchor: sessionStorage_listAll
+    // 读取索引中的所有会话元数据，按最后活跃时间倒序返回
     /**
      * 读取所有会话的元数据，按 lastActiveAt 倒序排列。
      */
@@ -154,6 +172,8 @@ public class SessionStorage {
 
     // ==================== 删除 ====================
 
+    // @anchor: sessionStorage_delete
+    // 删除会话目录及其文件，并从索引中移除
     public void delete(String sessionId) throws IOException {
         Path sessionDir = SESSIONS_DIR.resolve(sessionId);
         if (Files.exists(sessionDir)) {
@@ -169,6 +189,8 @@ public class SessionStorage {
 
     // ==================== 内部：索引维护 ====================
 
+    // @anchor: sessionStorage_updateIndex
+    // 同步更新 index.json：移除同 ID 旧记录后写入新元数据
     private synchronized void updateIndex(SessionMeta meta) throws IOException {
         Path indexFile = SESSIONS_DIR.resolve(INDEX_FILE);
         IndexRoot root = Files.exists(indexFile) ? readJson(indexFile, IndexRoot.class) : new IndexRoot();
@@ -183,6 +205,8 @@ public class SessionStorage {
         writeJson(indexFile, root);
     }
 
+    // @anchor: sessionStorage_removeFromIndex
+    // 从 index.json 中移除指定会话的元数据记录
     private synchronized void removeFromIndex(String sessionId) throws IOException {
         Path indexFile = SESSIONS_DIR.resolve(INDEX_FILE);
         if (!Files.exists(indexFile)) return;
@@ -196,17 +220,23 @@ public class SessionStorage {
 
     // ==================== 内部：JSON 读写 ====================
 
+    // @anchor: sessionStorage_writeJson
+    // 将对象序列化为缩进 JSON 并以覆盖方式写入文件
     private void writeJson(Path file, Object obj) throws IOException {
         String json = objectMapper.writeValueAsString(obj);
         Files.writeString(file, json, StandardCharsets.UTF_8,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 
+    // @anchor: sessionStorage_readJson
+    // 读取文件内容并反序列化为指定类型对象
     private <T> T readJson(Path file, Class<T> clazz) throws IOException {
         String json = Files.readString(file, StandardCharsets.UTF_8);
         return objectMapper.readValue(json, clazz);
     }
 
+    // @anchor: sessionStorage_writeJsonl
+    // 将消息列表逐行序列化为 JSONL 文本并写入文件
     private void writeJsonl(Path file, List<Map<String, Object>> messages) throws IOException {
         StringBuilder sb = new StringBuilder();
         for (Map<String, Object> msg : messages) {
@@ -216,6 +246,8 @@ public class SessionStorage {
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     }
 
+    // @anchor: sessionStorage_readJsonl
+    // 逐行读取 JSONL 文件并解析为消息映射列表（跳过空行）
     private List<Map<String, Object>> readJsonl(Path file) throws IOException {
         if (!Files.exists(file)) return new ArrayList<>();
         List<Map<String, Object>> result = new ArrayList<>();
@@ -230,6 +262,8 @@ public class SessionStorage {
 
     // ==================== 内部类：索引结构 ====================
 
+    // @anchor: sessionStorage_indexRoot
+    // index.json 顶层结构：以 public 字段承载会话元数据列表供 Jackson 反序列化
     /**
      * index.json 的顶层结构。
      * 用 public 字段是为了让 Jackson 直接反序列化。

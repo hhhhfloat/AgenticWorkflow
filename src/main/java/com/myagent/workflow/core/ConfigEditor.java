@@ -1,9 +1,15 @@
+// @anchor: configEditor_tot_desc
+// 运行配置装配器：把前端请求中的 config 字段覆盖到默认配置之上
 package com.myagent.workflow.core;
 
 import com.fasterxml.jackson.databind.JsonNode;
 
+// @anchor: configEditor_class
+// 配置编辑器：从 HTTP 请求构建运行配置，或返回默认配置
 public class ConfigEditor {
 
+    // @anchor: configEditor_buildFromRequest
+    // 用请求中的 config 字段覆盖默认配置，未提供则返回默认配置
     // 从请求根节点构建运行配置
     public static AgentConfig buildFromRequest(JsonNode root) {
         // 1. 先构建一个完全基于系统默认值的配置
@@ -34,6 +40,8 @@ public class ConfigEditor {
         );
     }
 
+    // @anchor: configEditor_buildDefault
+    // 构建默认配置（完全基于系统常量和环境变量）
     // 构建默认配置（完全基于系统常量和环境变量）
     public static AgentConfig buildDefault() {
         return AgentConfig.buildDefaultConfig();

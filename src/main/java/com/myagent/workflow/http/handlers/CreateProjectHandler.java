@@ -1,3 +1,5 @@
+// @anchor: createProjectHandler_tot_desc
+// 创建项目处理器：POST /createProject，在 sandbox 下新建项目目录
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -15,9 +17,13 @@ import java.util.regex.Pattern;
 
 import static com.myagent.workflow.http.utils.HandlerUtils.sendResponse;
 
+// @anchor: createProjectHandler_class
+// 创建项目处理器：校验项目名合法性后于 sandbox 下创建对应目录
 public class CreateProjectHandler implements HttpHandler {
     private static final Pattern SAFE_NAME = Pattern.compile("^(?!.*\\.\\.)[^\\\\/:*?\"<>|]+$");
 
+    // @anchor: createProjectHandler_handle
+    // 处理创建请求：名称校验、越界校验、存在性检测后建目录
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {

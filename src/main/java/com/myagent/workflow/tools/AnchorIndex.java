@@ -32,6 +32,7 @@ import java.util.regex.Pattern;
  * 由 AnchorManager 持有。不涉及文件内容修改。
  */
 // @anchor: anchorIndex_class
+// 锚点索引：维护 .anchors.json 的读写与查询
 class AnchorIndex {
     private static final Logger logger = LoggerFactory.getLogger(AnchorIndex.class);
     private final ObjectMapper objectMapper;
@@ -55,6 +56,7 @@ class AnchorIndex {
             "target", "node_modules", ".git", "classes", "build", "dist", "out");
 
     // @anchor: anchorIndex_constructor
+// 构造：绑定项目路径与索引文件
     AnchorIndex(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
     }
@@ -62,6 +64,7 @@ class AnchorIndex {
     // ===== 索引路径 =====
 
     // @anchor: anchorIndex_getIndexPath
+// 返回索引文件（.anchors.json）路径
     private Path getIndexPath(String projectPath) {
         try {
             Path projectDir = PathUtils.safeResolve(projectPath);
@@ -75,6 +78,7 @@ class AnchorIndex {
     // ===== 旧索引迁移 =====
 
     // @anchor: anchorIndex_migrateOldIndex
+// 旧索引迁移：兼容历史格式
     private synchronized void migrateOldIndexIfNeeded() {
         if (migrationAttempted) return;
         migrationAttempted = true;
@@ -527,6 +531,7 @@ class AnchorIndex {
     // ===== 列出锚点 =====
 
     // @anchor: anchorIndex_list
+// 列出指定项目/文件的所有锚点
     String list(String projectPath, String filePath) {
         try {
             Path projectDir = PathUtils.safeResolve(projectPath);
@@ -596,6 +601,7 @@ class AnchorIndex {
     }
 
     // @anchor: anchorIndex_appendAnchorLines
+// 提取锚点行及其下方描述并写入索引
     private void appendAnchorLines(StringBuilder sb, List<Map<String, Object>> anchors) {
         for (Map<String, Object> anchor : anchors) {
             String id = (String) anchor.get("id");
@@ -678,6 +684,7 @@ class AnchorIndex {
     // ===== 查找锚点 =====
 
     // @anchor: anchorIndex_find
+// 按锚点 ID 在文件内查找锚点
     AnchorLocation find(String projectPath, String anchorId) {
         try {
             Path indexFile = getIndexPath(projectPath);
@@ -713,6 +720,7 @@ class AnchorIndex {
     }
 
     // @anchor: anchorIndex_findGlobally
+// 跨项目全局查找锚点
     AnchorLocation findGlobally(String anchorId) {
         migrateOldIndexIfNeeded();
 

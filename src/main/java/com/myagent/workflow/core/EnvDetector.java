@@ -1,3 +1,5 @@
+// @anchor: envDetector_tot_desc
+// 本机开发环境探测器：自动定位 JDK/Maven/Python/Node/MinGW/MSVC 并生成配置文件
 package com.myagent.workflow.core;
 
 import java.io.File;
@@ -18,10 +20,14 @@ import java.util.stream.Stream;
  * <p>可独立运行：{@code java -cp app.jar com.myagent.workflow.core.EnvDetector out.properties}
  * <p>也可被 {@link AgentConfig} 在缺少配置文件时自动调用。
  */
+// @anchor: envDetector_class
+// 环境探测器：按 PATH/环境变量/注册表/常见安装位置逐层查找各语言工具链
 public final class EnvDetector {
 
     public static final String CONFIG_FILE_NAME = "agent-config.properties";
 
+    // @anchor: envDetector_scanLimits
+    // 全盘扫描深度上限与扫描时需要跳过的目录名集合
     /** 全盘扫描最大深度（够覆盖 {@code I:\dev\toolchains\mingw64\bin} 之类） */
     private static final int MAX_SCAN_DEPTH = 5;
 
@@ -40,6 +46,8 @@ public final class EnvDetector {
     // 入口
     // =================================================================
 
+    // @anchor: envDetector_main
+    // 命令行入口：探测环境并把配置写到指定路径（默认 agent-config.properties）
     public static void main(String[] args) {
         Path out = Paths.get(args.length > 0 ? args[0] : CONFIG_FILE_NAME);
         try {
@@ -54,6 +62,8 @@ public final class EnvDetector {
         }
     }
 
+    // @anchor: envDetector_detectAndWrite
+    // 探测工具链并渲染为 properties 文件落盘，返回写入路径
     /** 探测并写出配置文件，返回写入路径 */
     public static Path detectAndWrite(Path out) throws IOException {
         System.out.println("🔍 正在探测本机开发环境 ...");
@@ -72,6 +82,8 @@ public final class EnvDetector {
     // 收集
     // =================================================================
 
+    // @anchor: envDetector_collect
+    // 汇总各类工具链探测结果，并决策默认 C++ 编译器类型
     public static Map<String, String> collect() {
         Map<String, String> m = new LinkedHashMap<>();
         m.put("javaHome",          findJavaHome());
@@ -110,6 +122,8 @@ public final class EnvDetector {
     // Java Home
     // =================================================================
 
+    // @anchor: envDetector_findJavaHome
+    // 定位 JDK 根目录：环境变量 → 常见发行版安装位置 → 由 java.exe 反推
     private static String findJavaHome() {
         String jh = System.getenv("JAVA_HOME");
         if (jh != null && !jh.isBlank() && Files.isDirectory(Paths.get(jh))) return normalize(jh);
@@ -155,6 +169,8 @@ public final class EnvDetector {
     // Maven
     // =================================================================
 
+    // @anchor: envDetector_findMaven
+    // 定位 mvn 可执行文件：PATH → MAVEN_HOME/M2_HOME → IDE 自带与常见安装位置
     private static String findMaven() {
         // 1) PATH
         String p = which("mvn.cmd", "mvn.bat", "mvn");
@@ -203,6 +219,8 @@ public final class EnvDetector {
     // Python
     // =================================================================
 
+    // @anchor: envDetector_findPython
+    // 定位 python 解释器：PATH → py launcher → 常见安装位置
     private static String findPython() {
         // 1) PATH
         String p = which("python.exe", "python3.exe", "python", "python3");
@@ -238,6 +256,8 @@ public final class EnvDetector {
         return "";
     }
 
+    // @anchor: envDetector_pythonViaPyLauncher
+    // 通过 Windows py launcher 查询真实解释器路径
     /** 通过 Windows 的 py launcher 找到真正的 python 路径 */
     private static String pythonViaPyLauncher() {
         String py = which("py.exe", "py");
@@ -257,6 +277,8 @@ public final class EnvDetector {
     // Node
     // =================================================================
 
+    // @anchor: envDetector_findNode
+    // 定位 node 可执行文件：PATH → 常见安装位置与 nvm/scoop 目录
     private static String findNode() {
         String p = which("node.exe", "node");
         if (p != null) return normalize(p);
@@ -288,6 +310,8 @@ public final class EnvDetector {
     // MinGW —— 分层探测
     // =================================================================
 
+    // @anchor: envDetector_findMinGW
+    // 分层定位 g++：PATH → 由 gcc 反推 → 注册表 → 全盘扫描
     private static String findMinGW() {
         // 1) PATH
         String p = which(
@@ -322,6 +346,8 @@ public final class EnvDetector {
         return "";
     }
 
+    // @anchor: envDetector_probeBin
+    // 在候选目录的 bin 子目录中查找 g++
     /** 在 dir/bin/ 里找 g++ */
     private static String probeBin(Path dir) {
         if (dir == null || !Files.isDirectory(dir)) return null;
@@ -330,6 +356,8 @@ public final class EnvDetector {
         return findGppIn(bin);
     }
 
+    // @anchor: envDetector_findGppIn
+    // 在指定 bin 目录内匹配 g++（先精确名再按模式匹配）
     /** 在给定 bin 目录里匹配 g++（含带前缀的变体） */
     private static String findGppIn(Path binDir) {
         String[] exact = {
@@ -356,6 +384,8 @@ public final class EnvDetector {
     // 注册表探测
     // =================================================================
 
+    // @anchor: envDetector_registryCandidates
+    // 查询卸载注册表，筛选含 MinGW/MSYS2 等关键词的安装目录
     private static List<Path> registryCandidates() {
         List<Path> out = new ArrayList<>();
         String[] roots = {
@@ -377,6 +407,8 @@ public final class EnvDetector {
         return out;
     }
 
+    // @anchor: envDetector_runRegQuery
+    // 调用 reg query 递归读取注册表键并用系统默认编码解码输出
     private static String runRegQuery(String key) {
         try {
             Process p = new ProcessBuilder("reg", "query", key, "/s")
@@ -390,6 +422,8 @@ public final class EnvDetector {
         }
     }
 
+    // @anchor: envDetector_parseUninstallReg
+    // 解析注册表文本块，提取匹配关键词的 InstallLocation 及其子目录
     private static void parseUninstallReg(String text, String[] keywords, List<Path> out) {
         String[] blocks = text.split("(?=HKEY_)");
         for (String block : blocks) {
@@ -438,6 +472,8 @@ public final class EnvDetector {
     // 全盘扫描
     // =================================================================
 
+    // @anchor: envDetector_scanRoots
+    // 收集全盘扫描起点：所有盘符根 + 常见开发目录
     private static List<Path> scanRoots() {
         List<Path> roots = new ArrayList<>();
         // 所有盘符
@@ -462,6 +498,8 @@ public final class EnvDetector {
         return roots;
     }
 
+    // @anchor: envDetector_scanForGpp
+    // 限深遍历目录树查找含 g++ 的 bin 目录，命中即终止
     private static String scanForGpp(Path root, int maxDepth) {
         final String[] result = {null};
         try {
@@ -499,8 +537,12 @@ public final class EnvDetector {
     // MSVC
     // =================================================================
 
+    // @anchor: envDetector_msvcPaths
+    // MSVC 编译/头文件/库目录三元组
     private record MsvcPaths(String compiler, String include, String lib) {}
 
+    // @anchor: envDetector_findMsvc
+    // 组装 MSVC 的 cl.exe、include 与 lib 路径（含 Windows SDK）
     private static MsvcPaths findMsvc() {
         String vsRoot = findVsRoot();
         if (vsRoot == null) return new MsvcPaths("", "", "");
@@ -549,6 +591,8 @@ public final class EnvDetector {
                 normalize(String.join(";", lib)));
     }
 
+    // @anchor: envDetector_findVsRoot
+    // 用 vswhere 或常见安装目录定位 Visual Studio 根目录
     private static String findVsRoot() {
         String vswhere = "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
         if (Files.isRegularFile(Paths.get(vswhere))) {
@@ -593,6 +637,8 @@ public final class EnvDetector {
         if (p != null && Files.isDirectory(Paths.get(p))) list.add(p);
     }
 
+    // @anchor: envDetector_which
+    // 沿 PATH 查找可执行文件，无扩展名时按 PATHEXT 依次尝试
     /** PATH 探测：按 PATHEXT 依次尝试可执行文件后缀 */
     private static String which(String... names) {
         String pathEnv = System.getenv("PATH");
@@ -621,6 +667,8 @@ public final class EnvDetector {
         return null;
     }
 
+    // @anchor: envDetector_extList
+    // 读取 PATHEXT 得到可执行扩展名列表（缺失时给默认值）
     private static String[] extList() {
         String ext = System.getenv("PATHEXT");
         if (ext == null || ext.isBlank()) return new String[]{".exe", ".cmd", ".bat"};
@@ -642,6 +690,8 @@ public final class EnvDetector {
         return list.isEmpty() ? null : list.get(list.size() - 1).toString();
     }
 
+    // @anchor: envDetector_glob
+    // 简易单级通配匹配，并按版本号排序返回候选路径
     /** 简易 glob：处理路径中的 {@code *}（只做目录名/文件名一级匹配） */
     private static List<Path> glob(String pattern, boolean dirOnly) {
         List<Path> results = new ArrayList<>();
@@ -683,6 +733,8 @@ public final class EnvDetector {
         return results;
     }
 
+    // @anchor: envDetector_compareVersions
+    // 按数字段比较版本名，数字相同则回退字典序
     private static int compareVersions(String a, String b) {
         int[] na = numbers(a), nb = numbers(b);
         int n = Math.max(na.length, nb.length);
@@ -710,6 +762,8 @@ public final class EnvDetector {
         return v.replace("\\", "/").replace(":", "\\:").replace("=", "\\=");
     }
 
+    // @anchor: envDetector_render
+    // 把探测结果渲染为带注释分区的 agent-config.properties 文本
     private static String render(Map<String, String> env) {
         String ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
         StringBuilder sb = new StringBuilder();

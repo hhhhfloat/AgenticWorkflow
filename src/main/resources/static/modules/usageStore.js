@@ -1,4 +1,6 @@
 // @anchor: modules_usageStore
+// 按会话累计 Token / 成本并渲染用量面板
+
 const USAGE_KEY_PREFIX = 'usage_';
 
 function getSessionUsage(sessionId) {

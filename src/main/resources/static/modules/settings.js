@@ -1,4 +1,6 @@
 // @anchor: modules_settings
+// 配置弹窗：读写本地配置、填充表单、保存 / 重置并触发重启
+
 // ===== 配置管理模块 =====
 
 const SETTINGS_STORAGE_KEY = 'agentSettings';

@@ -1,11 +1,15 @@
 // @anchor: modules_status
+// 后端状态查询模块：页面加载时探测后端是否有任务在运行
+
 // ===== 后端状态查询 =====
 
 /**
  * 页面加载时查询后端是否有 Agent 在运行
  * 如果有，恢复前端状态（按钮、运行标志等）
  */
-// @anchor: modules_status
+// @anchor: modules_checkBackendStatus
+// 查询 /status，若后端仍在运行则恢复前端运行标志与按钮状态
+
 // ===== 后端状态查询（含重连检测） =====
 
 async function checkBackendStatus() {

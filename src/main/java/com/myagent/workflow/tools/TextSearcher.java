@@ -16,6 +16,7 @@ import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 // @anchor: textSearcher_class
+// 全文检索实现：按关键词/正则扫描项目文件
 /**
  * 全文正则搜索模块：负责 searchText 工具的逻辑。
  * 文件收集 / 排除目录 / 扩展名过滤复用 SearchFileFilter 基础设施。
@@ -30,6 +31,7 @@ public class TextSearcher {
             ".py", ".pyw");
 
     // @anchor: textSearcher_searchText
+// 在项目文件中搜索文本并返回命中行
     String searchText(String keyword, String filePattern, String path) {
         try {
             Path startPath = PathUtils.safeResolve(path);

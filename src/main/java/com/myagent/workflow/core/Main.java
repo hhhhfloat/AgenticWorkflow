@@ -1,3 +1,5 @@
+// @anchor: main_tot_desc
+// Agent 主循环：驱动 DeepSeek 多轮对话、分发工具调用、记录用量并刷新索引
 package com.myagent.workflow.core;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,6 +27,8 @@ import java.util.concurrent.TimeUnit;
  * - 多轮对话：首轮 init()，后续 appendUserMessage()；任务结束 mergeSummaryToBase()
  * - 去冗余：移除 outputCutTools、iterationListenerIsNull、未使用的静态 logIf
  */
+// @anchor: main_class
+// Agent 编排器：一个实例服务一个 Session，负责多轮 API 调用与工具分发
 public class Main {
 
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
@@ -61,6 +65,8 @@ public class Main {
 
     // ==================== 构造 ====================
 
+    // @anchor: main_constructor
+    // 首选构造：绑定 Session 并创建/复用其 ContextManager 与 ToolExecutor
     /**
      * 首选构造：绑定到 Session。
      * <p>
@@ -102,6 +108,8 @@ public class Main {
         this.toolExecutor.setLogConsumer(session::log);
     }
 
+    // @anchor: main_constructorWithConfig
+    // 兼容构造：内部创建一个独立的临时 Session
     /**
      * 兼容构造：内部创建一个独立的临时 Session。
      * 供 TestRunnerFX 等场景使用。
@@ -112,6 +120,8 @@ public class Main {
 
     // ==================== API Key 校验 ====================
 
+    // @anchor: main_checkApiKey
+    // 调用 /v1/models 校验 API Key 是否有效（网络异常时按可用处理）
     /**
      * 校验 DeepSeek API Key 是否有效。
      */
@@ -149,6 +159,8 @@ public class Main {
 
     // ==================== 运行入口 ====================
 
+    // @anchor: main_run
+    // 执行一次任务：准备消息→多轮请求→分发工具→合并摘要并刷新索引
     /**
      * 在绑定的 Session 中运行一次任务。
      * <p>
@@ -275,10 +287,14 @@ public class Main {
         }
     }
 
+    // @anchor: main_runDefault
+    // 便捷重载：使用默认最大迭代次数运行
     public String run(String userRequest) throws IOException {
         return run(userRequest, AgentConfig.getDefaultMaxIterations());
     }
 
+    // @anchor: main_buildTaskSummary
+    // 生成兜底任务摘要（Agent 未主动压缩时以其最终回复代替）
     /**
      * 兜底摘要生成：当 Agent 未主动压缩时，用它的最终回复作为摘要。
      * 若未来 Agent 稳定遵守"结束前必须压缩"的约定，此方法调用频率会大幅降低。
@@ -292,6 +308,8 @@ public class Main {
 
     // ==================== 传输层 ====================
 
+    // @anchor: main_sendAndReceive
+    // 发送请求体到 DeepSeek API 并返回解析后的 JSON
     /**
      * 通用传输层：发送 requestBody，返回解析后的 JsonNode。
      * <p>
@@ -328,6 +346,8 @@ public class Main {
 
     // ==================== 辅助 ====================
 
+    // @anchor: main_recordUsage
+    // 解析响应 usage 字段并累计成本，同时回调迭代监听器
     private void recordUsage(JsonNode root, int iteration) {
         JsonNode usage = root.get("usage");
         if (usage == null) return;
@@ -348,6 +368,8 @@ public class Main {
         }
     }
 
+    // @anchor: main_getDisplayResult
+    // 裁剪过长的工具结果，避免日志刷屏
     private static String getDisplayResult(String functionName, String result) {
         if ("read_file".equals(functionName) && result.length() > 300) {
             return result.substring(0, 200) + "... [共 " + result.length() + " 字符]";
@@ -357,6 +379,8 @@ public class Main {
 
     // ==================== 停止 ====================
 
+    // @anchor: main_stop
+    // 请求停止任务：置停止标记并中断运行线程
     public void stop() {
         this.stopRequested = true;
         Thread t = this.runningThread;
@@ -383,6 +407,8 @@ public class Main {
 
     // ==================== CLI 入口 ====================
 
+    // @anchor: main_cli
+    // 命令行入口：校验 API Key 与参数后按需求描述运行一次任务
     public static void main(String[] args) {
         String apiKey = System.getenv("DEEPSEEK_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {

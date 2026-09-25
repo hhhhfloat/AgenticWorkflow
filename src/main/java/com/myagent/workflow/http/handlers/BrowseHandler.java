@@ -1,3 +1,5 @@
+// @anchor: browseHandler_tot_desc
+// 目录浏览处理器：GET /browse，列出 sandbox/TestProjects 下的条目
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,7 +18,11 @@ import java.util.stream.Stream;
 
 import static com.myagent.workflow.http.utils.HandlerUtils.parseQuery;
 
+// @anchor: browseHandler_class
+// 目录浏览处理器：限制访问范围并返回目录条目（含 index.html 标记与大小）
 public class BrowseHandler implements HttpHandler {
+    // @anchor: browseHandler_handle
+    // 处理浏览请求：路径穿越校验、访问范围限制、条目收集与排序
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -98,3 +104,4 @@ public class BrowseHandler implements HttpHandler {
     }
 
 }
+

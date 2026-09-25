@@ -1,4 +1,6 @@
 // @anchor: modules_runner
+// 项目运行模块：按注册表信息请求后端编译并运行项目
+
 // ===== 项目运行模块 =====
 
 /**
@@ -7,7 +9,9 @@
  * @param {string} filename - 入口文件名（如 'Main.java'）
  * @param {string} mode - 编译模式（如 'java'、'auto'）
  */
-// @anchor: modules_runner
+// @anchor: modules_runRegisteredProject
+// 运行已注册项目并把编译运行结果回显到日志
+
 // ===== 项目运行模块 =====
 
 // runner.js

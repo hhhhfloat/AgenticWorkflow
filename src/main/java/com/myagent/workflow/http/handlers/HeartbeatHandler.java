@@ -1,3 +1,5 @@
+// @anchor: heartBeatHandler_tot_desc
+// 心跳处理器：POST /heartbeat，刷新会话心跳并检测沙箱目录变化
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,6 +19,8 @@ import java.util.Comparator;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+// @anchor: heartBeatHandler_class
+// 心跳处理器：更新指定会话心跳时间，并按目录哈希判断前端是否需要刷新
 /**
  * POST /heartbeat
  * 请求体：{ "sessionId": "xxx" }
@@ -31,6 +35,8 @@ public class HeartbeatHandler implements HttpHandler {
     private String lastTestProjectsHash = null;
     private int heartBeatCount = 0;
 
+    // @anchor: heartBeatHandler_handle
+    // 处理心跳请求：刷新会话心跳并返回是否需要刷新标志
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -68,6 +74,8 @@ public class HeartbeatHandler implements HttpHandler {
         }
     }
 
+    // @anchor: heartBeatHandler_detectDirectoryChange
+    // 每若干次心跳比对沙箱/测试目录哈希，判定是否需要刷新
     private boolean detectDirectoryChange() {
         String sbHash = computeHash("sandbox");
         String tpHash = computeHash("TestProjects");
@@ -90,6 +98,8 @@ public class HeartbeatHandler implements HttpHandler {
         return needRefresh;
     }
 
+    // @anchor: heartBeatHandler_computeHash
+    // 由目录内文件名与修改时间生成简易哈希
     private String computeHash(String dir) {
         Path target = Paths.get("./" + dir);
         if (!Files.exists(target) || !Files.isDirectory(target)) return null;

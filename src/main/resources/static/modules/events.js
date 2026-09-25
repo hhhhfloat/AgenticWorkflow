@@ -1,4 +1,6 @@
 // @anchor: modules_events
+// 绑定侧边栏视图切换与运行 / 停止 / 清空等界面事件
+
 // ===== 事件绑定 =====
 // ===== 侧边栏视图切换 =====
 function switchSidebarView(view) {
@@ -64,6 +66,8 @@ window.addEventListener('beforeunload', () => {
 });
 
 // @anchor: modules_visibility
+// 页面切回前台时立即补发心跳，避免后端超时断开
+
 // ===== 页面可见性变化：切回前台时立即心跳，防止后端超时断开 =====
 document.addEventListener('visibilitychange', function() {
     if (!document.hidden) {
@@ -78,6 +82,8 @@ document.getElementById('logBtn').addEventListener('click', () => {
 });
 
 // @anchor: modules_init
+// 页面加载完成时初始化配置 / 会话 / 文件树 / 心跳
+
 // ===== DOMContentLoaded 初始化 =====
 document.addEventListener('DOMContentLoaded', async function() {
     loadConfig();
