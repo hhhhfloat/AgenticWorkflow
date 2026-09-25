@@ -1,3 +1,5 @@
+// @anchor: fileStructureFormatter_tot_desc
+// 结构文本格式化器：把 FileStructure 渲染成精简可读的文本供 Agent 阅读
 package com.myagent.workflow.parser;
 
 import com.myagent.workflow.model.*;
@@ -8,8 +10,12 @@ import java.util.stream.Collectors;
 /**
  * 将 FileStructure 转换为精简文本格式，减少 Agent 接收的冗余信息
  */
+// @anchor: fileStructureFormatter_class
+// 结构格式化器：输出文件路径、语言、类/方法/字段与锚点清单
 public final class FileStructureFormatter {
 
+    // @anchor: fileStructureFormatter_format
+    // 把文件结构渲染为紧凑文本（含类、顶层函数与锚点分区）
     public static String format(FileStructure fs) {
         StringBuilder sb = new StringBuilder();
         sb.append("📄 ").append(fs.filePath()).append("\n");
@@ -70,6 +76,8 @@ public final class FileStructureFormatter {
         return sb.toString();
     }
 
+    // @anchor: fileStructureFormatter_formatMethod
+    // 渲染单个方法：修饰符、返回类型、名称、参数与行区间
     private static String formatMethod(MethodDefinition m) {
         StringBuilder sb = new StringBuilder();
         if (m.modifiers() != null && !m.modifiers().isEmpty()) {
@@ -82,6 +90,8 @@ public final class FileStructureFormatter {
         return sb.toString();
     }
 
+    // @anchor: fileStructureFormatter_formatField
+    // 渲染单个字段：修饰符、类型、名称与所在行
     private static String formatField(FieldDefinition f) {
         StringBuilder sb = new StringBuilder();
         if (f.modifiers() != null && !f.modifiers().isEmpty()) {

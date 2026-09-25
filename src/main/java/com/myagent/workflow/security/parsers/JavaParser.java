@@ -1,3 +1,5 @@
+// @anchor: securityJavaParser_tot_desc
+// Java 注释解析器：剥离 // 与 /* */ 注释后提取有效代码行
 package com.myagent.workflow.security.parsers;
 
 import com.myagent.workflow.security.CodeLine;
@@ -5,11 +7,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+// @anchor: securityJavaParser_class
+// Java 解析器：逐行剥离单行与块注释，产出非空代码行及其原始行号
 public class JavaParser implements CodeParser {
+    // @anchor: securityJavaParser_patterns
+    // 单行注释与块注释起止的匹配模式
     private static final Pattern SINGLE_LINE_COMMENT = Pattern.compile("//.*$");
     private static final Pattern MULTI_LINE_COMMENT_START = Pattern.compile("/\\*");
     private static final Pattern MULTI_LINE_COMMENT_END = Pattern.compile("\\*/");
 
+    // @anchor: securityJavaParser_extractEffectiveLines
+    // 处理跨行块注释状态并移除单行注释，返回非空的代码行
     @Override
     public List<CodeLine> extractEffectiveLines(String source) {
         List<CodeLine> effectiveLines = new ArrayList<>();

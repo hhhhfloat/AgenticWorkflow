@@ -4,46 +4,88 @@
     <meta charset="UTF-8">
     <title>本地 Agent 工作台</title>
     <!-- @anchor: html_head -->
+    <!-- 页面 head：引入 marked 渲染库与全局样式表 -->
     <script src="marked.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="mobileLockBanner" style="display:none;">
+    📱 手机正在使用中，本设备操作已暂停（本机模式重启服务可释放）
+</div>
 <div id="app">
     <!-- ===== 侧边栏 ===== -->
+    <!-- @anchor: html_sidebar -->
+    <!-- 侧边栏：视图切换、工作项目、文件树视图与会话视图 -->
     <div id="sidebar">
         <div id="sidebarHeader">
-            <span>📁 文件浏览器</span>
+            <span>📁 工作台</span>
             <button id="toggleSidebarBtn" title="折叠侧边栏">◀</button>
         </div>
-        <div id="sidebarContent">
-            <div class="tree-root" data-path="sandbox">📂 sandbox</div>
-            <div class="tree-root" data-path="TestProjects">📂 TestProjects</div>
+
+        <!-- 顶部视图切换 -->
+        <div id="sidebarToolbar">
+            <button id="viewFilesBtn" class="active">📁 文件</button>
+            <button id="viewSessionsBtn">💬 会话</button>
+        </div>
+
+        <!-- 工作项目占位（阶段 2 改为下拉） -->
+        <div id="projectSelector">
+            <span class="label">📌 工作项目：</span>
+            <span class="value">未选择</span>
+        </div>
+
+        <!-- 文件视图 -->
+        <div id="filesView">
+            <div id="sidebarContent">
+                <div class="tree-root" data-path="sandbox">📂 sandbox</div>
+                <div class="tree-root" data-path="TestProjects">📂 TestProjects</div>
+            </div>
+        </div>
+
+        <!-- 会话视图 -->
+        <div id="sessionsView" style="display:none;">
+            <div class="session-header">
+                <button id="newSessionBtn">＋ 新对话</button>
+            </div>
+            <div id="sessionListView"></div>
         </div>
     </div>
 
     <!-- ===== 主工作区 ===== -->
+    <!-- @anchor: html_main -->
+    <!-- 主工作区：标题、日志输出、用量面板与输入区 -->
     <div id="main">
         <h2>Agentic 工作台</h2>
 
-        <textarea id="prompt" placeholder="输入你的需求，例如：写一个 HTML 计算器，支持加减乘除">写一个 HTML 计算器，支持加减乘除</textarea>
+        <!-- 日志区（顶部，占据剩余空间） -->
+        <div id="output">等待输入...</div>
 
-        <div id="historyContainer"></div>
+        <div id="usagePanel" class="usage-panel"></div>
+        <!-- 输入区（底部固定） -->
+        <!-- @anchor: html_inputArea -->
+        <!-- 输入区：提示词、历史、迭代次数与运行/停止/清空/日志/配置按钮 -->
+        <div id="inputArea">
+            <textarea id="prompt" placeholder="输入你的需求，例如：写一个 HTML 计算器，支持加减乘除">写一个 HTML 计算器，支持加减乘除</textarea>
+            <div id="historyContainer"></div>
 
-        <div class = "iteration-control">
-            <label for="maxIterations" >🔄 最大迭代次数：</label>
-            <input type="number" id="maxIterations" value="20" min="3" max="100">
-            <span class="hint">（3-100, 建议 > 15）</span>
-        </div>
+            <div class="iteration-control">
+                <label for="maxIterations">🔄 最大迭代次数：</label>
+                <input type="number" id="maxIterations" value="100" min="3" max="100">
+                <span class="hint">（3-100）</span>
+            </div>
 
-        <div class="button-row">
-            <button id="runBtn">▶ 运行</button>
-            <button id="stopBtn" disabled>⏹ 停止</button>
-            <button id="clearBtn" class="clear-btn">🗑 清空</button>
-            <button id="logBtn" class="log-btn" title="打开 HistoryOutput 日志文件夹">📂 日志</button>
-            <button id="configBtn" class="config-btn" title="高级配置">⚙️ 配置</button>
+            <div class="button-row">
+                <button id="runBtn">▶ 运行</button>
+                <button id="stopBtn" disabled>⏹ 停止</button>
+                <button id="clearBtn" class="clear-btn">🗑 清空</button>
+                <button id="logBtn" class="log-btn" title="打开 HistoryOutput 日志文件夹">📂 日志</button>
+                <button id="configBtn" class="config-btn" title="高级配置">⚙️ 配置</button>
+            </div>
         </div>
 
         <!-- ===== 配置弹窗 ===== -->
+        <!-- @anchor: html_configModal -->
+        <!-- 配置弹窗：API Key、模型、编译工具链路径与安全扫描开关 -->
         <div id="configModal" class="modal" style="display:none;">
             <div class="modal-content">
                 <div class="modal-header">
@@ -60,7 +102,7 @@
                     </div>
                     <div class="setting-row">
                         <label>模型</label>
-                        <input type="text" id="setModel" value="deepseek-v4-flash">
+                        <input type="text" id="setModel" value="">
                     </div>
                     <div class="setting-row">
                         <label>自动打开浏览器</label>
@@ -106,28 +148,6 @@
                             <span class="hint-text">关闭后编译前不扫描危险代码（请自行承担风险）</span>
                         </div>
                     </div>
-                    <div class="setting-row">
-                        <label>🧠 上下文压缩</label>
-                        <div class="toggle-group">
-                            <input type="checkbox" id="setCompressionEnabled" checked>
-                            <span class="hint-text">关闭后 Agent 不会进行上下文压缩（用于对比测试）</span>
-                        </div>
-                    </div>
-                    <!-- 🆕 新增：压缩间隔参数 -->
-                    <div class="setting-row">
-                        <label>📏 最小压缩间隔</label>
-                        <div class="toggle-group">
-                            <input type="number" id="setMinInterval" value="5" min="2" max="10" step="1">
-                            <span class="hint-text">（2~10，建议 ≥ 3）</span>
-                        </div>
-                    </div>
-                    <div class="setting-row">
-                        <label>📏 最大压缩间隔</label>
-                        <div class="toggle-group">
-                            <input type="number" id="setMaxInterval" value="15" min="10" max="30" step="1">
-                            <span class="hint-text">（10~30，必须 ≥ 最小压缩间隔）</span>
-                        </div>
-                    </div>
                 </div>
                 <div class="modal-footer">
                     <button id="saveSettingsBtn">💾 保存</button>
@@ -137,11 +157,11 @@
             </div>
         </div>
 
-        <div id="output">等待输入...</div>
     </div>
 </div>
 
 <!-- @anchor: html_scripts -->
+<!-- 脚本加载顺序：第三方库 → 核心模块 → 各功能模块 → 事件绑定与初始化 -->
 <!-- 第三方库 -->
 <script src="tips.js"></script>
 
@@ -156,6 +176,9 @@
 <script src="modules/log.js"></script>
 <!-- 历史记录 -->
 <script src="modules/history.js"></script>
+<script src="modules/sessionState.js"></script>
+<script src="modules/usageStore.js"></script>
+<script src="modules/sessionList.js"></script>
 <!-- 心跳机制 -->
 <script src="modules/heartbeat.js"></script>
 <!-- 文件树 -->

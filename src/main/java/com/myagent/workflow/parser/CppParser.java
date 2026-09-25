@@ -1,3 +1,5 @@
+// @anchor: cppParser_tot_desc
+// C/C++ 结构解析器：提取锚点、#include、命名空间、类、方法与字段
 package com.myagent.workflow.parser;
 
 import com.myagent.workflow.model.*;
@@ -9,8 +11,12 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 
+// @anchor: cppParser_class
+// C/C++ 解析器：结合花括号深度与命名空间栈识别类、成员与自由函数
 public class CppParser implements StructureParser {
 
+    // @anchor: cppParser_patterns
+    // C/C++ 锚点、头文件、命名空间、类/结构体、方法与字段等匹配正则集合
     private static final Pattern ANCHOR_PATTERN = Pattern.compile(
             "//\\s*@anchor:\\s*(\\w+)|" +
                     "/\\*\\s*@anchor:\\s*(\\w+)\\s*\\*/"
@@ -61,6 +67,8 @@ public class CppParser implements StructureParser {
     // 结束句点
     private static final Pattern SEMICOLON = Pattern.compile(";");
 
+    // @anchor: cppParser_supports
+    // 识别 .cpp/.cc/.cxx/.h/.hpp/.hxx 等 C/C++ 文件
     @Override
     public boolean supports(Path file) {
         String name = file.getFileName().toString().toLowerCase();
@@ -69,6 +77,8 @@ public class CppParser implements StructureParser {
                 name.endsWith(".hpp") || name.endsWith(".hxx");
     }
 
+    // @anchor: cppParser_parse
+    // 逐行解析：维护命名空间栈与花括号深度，收集类、成员与自由函数
     @Override
     public FileStructure parse(Path file) throws IOException {
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
@@ -339,6 +349,8 @@ public class CppParser implements StructureParser {
         );
     }
 
+    // @anchor: cppParser_parseParameters
+    // 把逗号分隔的形参串拆成参数名列表
     private List<String> parseParameters(String params) {
         List<String> result = new ArrayList<>();
         if (params == null || params.trim().isEmpty()) return result;
@@ -350,6 +362,8 @@ public class CppParser implements StructureParser {
         return result;
     }
 
+    // @anchor: cppParser_stripStringsOnly
+    // 移除字符串与字符常量内容，保留注释与代码
     /**
      * 去除字符串和字符常量，保留注释和代码
      */
@@ -391,6 +405,8 @@ public class CppParser implements StructureParser {
         return result.toString();
     }
 
+    // @anchor: cppParser_cleanLine
+    // 去掉行注释、块注释、字符串与字符常量，返回干净代码行
     @Override
     public String cleanLine(String rawLine) {
         StringBuilder result = new StringBuilder();
@@ -456,6 +472,8 @@ public class CppParser implements StructureParser {
         return result.toString();
     }
 
+    // @anchor: cppParser_builder
+    // 类定义构建器：累积类名/父类/行号以及方法与字段
     private static class ClassDefinitionBuilder {
         private final String name;
         private final String type;

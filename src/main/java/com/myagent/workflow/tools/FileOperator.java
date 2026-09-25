@@ -1,18 +1,19 @@
 package com.myagent.workflow.tools;
 
-import com.myagent.workflow.core.AgentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.function.Consumer;
 
 // @anchor: fileOperator_class
+// 文件操作实现：沙箱内读写/列目录/删文件
 public class FileOperator {
     private static final Logger logger = LoggerFactory.getLogger(FileOperator.class);
     private Consumer<String> logConsumer;
@@ -24,13 +25,12 @@ public class FileOperator {
 
     // ===== 工具方法 =====
     // @anchor: fileOperator_writeFile
+// 写入或覆盖沙箱内文件
     public String writeFile(String filename, String code) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
             Files.createDirectories(filePath.getParent());
-            try (FileWriter writer = new FileWriter(filePath.toFile())) {
-                writer.write(code);
-            }
+            writeAtomic(filePath,code);
             return "✅ " + filename;
         } catch (IOException e) {
             logger.error("写入文件失败", e);
@@ -38,8 +38,52 @@ public class FileOperator {
         }
     }
 
+    // @anchor: fileOperator_writeAtomic
+    /**
+     * 原子写入：先写临时文件，再 ATOMIC_MOVE 覆盖目标。
+     * 避免写入过程中进程被 kill 导致原文件被截断。
+     */
+    public static void writeAtomic(Path filePath, String content) throws IOException {
+        Path tmp = filePath.resolveSibling(filePath.getFileName() + ".tmp");
+        try {
+            Files.writeString(tmp, content, StandardCharsets.UTF_8);
+            try {
+                Files.move(tmp, filePath,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
+            throw e;
+        }
+    }
+
+// @anchor: fileOperator_writeLinesAtomic
+    /**
+     * 原子写入行列表，行为与 Files.write(path, lines) 一致。
+     */
+    public static void writeLinesAtomic(Path filePath, List<String> lines) throws IOException {
+        Path tmp = filePath.resolveSibling(filePath.getFileName() + ".tmp");
+        try {
+            Files.write(tmp, lines, StandardCharsets.UTF_8);
+            try {
+                Files.move(tmp, filePath,
+                        StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(tmp, filePath, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            try { Files.deleteIfExists(tmp); } catch (IOException ignored) {}
+            throw e;
+        }
+    }
+
 
     // @anchor: fileOperator_readFile
+// 读取沙箱内文件内容
     public String readFile(String filename) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -59,6 +103,7 @@ public class FileOperator {
     }
 
     // @anchor: fileOperator_deleteFile
+// 删除沙箱内文件
     public String deleteFile(String filename) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -78,6 +123,7 @@ public class FileOperator {
 
 
     // @anchor: fileOperator_listDirectory
+// 列出目录内容（可递归）
     public String listDirectory(String path, boolean recursive) {
         if (path == null || path.trim().isEmpty()) {
             path = ".";
@@ -115,6 +161,7 @@ public class FileOperator {
 
     // 辅助递归
     // @anchor: fileOperator_buildTree
+// 把目录结构渲染为树形文本
     private void buildTree(StringBuilder sb, Path dir, String indent, boolean isLast) {
         try {
             List<Path> entries = Files.list(dir)
@@ -160,6 +207,7 @@ public class FileOperator {
      * 判断是否应忽略该路径（隐藏目录/IDE元数据目录/版本控制目录）
      */
     // @anchor: fileOperator_shouldIgnore
+// 判断文件/目录是否应被忽略
     private boolean shouldIgnore(Path p) {
         String name = p.getFileName().toString();
         // 忽略以点开头的目录（Unix 隐藏目录），但保留 .gitignore 这样的文件

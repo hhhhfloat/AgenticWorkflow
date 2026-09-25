@@ -1,76 +1,104 @@
+// @anchor: httpServerMain_tot_desc
+// HTTP 服务入口：校验 API Key、初始化配置与会话、注册路由并启动服务
 package com.myagent.workflow.http;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.AgentConfig;
 import com.myagent.workflow.core.ConfigEditor;
 import com.myagent.workflow.core.Main;
 import com.myagent.workflow.http.handlers.*;
-import com.myagent.workflow.tools.ToolExecutor;
-import com.sun.net.httpserver.HttpServer;
+import com.myagent.workflow.session.SessionManager;
 import com.sun.net.httpserver.HttpHandler;
-import com.sun.net.httpserver.HttpExchange;
+import com.sun.net.httpserver.HttpServer;
 
-import java.io.*;
+import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.ClosedByInterruptException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.*;
 import java.util.concurrent.Executors;
-import java.util.stream.Stream;
 
-import static com.myagent.workflow.http.utils.HandlerUtils.parseQuery;
-import static com.myagent.workflow.http.utils.HandlerUtils.sendResponse;
-
-/**
- * @anchor: httpserver_class
- * HTTP 服务入口 —— 提供 Web 界面并托管 Agent 的 REST API。
- * 处理器类（ProjectsHandler / StaticHandler / ExternalFileHandler）已提取至 Handlers.java。
- */
+// @anchor: httpServerMain_class
+// HTTP 服务主类：维护会话管理器/全局配置单例，注册全部路由与心跳监控
 public class HttpServerMain {
-    // @anchor: httpserver_config
-    private static final int PORT = 8080;
-    private static final long HEARTBEAT_TIMEOUT_MS = 120000;
-    private static final long HEARTBEAT_CHECK_INTERVAL_MS = 5000;
 
-    // @anchor: httpserver_state
-    private static volatile long lastHeartbeatTime = System.currentTimeMillis();
-    private static volatile boolean isHeartbeatMonitorRunning = false;
-    private static volatile Main currentAgent = null;
-    private static final Object lock = new Object();
+    // ==================== 端口与超时 ====================
 
-    // @anchor: httpserver_exitCodes
-
-
-    /** 用户主动清除 API Key，需要删除环境变量并重启 */
-    public static final int EXIT_CODE_NO_API = 10;
-
-    public static final int EXIT_CODE_CLEAR_API_KEY = 42;
-
-    /** 用户修改了配置，需要重启（不删除环境变量） */
-    public static final int EXIT_CODE_RESTART = 43;
-
-    // 检测到有其他进程
-    public static final int EXIT_CODE_EXISTED_THREAD = 12;
-
+    public static final int PORT = 8080;
+    public static final long HEARTBEAT_TIMEOUT_MS = 120_000;
+    public static final long HEARTBEAT_CHECK_INTERVAL_MS = 5_000;
     public static final int MAX_ITERATIONS = 100;
 
-    // 在 HttpServerMain 类中
-    private static volatile boolean apiKeyClearedByUser = false;
-    public static boolean isApiKeyCleared() {
+    // ==================== 退出码 ====================
 
+    public static final int EXIT_CODE_NO_API = 10;
+    public static final int EXIT_CODE_CLEAR_API_KEY = 42;
+    public static final int EXIT_CODE_RESTART = 43;
+    public static final int EXIT_CODE_EXISTED_THREAD = 12;
+
+    // ==================== 全局单例 ====================
+
+    // @anchor: httpServerMain_singletons
+    // 全局单例与运行标志：会话管理器、配置、API Key 清除状态、心跳监控开关
+    private static volatile SessionManager sessionManager;
+    private static volatile AgentConfig globalConfig;
+    private static volatile boolean apiKeyClearedByUser = false;
+    private static volatile boolean heartbeatMonitorRunning = false;
+
+    // @anchor: httpServerMain_mobileLock
+    /** 手机独占锁：一旦手机发起请求即置位，服务重启才清除 */
+    private static volatile boolean mobileLocked = false;
+
+    public static void lockForMobile() { mobileLocked = true; }
+    public static boolean isMobileLocked() { return mobileLocked; }
+
+    // @anchor: httpServerMain_reg
+    /**
+     * 注册路由并包装设备保护。
+     * protect=true：手机锁定期间，来自桌面端的请求返回 403。
+     */
+    private static void reg(HttpServer server, String path, HttpHandler handler, boolean protect) {
+        server.createContext(path, new GuardedHandler(handler, protect));
+    }
+
+    /** 默认绑定：仅本机可访问 */
+    public static final String DEFAULT_BIND = "127.0.0.1";
+    /** 环境变量 key：设置后覆盖默认绑定地址（例如 Tailscale IP） */
+    public static final String BIND_ENV_KEY = "AGENT_BIND";
+
+    public static SessionManager getSessionManager() {
+        return sessionManager;
+    }
+
+    public static AgentConfig getGlobalConfig() {
+        return globalConfig;
+    }
+
+    public static boolean isApiKeyCleared() {
         return apiKeyClearedByUser;
     }
 
-    // @anchor: httpserver_entry
+    public static void markApiKeyCleared() {
+        apiKeyClearedByUser = true;
+    }
+
+    // @anchor: httpServerMain_resolveBindAddress
+    /**
+     * 解析 HTTP 服务绑定地址：
+     * - 环境变量 AGENT_BIND 优先（如 Tailscale 的 100.x.x.x）
+     * - 未设置时默认 127.0.0.1（仅本机可访问）
+     */
+    private static String resolveBindAddress() {
+        String v = System.getenv(BIND_ENV_KEY);
+        if (v == null || v.isBlank()) return DEFAULT_BIND;
+        return v.trim();
+    }
+
+    // ==================== 入口 ====================
+
+    // @anchor: httpServerMain_main
+    // 服务主流程：校验 API Key、建运行时目录、初始化会话并启动 HTTP 服务
     public static void main(String[] args) throws IOException {
-        // ===== 1. 校验 API Key =====
+        // 1. 校验 API Key
         String apiKey = System.getenv("DEEPSEEK_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {
             System.err.println("❌ 未设置 DEEPSEEK_API_KEY 环境变量");
@@ -81,10 +109,11 @@ public class HttpServerMain {
             System.exit(EXIT_CODE_NO_API);
         }
 
+        // 2. 初始化全局配置
+        globalConfig = ConfigEditor.buildDefault();
 
-        // 确保运行时目录存在
-        String[] requiredDirs = {"./sandbox", "./TestProjects", "./HistoryOutput", "./temp"};
-        for (String dir : requiredDirs) {
+        // 3. 确保运行时目录存在
+        for (String dir : new String[]{"./sandbox", "./TestProjects", "./HistoryOutput", "./temp", "./sessions"}) {
             Path p = Paths.get(dir);
             if (!Files.exists(p)) {
                 Files.createDirectories(p);
@@ -92,591 +121,116 @@ public class HttpServerMain {
             }
         }
 
+        // 4. 初始化 SessionManager
+        sessionManager = new SessionManager();
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            if (sessionManager != null) sessionManager.shutdown();
+        }));
+
+        // 5. 启动 HTTP 服务
         HttpServer server;
-
         try {
-            server = HttpServer.create(new InetSocketAddress("127.0.0.1", PORT), 0);
-
-            // 业务接口
-            server.createContext("/run", new RunHandler());
-            server.createContext("/stop", new StopHandler());
-            server.createContext("/heartbeat", new HeartbeatHandler());
-            server.createContext("/projects", new ProjectsHandler());
-            server.createContext("/browse", new BrowseHandler());
-            server.createContext("/archive", new ArchiveHandler());
-            server.createContext("/upload", new UploadHandler());
-            server.createContext("/createProject", new CreateProjectHandler());
-            server.createContext("/openFolder", new OpenFolderHandler());
-            server.createContext("/config", new ConfigHandler());
-            server.createContext("/clear-api-key", new ClearApiKeyHandler());
-            server.createContext("/restart", new RestartHandler());
-            server.createContext("/project-meta", new ProjectMetaHandler());
-            server.createContext("/runProject", new RunProjectHandler());
-            server.createContext("/status", new StatusHandler());
-
-
-            // 静态资源
-            server.createContext("/", new StaticHandler());
-
-            // 外部项目目录挂载
-            Path testProjectsDir = Paths.get("./TestProjects");
-            server.createContext("/TestProjects", new ExternalFileHandler(testProjectsDir, "/TestProjects"));
-            System.out.println("📁 已挂载外部目录: ./TestProjects -> http://localhost:" + PORT + "/TestProjects");
-
-            // 沙箱目录挂载
-            Path sandboxDir = Paths.get("./sandbox");
-            server.createContext("/sandbox", new ExternalFileHandler(sandboxDir, "/sandbox"));
-            System.out.println("📁 已挂载沙箱目录: ./sandbox -> http://localhost:" + PORT + "/sandbox");
-
+            String bindAddr = resolveBindAddress();
+            server = HttpServer.create(new InetSocketAddress(bindAddr, PORT), 0);
+            registerRoutes(server);
             server.setExecutor(Executors.newCachedThreadPool());
             server.start();
 
-            // 自动打开浏览器
-            try {
-                String url = "http://localhost:" + PORT;
-                if (java.awt.Desktop.isDesktopSupported()) {
-                    java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
-                    System.out.println("🌐 已自动打开浏览器: " + url);
-                } else {
-                    System.out.println("请手动打开浏览器访问: " + url);
-                }
-            } catch (Exception e) {
-                System.out.println("⚠️ 自动打开浏览器失败，请手动访问 http://localhost:" + PORT);
-            }
-
+            openBrowser(bindAddr);
             System.out.println("🚀 Agent 服务已启动（按 Enter 停止...）");
             startHeartbeatMonitor();
             System.in.read();
             server.stop(0);
-            System.out.println("服务已停止，重新启动以重新启动");
+            System.out.println("服务已停止。");
         } catch (Exception e) {
+            System.err.println("服务启动失败: " + e.getMessage());
             System.exit(EXIT_CODE_EXISTED_THREAD);
         }
     }
 
-    // ===================== 内部 Handler 类 =====================
+    // ==================== 路由注册 ====================
 
-    // ===================== 项目执行处理器 =====================
-    static class RunProjectHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                exchange.sendResponseHeaders(405, -1);
-                return;
-            }
+    // @anchor: httpServerMain_registerRoutes
+    // 注册全部 HTTP 路由：会话、任务、项目、系统、静态资源与外部目录
+    private static void registerRoutes(HttpServer server) {
+        // ── 会话管理（写：保护） ──
+        reg(server, "/session/create", new SessionCreateHandler(), true);
+        reg(server, "/session/close",  new SessionCloseHandler(), true);
+        reg(server, "/session/rename", new SessionRenameHandler(), true);
+        // ── 会话管理（读：放行） ──
+        reg(server, "/session/list",    new SessionListHandler(), false);
+        reg(server, "/session/history", new SessionHistoryHandler(), false);
 
-            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-            ObjectMapper mapper = new ObjectMapper();
-            JsonNode root;
-            String filename, mode;
+        // ── 任务执行 ──
+        reg(server, "/run",  new RunHandler(), true);
+        reg(server, "/stop", new StopHandler(), true);
 
-            try {
-                root = mapper.readTree(body);
-                filename = root.get("filename").asText();
-                mode = root.get("mode").asText();
-            } catch (Exception e) {
-                sendResponse(exchange, 400, "{\"error\":\"请求格式错误: " + e.getMessage() + "\"}");
-                return;
-            }
+        // ── 心跳 / 状态（放行） ──
+        reg(server, "/heartbeat", new HeartbeatHandler(), false);
+        reg(server, "/status",    new StatusHandler(), false);
+        reg(server, "/lock-status", new LockStatusHandler(), false);   // 新增
 
-            if (filename == null || filename.isEmpty() || mode == null || mode.isEmpty()) {
-                sendResponse(exchange, 400, "{\"error\":\"缺少必要参数: filename, mode\"}");
-                return;
-            }
+        // ── 项目操作 ──
+        reg(server, "/runProject",   new RunProjectHandler(), true);
+        reg(server, "/project-meta", new ProjectMetaHandler(), false);
 
-            // 安全检查：禁止路径穿越
-            if (filename.contains("..")) {
-                sendResponse(exchange, 403, "{\"error\":\"路径非法\"}");
-                return;
-            }
+        // ── 系统操作（保护） ──
+        reg(server, "/restart",       new RestartHandler(), true);
+        reg(server, "/clear-api-key", new ClearApiKeyHandler(), true);
+        reg(server, "/config",        new ConfigHandler(), true);
+        reg(server, "/switch-to-local", new SwitchToLocalHandler(), false);
 
-            try {
-                AgentConfig config = ConfigEditor.buildFromRequest(root);
-                ToolExecutor executor = new ToolExecutor(config, new ObjectMapper(), null, null);
+        // ── 项目/文件管理（保护） ──
+        reg(server, "/projects",      new ProjectsHandler(), false);
+        reg(server, "/browse",        new BrowseHandler(), false);
+        reg(server, "/archive",       new ArchiveHandler(), true);
+        reg(server, "/upload",        new UploadHandler(), true);
+        reg(server, "/createProject", new CreateProjectHandler(), true);
+        reg(server, "/openFolder",    new OpenFolderHandler(), true);
 
-                // ✅ 直接使用注册表中的参数，原样调用 compile_and_run
-                Map<String, Object> args = new HashMap<>();
-                args.put("filename", filename);
-                args.put("mode", mode);
-                args.put("run", true);
-
-                String result = executor.dispatch("compile_and_run", args);
-
-                Map<String, Object> response = new LinkedHashMap<>();
-                response.put("status", "success");
-                response.put("output", result);
-                String json = mapper.writeValueAsString(response);
-                sendResponse(exchange, 200, json);
-
-            } catch (Exception e) {
-                Map<String, Object> errorResponse = new LinkedHashMap<>();
-                errorResponse.put("status", "error");
-                errorResponse.put("error", e.getMessage());
-                String json = mapper.writeValueAsString(errorResponse);
-                sendResponse(exchange, 500, json);
-            }
-        }
+        // ── 静态资源（放行） ──
+        reg(server, "/", new StaticHandler(), false);
+        reg(server, "/TestProjects",
+                new ExternalFileHandler(Paths.get("./TestProjects"), "/TestProjects"), false);
+        reg(server, "/sandbox",
+                new ExternalFileHandler(Paths.get("./sandbox"), "/sandbox"), false);
     }
-    // ===================== 项目注册表查询处理器 =====================
-    static class ProjectMetaHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                exchange.sendResponseHeaders(405, -1);
-                return;
+
+    // @anchor: httpServerMain_openBrowser
+    // 启动后尝试用系统默认浏览器打开首页，失败则提示手动访问
+    private static void openBrowser(String bindAddr) {
+        try {
+            String path = "127.0.0.1".equals(bindAddr) ? "/" : "/qr.html";
+            String url = "http://" + bindAddr + ":" + PORT + path;
+            if (java.awt.Desktop.isDesktopSupported()) {
+                java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
+                System.out.println("🌐 已自动打开浏览器: " + url);
             }
-
-            // 解析查询参数
-            String query = exchange.getRequestURI().getQuery();
-            Map<String, String> params = parseQuery(query);
-            String path = params.get("path");
-
-            if (path == null || path.isEmpty()) {
-                sendResponse(exchange, 400, "{\"error\":\"缺少 path 参数\"}");
-                return;
-            }
-
-            // 安全检查：只允许 sandbox/ 和 TestProjects/
-            if (!path.startsWith("sandbox/") && !path.startsWith("TestProjects/")) {
-                sendResponse(exchange, 403, "{\"error\":\"路径非法\"}");
-                return;
-            }
-
-            // 防止路径穿越
-            if (path.contains("..")) {
-                sendResponse(exchange, 403, "{\"error\":\"路径非法\"}");
-                return;
-            }
-
-            Path projectDir = Paths.get(path).normalize();
-            Path metaFile = projectDir.resolve(".agent_entry.json");
-
-            if (Files.exists(metaFile) && Files.isRegularFile(metaFile)) {
-                try {
-                    String content = Files.readString(metaFile, StandardCharsets.UTF_8);
-                    // 验证是否是有效的 JSON
-                    new ObjectMapper().readTree(content);
-                    sendResponse(exchange, 200, content);
-                } catch (Exception e) {
-                    sendResponse(exchange, 500, "{\"error\":\"读取注册表失败: " + e.getMessage() + "\"}");
-                }
-            } else {
-                sendResponse(exchange, 200, "{\"exists\":false}");
-            }
+        } catch (Exception e) {
+            System.out.println("⚠️ 自动打开浏览器失败，请手动访问 http://" + bindAddr + ":" + PORT);
         }
     }
 
-    static class RestartHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                exchange.sendResponseHeaders(405, -1);
-                return;
-            }
+    // ==================== 心跳监控 ====================
 
-            String response = "{\"status\":\"success\", \"message\":\"配置已保存，程序即将重启...\"}";
-            byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json");
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-            exchange.sendResponseHeaders(200, bytes.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(bytes);
-            }
-            exchange.close();
-
-            new Thread(() -> {
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException ignored) {}
-                System.out.println("🔄 配置已更新，正在重启...");
-                System.exit(HttpServerMain.EXIT_CODE_RESTART);
-            }).start();
-        }
-    }
-
-    static class ClearApiKeyHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                exchange.sendResponseHeaders(405, -1);
-                return;
-            }
-
-            String response = "{\"status\":\"success\", \"message\":\"API Key 已清除，程序即将重启...\"}";
-            byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json");
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-            exchange.sendResponseHeaders(200, bytes.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(bytes);
-            }
-            exchange.close();
-
-            // 延迟退出，确保响应已发送
-            new Thread(() -> {
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException ignored) {}
-                System.out.println("🔑 API Key 已清除，正在重启...");
-                System.exit(HttpServerMain.EXIT_CODE_CLEAR_API_KEY);
-            }).start();
-        }
-    }
-    // @anchor: httpserver_runHandler
-    static class RunHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            // ===== 0. 提前检查 API Key 是否已被清除 =====
-            if (HttpServerMain.isApiKeyCleared()) {
-                String error = "{\"status\":\"error\", \"message\":\"API Key 已被清除，请设置环境变量 DEEPSEEK_API_KEY 后重启程序\"}";
-                byte[] bytes = error.getBytes(StandardCharsets.UTF_8);
-                exchange.getResponseHeaders().set("Content-Type", "application/json");
-                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-                exchange.sendResponseHeaders(403, bytes.length);
-                try (OutputStream os = exchange.getResponseBody()) {
-                    os.write(bytes);
-                }
-                exchange.close();
-                return;
-            }
-
-            // 处理 OPTIONS 请求（CORS）
-            if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
-                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-                exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "POST, OPTIONS");
-                exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type");
-                exchange.sendResponseHeaders(204, -1);
-                return;
-            }
-
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                exchange.sendResponseHeaders(405, -1);
-                return;
-            }
-
-            // ===== 1. 解析请求体（此时 API Key 未被清除，可以安全解析） =====
-            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-            String userRequest;
-            AgentConfig runConfig;
-            int maxIterations;
-
-            try {
-                ObjectMapper mapper = new ObjectMapper();
-                JsonNode root = mapper.readTree(body);
-                userRequest = root.get("prompt").asText();
-
-                // Main.logIf("🔍 [调试] 收到请求体: " + body);
-
-                runConfig = ConfigEditor.buildFromRequest(root);
-
-                maxIterations = AgentConfig.getDefaultMaxIterations();
-                if (root.has("maxIterations")) {
-                    int raw = root.get("maxIterations").asInt();
-                    if (raw >= 3 && raw <= MAX_ITERATIONS) {
-                        maxIterations = raw;
-                    }
-                }
-
-                appendHistory(userRequest);
-
-            } catch (Exception e) {
-                String err = "请求格式错误: " + e.getMessage();
-                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-                exchange.sendResponseHeaders(400, err.getBytes().length);
-                exchange.getResponseBody().write(err.getBytes());
-                exchange.close();
-                return;
-            }
-
-            // SSE 响应头
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
-            exchange.getResponseHeaders().set("Cache-Control", "no-cache");
-            exchange.getResponseHeaders().set("Connection", "keep-alive");
-            exchange.sendResponseHeaders(200, 0);
-
-            OutputStream out = exchange.getResponseBody();
-
-            // ===== 2. 校验 API Key（直接从环境变量读取） =====
-            String apiKey = System.getenv("DEEPSEEK_API_KEY");
-            if (apiKey == null || apiKey.isEmpty()) {
-                sendEvent(out, "[错误] 请设置环境变量 DEEPSEEK_API_KEY");
-                out.close();
-                exchange.close();
-                return;
-            }
-
-            // 日志文件写入器
-            LogFileWriter logWriter = null;
-            try {
-                logWriter = new LogFileWriter(userRequest);
-            } catch (IOException e) {
-                System.err.println("⚠️ 无法创建日志文件: " + e.getMessage());
-            }
-
-            // 创建 Agent 实例，传入配置
-            Main agent = new Main(runConfig);
-
-            synchronized (lock) {
-                if (currentAgent != null) {
-                    currentAgent.stop();
-                }
-                currentAgent = agent;
-                lastHeartbeatTime = System.currentTimeMillis();
-            }
-
-            final LogFileWriter finalLogWriter = logWriter;
-            agent.setLogConsumer(msg -> {
-                try {
-                    sendEvent(out, msg);
-                    if (finalLogWriter != null) {
-                        try {
-                            finalLogWriter.write(msg);
-                        } catch (IOException e) {
-                            System.err.println("⚠️ 写入日志失败: " + e.getMessage());
-                        }
-                    }
-                } catch(ClosedByInterruptException e){
-                    System.out.println("⏹ 任务已停止，停止发送日志");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
-
-            final int finalMaxIterations = maxIterations;
-            new Thread(() -> {
-                try {
-                    String result = agent.run(userRequest, finalMaxIterations);
-                    sendEvent(out, "[完成] " + result);
-                    sendEvent(out, "[结束]");
-                    out.close();
-                } catch(ClosedByInterruptException e){
-                    try {
-                        sendEvent(out, "[结束]");
-                        out.close();
-                    }catch (IOException ignored){
-
-                    }
-                } catch (Exception e) {
-                    try {
-                        sendEvent(out, "[错误] " + e.getMessage());
-                        out.close();
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-                } finally {
-                    if (finalLogWriter != null) {
-                        try {
-                            finalLogWriter.close();
-                            System.out.println("📝 日志已保存: " + finalLogWriter.getLogFilePath());
-                        } catch (IOException e) {
-                            System.err.println("⚠️ 关闭日志文件失败: " + e.getMessage());
-                        }
-                    }
-                    synchronized (lock) {
-                        if (currentAgent == agent) {
-                            currentAgent = null;
-                        }
-                    }
-                }
-            }).start();
-        }
-
-        // 在 RunHandler 类中添加
-        private void appendHistory(String userRequest) {
-            try {
-                Path historyFile = Paths.get("./HistoryOutput/history.jsonl");
-                // 确保目录存在
-                if (!Files.exists(historyFile.getParent())) {
-                    Files.createDirectories(historyFile.getParent());
-                }
-
-                ObjectMapper mapper = new ObjectMapper();
-                Map<String, Object> entry = new LinkedHashMap<>();
-                entry.put("timestamp", LocalDateTime.now().toString());
-                entry.put("prompt", userRequest);
-
-                String jsonLine = mapper.writeValueAsString(entry) + System.lineSeparator();
-                Files.writeString(historyFile, jsonLine, StandardCharsets.UTF_8,
-                        StandardOpenOption.CREATE,
-                        StandardOpenOption.APPEND);
-
-            } catch (IOException e) {
-                // 历史记录写入失败不影响主流程
-                System.err.println("⚠️ 写入历史记录失败: " + e.getMessage());
-            }
-        }
-
-        private void sendEvent(OutputStream out, String data) throws IOException {
-            if(Thread.interrupted()){
-                return;
-            }
-            String event = "data: " + data.replace("\n", "\\n") + "\n\n";
-            out.write(event.getBytes(StandardCharsets.UTF_8));
-            out.flush();
-        }
-    }
-
-    // @anchor: httpserver_stopHandler
-    static class StopHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                exchange.sendResponseHeaders(405, -1);
-                return;
-            }
-
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-            exchange.getResponseHeaders().set("Content-Type", "application/json");
-
-            String response;
-            synchronized (lock) {
-                if (currentAgent != null) {
-                    currentAgent.stop();
-                    currentAgent = null;
-                    // 关键：将心跳时间置为 0，让监控线程立即判定超时
-                    lastHeartbeatTime = 0;
-                    response = "{\"status\":\"stopped\", \"message\":\"已发送停止信号\"}";
-                } else {
-                    response = "{\"status\":\"idle\", \"message\":\"没有正在运行的任务\"}";
-                }
-            }
-
-            byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
-            exchange.sendResponseHeaders(200, bytes.length);
-            exchange.getResponseBody().write(bytes);
-            exchange.close();
-        }
-    }
-
-    // @anchor: httpserver_heartbeatHandler
-    static class HeartbeatHandler implements HttpHandler {
-        // 存储上次的哈希值（静态，跨请求保持）
-        private static String lastSandboxHash = null;
-        private static String lastTestProjectsHash = null;
-        private int heartBeatCount = 0;
-
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
-                exchange.sendResponseHeaders(405, -1);
-                return;
-            }
-
-            // 更新心跳时间（保持原有功能）
-            synchronized (lock) {
-                lastHeartbeatTime = System.currentTimeMillis();
-            }
-
-            // 检查目录变化
-            String sbHash = computeHash("sandbox");
-            String tpHash = computeHash("TestProjects");
-            boolean needRefresh = false;
-
-            // 只有两个目录都扫描完成才比较（避免空值误判）
-            if (heartBeatCount++ % 4 == 0) {
-                if (sbHash != null && tpHash != null) {
-                    if (!Objects.equals(sbHash, lastSandboxHash) || !Objects.equals(tpHash, lastTestProjectsHash)) {
-                        needRefresh = true;
-                        lastSandboxHash = sbHash;
-                        lastTestProjectsHash = tpHash;
-                    }
-                } else {
-                    // 首次运行，只记录哈希，不触发刷新
-                    if (sbHash != null) lastSandboxHash = sbHash;
-                    if (tpHash != null) lastTestProjectsHash = tpHash;
-                }
-            }
-            if(heartBeatCount == 1000000)heartBeatCount = 0;
-
-            // 返回 JSON 响应
-            String response = "{\"refresh\":" + needRefresh + "}";
-            byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json");
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-            exchange.sendResponseHeaders(200, bytes.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(bytes);
-            }
-        }
-
-        private String computeHash(String dir) {
-            Path target = Paths.get("./" + dir);
-            if (!Files.exists(target) || !Files.isDirectory(target)) {
-                return null;
-            }
-            try (Stream<Path> stream = Files.list(target)) {
-                StringBuilder sb = new StringBuilder();
-                stream.sorted(Comparator.comparing(p -> p.getFileName().toString()))
-                        .forEach(p -> {
-                            try {
-                                sb.append(p.getFileName().toString());
-                                sb.append("|");
-                                sb.append(Files.getLastModifiedTime(p).toMillis());
-                                sb.append(";");
-                            } catch (IOException ignored) {}
-                        });
-                if (sb.length() == 0) {
-                    return "";
-                }
-                return Integer.toHexString(sb.toString().hashCode());
-            } catch (IOException e) {
-                return null;
-            }
-        }
-    }
-
-    // ===================== 状态查询处理器 =====================
-    static class StatusHandler implements HttpHandler {
-        @Override
-        public void handle(HttpExchange exchange) throws IOException {
-            if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
-                exchange.sendResponseHeaders(405, -1);
-                return;
-            }
-
-            boolean isRunning;
-            synchronized (lock) {
-                isRunning = currentAgent != null;
-            }
-
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("running", isRunning);
-            // 如果有 Agent 在运行，额外返回一些信息
-            if (isRunning) {
-                // 可以添加更多元数据，比如 startTime、当前迭代数等
-            }
-
-            String json = new ObjectMapper().writeValueAsString(response);
-            byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().set("Content-Type", "application/json");
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-            exchange.sendResponseHeaders(200, bytes.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(bytes);
-            }
-        }
-    }
-
-    // ===================== 心跳监控 =====================
-
-    // @anchor: httpserver_heartbeatMonitor
+    // @anchor: httpServerMain_startHeartbeatMonitor
+    // 启动心跳监控线程：超时会话自动停止任务
     private static void startHeartbeatMonitor() {
-        if (isHeartbeatMonitorRunning) return;
-        isHeartbeatMonitorRunning = true;
+        if (heartbeatMonitorRunning) return;
+        heartbeatMonitorRunning = true;
+
         new Thread(() -> {
             while (true) {
                 try {
                     Thread.sleep(HEARTBEAT_CHECK_INTERVAL_MS);
                     long now = System.currentTimeMillis();
-                    synchronized (lock) {
-                        if (currentAgent != null) {
-                            long elapsed = now - lastHeartbeatTime;
-                            if (elapsed > HEARTBEAT_TIMEOUT_MS) {
-                                System.out.println("⚠️ 心跳超时，前端已断开，正在停止 Agent...");
-                                currentAgent.stop();
-                                currentAgent = null;
-                            }
+                    for (var session : sessionManager.listActive()) {
+                        if (!session.isRunning()) continue;
+                        long elapsed = now - session.getLastHeartbeatTime();
+                        if (elapsed > HEARTBEAT_TIMEOUT_MS) {
+                            System.out.println("⚠️ 会话 " + session.getSessionId()
+                                    + " 心跳超时，停止任务");
+                            session.stopTask();
                         }
                     }
                 } catch (InterruptedException e) {
@@ -686,5 +240,4 @@ public class HttpServerMain {
             }
         }, "HeartbeatMonitor").start();
     }
-
 }

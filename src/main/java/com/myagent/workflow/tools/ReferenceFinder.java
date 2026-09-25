@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 
 // @anchor: referenceFinder_class
+// 符号引用查找实现
 /**
  * 引用查找模块：负责 findReferences / findCallers / extractContext 三个工具的逻辑。
  * 文件收集 / 排除目录 / 扩展名过滤复用 SearchFileFilter 基础设施。
@@ -23,22 +24,17 @@ import java.util.regex.Pattern;
 public class ReferenceFinder {
     private static final Logger logger = LoggerFactory.getLogger(ReferenceFinder.class);
 
-    private static final List<String> REF_EXCLUDED_DIRS =
-            Arrays.asList("target", "build", ".git", ".idea", "node_modules",
-                    "dist", "out", "bin", "logs");
     private static final List<String> REF_CODE_EXTENSIONS = Arrays.asList(
             ".java", ".js", ".jsx", ".ts", ".tsx", ".css", ".html", ".htm",
             ".py", ".go", ".rs", ".c", ".cpp", ".h", ".hpp", ".php", ".rb",
             ".swift", ".kt", ".scala", ".groovy", ".vue", ".svelte");
 
-    private static final List<String> CALLER_EXCLUDED_DIRS =
-            Arrays.asList("target", "build", ".git", ".idea", "node_modules",
-                    "dist", "out", "bin");
     private static final List<String> CALLER_CODE_EXTENSIONS = Arrays.asList(
             ".java", ".js", ".jsx", ".ts", ".tsx", ".py", ".go", ".rs",
             ".c", ".cpp", ".h", ".php", ".rb", ".kt", ".vue");
 
     // @anchor: referenceFinder_findReferences
+// 查找某符号在项目内的所有引用位置
     String findReferences(String symbol, String path, String filePattern) {
         try {
             Path startPath = PathUtils.safeResolve(path != null ? path : ".");
@@ -57,7 +53,7 @@ public class ReferenceFinder {
             Map<String, List<Map<String, Object>>> results = new LinkedHashMap<>();
             AtomicInteger totalMatches = new AtomicInteger(0);
 
-            List<Path> files = SearchFileFilter.collectFiles(startPath, REF_EXCLUDED_DIRS);
+            List<Path> files = SearchFileFilter.collectFiles(startPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS, SearchFileFilter.DEFAULT_EXCLUDED_FILES);
             for (Path file : files) {
                 try {
                     String fileName = file.getFileName().toString();
@@ -133,6 +129,7 @@ public class ReferenceFinder {
     }
 
     // @anchor: referenceFinder_findCallers
+// 查找某函数的调用点及上下文
     String findCallers(String functionName, String path, String filePattern) {
         try {
             Path startPath = PathUtils.safeResolve(path != null ? path : ".");
@@ -160,7 +157,7 @@ public class ReferenceFinder {
             Map<String, List<Map<String, Object>>> results = new LinkedHashMap<>();
             AtomicInteger totalCallers = new AtomicInteger(0);
 
-            List<Path> files = SearchFileFilter.collectFiles(startPath, CALLER_EXCLUDED_DIRS);
+            List<Path> files = SearchFileFilter.collectFiles(startPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS, SearchFileFilter.DEFAULT_EXCLUDED_FILES);
             for (Path file : files) {
                 try {
                     String fileName = file.getFileName().toString();
@@ -249,6 +246,7 @@ public class ReferenceFinder {
     // ===== 内部辅助 =====
 
     // @anchor: referenceFinder_extractContext
+// 抽取命中行周围的上下文代码
     private String extractContext(List<String> lines, int lineIndex) {
         // 向上查找最近的函数定义
         int searchLimit = Math.max(0, lineIndex - 20);

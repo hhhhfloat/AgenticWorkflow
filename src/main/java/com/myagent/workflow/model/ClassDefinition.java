@@ -2,6 +2,8 @@ package com.myagent.workflow.model;
 
 import java.util.List;
 
+// @anchor: classDefinition_class
+// 类结构 record：承载类型/父类/接口/方法/字段/类内锚点与行范围
 public record ClassDefinition(
         String name,
         String type,             // "class", "interface", "enum", "record", "struct"

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手机访问二维码</title>
+    <style>
+        body {
+            margin: 0;
+            background: #1a1a1a;
+            color: #ddd;
+            font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        h1 { font-size: 20px; margin: 0 0 8px; color: #4a8aff; }
+        p.hint { font-size: 13px; color: #888; margin: 0 0 24px; }
+        #qrcode {
+            background: #fff;
+            padding: 16px;
+            border-radius: 8px;
+            line-height: 0;
+        }
+        .url-box {
+            margin-top: 24px;
+            background: #2a2a2a;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 16px;
+            color: #4a8aff;
+            user-select: all;
+            max-width: 90vw;
+            word-break: break-all;
+            text-align: center;
+        }
+        .url-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 12px;
+            text-align: center;
+        }
+        .enter-btn {
+            margin-top: 32px;
+            background: #4a8aff;
+            color: #fff;
+            border: none;
+            padding: 12px 32px;
+            font-size: 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .enter-btn:hover { background: #5a9aff; }
+    </style>
+</head>
+<body>
+<h1>📱 手机访问</h1>
+<p class="hint">用手机扫码，或在手机浏览器输入下方地址</p>
+
+<div id="qrcode"></div>
+
+<div class="url-label">访问地址（点击可全选复制）</div>
+<div class="url-box" id="urlText">...</div>
+
+<button class="enter-btn" onclick="switchToLocal()">
+    在电脑端进入工作台（切回本地模式）
+</button>
+
+<script>
+    function switchToLocal() {
+        if (!confirm('服务将重启并切回本地模式。\n重启后请手动打开 http://127.0.0.1:8080')) return;
+
+        fetch('/switch-to-local', {method: 'POST'})
+            .finally(() => {
+            document.body.innerHTML = `
+                <h1>🔄 服务正在重启</h1>
+                <p class="hint">即将切回本地模式</p>
+                <div class="url-box">http://127.0.0.1:8080</div>
+                <p class="url-label">重启完成后请在电脑端打开上述地址</p>
+            `;
+        });
+    }
+</script>
+
+<script src="qrcode.min.js"></script>
+<script>
+    // 用当前页面的 origin，无论绑定哪个 IP 都对
+    const url = window.location.origin;
+
+    // 渲染 URL 文本
+    document.getElementById('urlText').textContent = url;
+
+    // 渲染二维码
+    // qrcode-generator API：0 = 自动选择版本，'M' = 纠错等级
+    const qr = qrcode(0, 'M');
+    qr.addData(url);
+    qr.make();
+
+    // cellSize=6 生成 SVG，比 PNG 清晰
+    document.getElementById('qrcode').innerHTML = qr.createSvgTag({
+        cellSize: 6,
+        margin: 0
+    });
+</script>
+</body>
+</html>

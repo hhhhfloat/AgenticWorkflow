@@ -1,3 +1,5 @@
+// @anchor: uploadHandler_tot_desc
+// 上传处理器：POST /upload，解析 multipart 表单并把文件写入 sandbox 项目
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -18,10 +20,14 @@ import java.util.regex.Pattern;
 
 import static com.myagent.workflow.http.utils.HandlerUtils.sendResponse;
 
+// @anchor: uploadHandler_class
+// 上传处理器：自带 multipart 解析，校验项目名与文件名后保存上传文件
 public class UploadHandler implements HttpHandler {
     private static final int MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
     private static final Pattern SAFE_NAME = Pattern.compile("^(?!.*\\.\\.)[^\\\\/:*?\"<>|]+$");
 
+    // @anchor: uploadHandler_handle
+    // 处理上传请求：解析 multipart、安全校验、存在性检测并保存文件
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -136,6 +142,8 @@ public class UploadHandler implements HttpHandler {
         }
     }
 
+    // @anchor: uploadHandler_extractBoundary
+    // 从 Content-Type 头中提取 multipart 的 boundary 值
     /**
      * 从 Content-Type 提取 boundary
      */
@@ -149,6 +157,8 @@ public class UploadHandler implements HttpHandler {
         return null;
     }
 
+    // @anchor: uploadHandler_parseMultipart
+    // 解析 multipart 请求体：切分字段与文件，处理文件名编码
     /**
      * 解析 multipart/form-data 请求体
      * 注意：此实现不依赖第三方库，但假设文件数据不大（<100MB）
@@ -189,7 +199,7 @@ public class UploadHandler implements HttpHandler {
             for (String line : headers.split("\r\n")) {
                 if (line.startsWith("Content-Disposition:")) {
                     // 1. 尝试匹配 filename*= （RFC 5987 编码）
-                    java.util.regex.Matcher m = java.util.regex.Pattern.compile("filename\\*=(?:UTF-8'')([^;]+)").matcher(line);
+                    java.util.regex.Matcher m = Pattern.compile("filename\\*=(?:UTF-8'')([^;]+)").matcher(line);
                     if (m.find()) {
                         String encoded = m.group(1);
                         try {
@@ -200,7 +210,7 @@ public class UploadHandler implements HttpHandler {
                         }
                     } else {
                         // 2. 回退到 filename= （旧式，ISO-8859-1 编码）
-                        m = java.util.regex.Pattern.compile("filename=\"([^\"]*)\"").matcher(line);
+                        m = Pattern.compile("filename=\"([^\"]*)\"").matcher(line);
                         if (m.find()) {
                             String raw = m.group(1);
                             // 将 ISO-8859-1 字符串转回字节，再用 UTF-8 解码
@@ -209,7 +219,7 @@ public class UploadHandler implements HttpHandler {
                     }
 
                     // 提取 name
-                    m = java.util.regex.Pattern.compile("name=\"([^\"]*)\"").matcher(line);
+                    m = Pattern.compile("name=\"([^\"]*)\"").matcher(line);
                     if (m.find()) {
                         name = m.group(1);
                     }
@@ -243,11 +253,15 @@ public class UploadHandler implements HttpHandler {
     }
 
     // 内部数据类
+    // @anchor: uploadHandler_multipartData
+    // multipart 解析结果：项目名与文件列表
     private static class MultipartData {
         String projectName;
         List<MultipartFile> files;
     }
 
+    // @anchor: uploadHandler_multipartFile
+    // 单个上传文件：文件名与数据流
     private static class MultipartFile {
         String fileName;
         InputStream data;

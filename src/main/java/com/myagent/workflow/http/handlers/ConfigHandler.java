@@ -1,3 +1,5 @@
+// @anchor: configHandler_tot_desc
+// 配置处理器：GET /config，向前端返回默认配置项
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,7 +12,11 @@ import java.io.OutputStream;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+// @anchor: configHandler_class
+// 配置处理器：输出最大迭代次数等运行参数供前端展示
 public class ConfigHandler implements HttpHandler {
+    // @anchor: configHandler_handle
+    // 处理配置查询：组装并返回配置 JSON
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {

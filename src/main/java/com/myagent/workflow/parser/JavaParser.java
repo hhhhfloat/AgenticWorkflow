@@ -1,3 +1,5 @@
+// @anchor: javaParser_tot_desc
+// Java 结构解析器：优先用 javac AST 提取类/方法/字段，失败时回退正则
 package com.myagent.workflow.parser;
 
 import com.myagent.workflow.model.*;
@@ -6,6 +8,8 @@ import com.sun.source.util.JavacTask;
 import com.sun.source.util.SourcePositions;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.tools.*;
 import java.io.IOException;
@@ -15,18 +19,28 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 
+// @anchor: javaParser_class
+// Java 解析器：基于 javac 编译器树解析结构，无法解析时降级为正则扫描
 public class JavaParser implements StructureParser {
 
+    private static final Logger logger = LoggerFactory.getLogger(JavaParser.class);
+
+    // @anchor: javaParser_patterns
+    // Java 锚点行（// 或 /* */ 两种注释形式）的匹配正则
     private static final Pattern ANCHOR_PATTERN = Pattern.compile(
             "//\\s*@anchor:\\s*(\\w+)|" +
                     "/\\*\\s*@anchor:\\s*(\\w+)\\s*\\*/"
     );
 
+    // @anchor: javaParser_supports
+    // 仅识别 .java 文件
     @Override
     public boolean supports(Path file) {
         return file.getFileName().toString().toLowerCase().endsWith(".java");
     }
 
+    // @anchor: javaParser_parse
+    // 用 javac 任务解析编译单元，收集包名/导入/类/方法与锚点，异常时回退正则
     @Override
     public FileStructure parse(Path file) throws IOException {
         JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
@@ -87,11 +101,13 @@ public class JavaParser implements StructureParser {
             );
         } catch (Exception e) {
             // 打印异常堆栈，便于调试
-            e.printStackTrace();
+            logger.debug("JavaParser AST 解析失败，回退到正则: {} - {}", file, e.getMessage());
             return parseWithRegex(file);
         }
     }
 
+    // @anchor: javaParser_collector
+    // 编译单元访问器：遍历 AST 收集类、方法与字段（支持嵌套类）
     private static class StructureCollector extends TreeScanner<Void, Void> {
         private final String filePath;
         private final CompilationUnitTree cu;
@@ -108,10 +124,12 @@ public class JavaParser implements StructureParser {
             this.srcPos = srcPos;
         }
 
+        // @anchor: javaParser_visitClass
+        // 访问类节点：提取名称/父类/接口与行号范围，递归处理成员
         @Override
         public Void visitClass(ClassTree node, Void unused) {
             String name = node.getSimpleName().toString();
-            String type = "class"; // 简化，可后续增强
+            String type = "class";
             String superClass = node.getExtendsClause() != null ? node.getExtendsClause().toString() : null;
             List<String> interfaces = new ArrayList<>();
             if (node.getImplementsClause() != null) {
@@ -125,17 +143,23 @@ public class JavaParser implements StructureParser {
             int startLine = getLineNumber(startPos);
             int endLine = getLineNumber(endPos);
 
-            currentClassBuilder = new ClassDefinitionBuilder(name, type, superClass, interfaces, startLine, endLine);
+            // 保存外层 builder（若有），处理完恢复——支持内部类/嵌套类
+            ClassDefinitionBuilder previous = currentClassBuilder;
+            ClassDefinitionBuilder builder = new ClassDefinitionBuilder(
+                    name, type, superClass, interfaces, startLine, endLine);
+            currentClassBuilder = builder;
 
             for (Tree member : node.getMembers()) {
                 member.accept(this, null);
             }
 
-            classes.add(currentClassBuilder.build());
-            currentClassBuilder = null;
+            classes.add(builder.build());
+            currentClassBuilder = previous;
             return null;
         }
 
+        // @anchor: javaParser_visitMethod
+        // 访问方法节点：提取名称/返回类型/参数/修饰符与行号，按上下文归入类或顶层
         @Override
         public Void visitMethod(MethodTree node, Void unused) {
             String name = node.getName().toString();
@@ -165,6 +189,8 @@ public class JavaParser implements StructureParser {
             return null;
         }
 
+        // @anchor: javaParser_visitVariable
+        // 访问字段节点：提取名称/类型/修饰符与行号，按上下文归入类或顶层
         @Override
         public Void visitVariable(VariableTree node, Void unused) {
             String name = node.getName().toString();
@@ -184,6 +210,8 @@ public class JavaParser implements StructureParser {
             return null;
         }
 
+        // @anchor: javaParser_getLineNumber
+        // 把源码字符偏移换算为行号（读源文件计数换行）
         private int getLineNumber(long position) {
             if (position < 0) return -1;
             try {
@@ -199,6 +227,8 @@ public class JavaParser implements StructureParser {
         }
     }
 
+    // @anchor: javaParser_builder
+    // 类定义构建器：累积类名/父类/行号以及方法与字段
     private static class ClassDefinitionBuilder {
         private final String name, type, superClass;
         private final List<String> interfaces;
@@ -229,6 +259,8 @@ public class JavaParser implements StructureParser {
     }
 
     // ===== 修改 extractAnchors 方法 =====
+    // @anchor: javaParser_extractAnchors
+    // 逐行去除字符串后匹配锚点，返回锚点摘要列表
     private List<AnchorSummary> extractAnchors(Path file) throws IOException {
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
         List<AnchorSummary> anchors = new ArrayList<>();
@@ -255,6 +287,8 @@ public class JavaParser implements StructureParser {
         return anchors;
     }
 
+    // @anchor: javaParser_stripStringsOnly
+    // 去除字符串与字符常量，保留注释和代码
     /**
      * 去除字符串和字符常量，保留注释和代码。
      */
@@ -296,6 +330,8 @@ public class JavaParser implements StructureParser {
         return result.toString();
     }
 
+    // @anchor: javaParser_cleanLine
+    // 去掉行注释与块注释，返回纯净代码行
     /**
      * 去除注释和字符串，返回纯净代码行。
      */
@@ -333,6 +369,8 @@ public class JavaParser implements StructureParser {
         return result.toString();
     }
 
+    // @anchor: javaParser_parseWithRegex
+    // 正则降级解析：提取包名、导入与类名，作为 AST 失败时的兜底
     private FileStructure parseWithRegex(Path file) throws IOException {
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
         List<AnchorSummary> anchors = extractAnchors(file);

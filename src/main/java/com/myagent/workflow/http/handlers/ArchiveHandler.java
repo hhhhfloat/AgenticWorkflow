@@ -1,3 +1,5 @@
+// @anchor: archiveHandler_tot_desc
+// 归档处理器：POST /archive，把 sandbox 项目复制到 TestProjects 版本目录
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -14,7 +16,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
+// @anchor: archiveHandler_class
+// 项目归档处理器：校验项目名与目标存在性后执行目录递归复制
 public class ArchiveHandler implements HttpHandler {
+    // @anchor: archiveHandler_handle
+    // 处理归档请求：校验参数、检测目标冲突并按 force 决定是否覆盖
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         // 只接受 POST
@@ -82,6 +88,8 @@ public class ArchiveHandler implements HttpHandler {
         }
     }
 
+    // @anchor: archiveHandler_copyDirectory
+    // 递归复制目录：逐项创建子目录或复制文件（覆盖同名）
     /**
      * 递归复制目录
      */
@@ -102,6 +110,8 @@ public class ArchiveHandler implements HttpHandler {
         });
     }
 
+    // @anchor: archiveHandler_deleteDirectory
+    // 递归删除目录：按深度倒序删除以避免父目录先于子项
     /**
      * 递归删除目录
      */
@@ -119,6 +129,8 @@ public class ArchiveHandler implements HttpHandler {
         }
     }
 
+    // @anchor: archiveHandler_sendResponse
+    // 发送 UTF-8 JSON 响应（含 CORS 头）
     private void sendResponse(HttpExchange exchange, int statusCode, String response) throws IOException {
         byte[] bytes = response.getBytes(StandardCharsets.UTF_8);
         exchange.getResponseHeaders().set("Content-Type", "application/json");

@@ -6,11 +6,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * @anchor: toolDefinitions_class
  * 工具定义构建器 —— 生成 DeepSeek Function Calling 所需的 tools 列表。
  * 从 Main.java 中独立出来，便于单独维护工具 Schema。
  */
-// @anchor: toolDefinitions_class_single
+// @anchor: toolDefinitions_class
+// 工具定义构建器：集中声明可暴露给 Agent 的全部工具 schema
 public final class ToolDefinitions {
 
     private ToolDefinitions() {
@@ -18,15 +18,16 @@ public final class ToolDefinitions {
     }
 
     /**
-     * @anchor: toolDefinitions_build
      * 构建全部工具定义（符合 DeepSeek Function Calling 规范）。
      * @return 工具定义列表
      */
-    // @anchor: toolDefinitions_build_single
-    public static List<Map<String, Object>> build(boolean enableCompression) {
+    // @anchor: toolDefinitions_build
+    // 构建全部工具 schema 列表（DeepSeek Function Calling 规范）
+    public static List<Map<String, Object>> build() {
         List<Map<String, Object>> tools = new ArrayList<>();
 
         // @anchor: toolDef_listDirectory
+// 工具：list_directory 列出目录树
         tools.add(defineTool(
                 "list_directory",
                 "列出沙箱目录下指定路径的所有文件和子目录。如果 recursive 为 true，则递归列出所有层级（慎用，仅当项目较小时使用）。",
@@ -38,6 +39,7 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_writeFile
+// 工具：write_file 写入/覆盖文件
         tools.add(defineTool(
                 "write_file",
                 "将源代码（Java/TML/CSS/JS/Python/C++）写入沙箱目录下的指定文件。如果文件已存在则覆盖。",
@@ -49,6 +51,7 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_compileRun
+// 工具：compile_and_run 编译并运行代码
         tools.add(defineTool(
                 "compile_and_run",
                 "编译并运行文件。Agent 可根据需要仅编译不运行。",
@@ -61,6 +64,7 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_getFileStructure
+// 工具：get_file_structure 获取代码结构
         tools.add(defineTool(
                 "get_file_structure",
                 "获取文件的代码结构信息（类、方法、字段、锚点等），帮助快速了解文件内容，而不需要读取整个文件。",
@@ -71,6 +75,7 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_readFile
+// 工具：read_file 读取文件内容
         tools.add(defineTool(
                 "read_file",
                 "读取沙箱目录下指定文件的内容（文本格式），返回文件内容。支持 Java、HTML、TXT 等文本文件。读取大小限制为 5000 字符，超过则截断并提示。",
@@ -81,17 +86,20 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_readBetweenAnchors
+// 工具：read_between_anchors 按锚点区间读取
         tools.add(defineTool(
                 "read_between_anchors",
                 "读取两个锚点之间的所有代码内容（包含锚点所在行）。用于精准读取特定代码块，避免读取整个文件。",
                 defineParams()
                         .prop("startAnchor", "string", "起始锚点 ID")
                         .prop("endAnchor", "string", "结束锚点 ID")
+                        .prop("file", "string", "可选。锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
                         .build(),
                 List.of("startAnchor", "endAnchor")
         ));
 
         // @anchor: toolDef_deleteFile
+// 工具：delete_file 删除文件
         tools.add(defineTool(
                 "delete_file",
                 "删除沙箱目录下的指定文件。请谨慎使用，确认该文件不再需要后再删除。",
@@ -102,6 +110,7 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_searchText
+// 工具：search_text 全文检索
         tools.add(defineTool(
                 "search_text",
                 "在沙箱目录中搜索指定文本（支持正则表达式），返回匹配的文件路径、行号和内容预览。用于查找代码引用、定位函数调用等。结果限制最多 30 条，超出会提示缩小范围。",
@@ -114,6 +123,7 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_buildAnchor
+// 工具：build_anchor_index 重建锚点索引
         tools.add(defineTool(
                 "build_anchor_index",
                 "扫描指定项目目录下的所有文本文件，提取所有 @anchor 注释，重建该项目锚点索引文件（.anchors.json）。通常在修改代码后调用此工具更新索引。",
@@ -124,6 +134,7 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_listAnchors
+// 工具：list_anchors 列出锚点
         tools.add(defineTool(
                 "list_anchors",
                 "列出指定项目中的所有锚点，返回锚点ID、所在文件、行号和内容预览。可指定文件参数仅列出该文件的锚点。",
@@ -135,6 +146,7 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_insertAnchor
+// 工具：insert_at_anchor 在锚点处插入代码
         tools.add(defineTool(
                 "insert_at_anchor",
                 "在锚点位置插入代码。position 为 'before' 表示在锚点行之前插入，'after' 表示在锚点行之后插入。",
@@ -142,22 +154,26 @@ public final class ToolDefinitions {
                         .prop("anchor_id", "string", "锚点 ID")
                         .prop("content", "string", "要插入的代码内容")
                         .prop("position", "string", "'before' 或 'after'，默认 'after'")
+                        .prop("file", "string", "可选。锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
                         .build(),
                 List.of("anchor_id", "content")
         ));
 
         // @anchor: toolDef_deleteBetween
+// 工具：delete_between_anchors 删除锚点区间
         tools.add(defineTool(
                 "delete_between_anchors",
                 "删除从 startAnchor 所在行开始，到 endAnchor 所在行结束之间的所有内容（不包含锚点所在行）。删除后索引自动更新。常用于配合 insert_at_anchor 实现区间替换。",
                 defineParams()
                         .prop("startAnchor", "string", "起始锚点 ID")
                         .prop("endAnchor", "string", "结束锚点 ID")
+                        .prop("file", "string", "可选。锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
                         .build(),
                 List.of("startAnchor", "endAnchor")
         ));
 
         // @anchor: toolDef_findReferences
+// 工具：find_references 查找符号引用
         tools.add(defineTool(
                 "find_references",
                 "查找函数、变量、类、方法在项目中的所有引用位置。返回文件、行号和代码预览。修改代码前先用此工具评估影响范围。",
@@ -170,6 +186,7 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_findCallers
+// 工具：find_callers 查找调用者
         tools.add(defineTool(
                 "find_callers",
                 "查找函数被调用的所有位置。返回文件路径、行号、调用所在函数上下文和参数预览。比 search_text 更精准，只会匹配函数调用表达式，跳过定义、声明和注释。",
@@ -182,6 +199,7 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_findCallees
+// 工具：find_callees 查找被调用者
         tools.add(defineTool(
                 "find_callees",
                 "查找函数内部直接调用的所有其他函数。返回被调用函数名称、调用行号和上下文。用于理解函数依赖和重构评估。",
@@ -194,48 +212,24 @@ public final class ToolDefinitions {
                 List.of("functionName")
         ));
 
-        // @anchor: toolDef_switchModel
+        // @anchor: toolDef_describeAnchors
+// 工具：describe_anchors 列出锚点及其职责描述
         tools.add(defineTool(
-                "switch_model",
-                "切换 DeepSeek 模型。参数 target: 'pro' 或 'flash'。仅在当前任务确实需要更强推理能力时使用（如复杂重构、大型项目分析），一般情况保持 flash 以节省成本。",
+                "describe_anchors",
+                "返回指定文件中所有功能性锚点及其对应描述。仅返回非 _end 锚点，并额外提供每个锚点的功能描述（来自锚点下方紧邻的注释）。用于快速理解文件中各部分的职责，避免读取整份源码。",
                 defineParams()
-                        .prop("target", "string", "目标模型：'pro' 表示 deepseek-v4-pro，'flash' 表示 deepseek-v4-flash")
+                        .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
+                        .prop("file", "string", "文件相对路径（如 src/main/java/Main.java），需要完整以避免歧义")
                         .build(),
-                List.of("target")
+                List.of("project_path", "file")
         ));
-
-        // @anchor: toolDef_queryHistory
-        tools.add(defineTool(
-                "query_history",
-                "在完整历史记录中搜索指定关键词（支持正则表达式），返回匹配的消息片段（最多 limit 条）。用于在压缩后查找被摘要覆盖的细节信息。",
-                defineParams()
-                        .prop("keyword", "string", "要搜索的关键词（支持正则表达式）")
-                        .prop("limit", "integer", "返回结果的最大条数，默认 10")
-                        .build(),
-                List.of("keyword")
-        ));
-
-        // 在 ToolDefinitions.java 中添加
-        // @anchor: toolDef_requestCheckpoint
-        // 仅在启用压缩时添加 request_checkpoint
-        if (enableCompression) {
-            tools.add(defineTool(
-                    "request_checkpoint",
-                    "当完成一个明确的里程碑（如一组文件创建完成、编译通过）后调用。调用后系统将进入压缩模式，下一轮迭代中你需要按系统提示词中的【压缩模式】要求生成 PROJECT_STATE_SNAPSHOT 摘要。",
-                    defineParams()
-                            .prop("phase_summary", "string", "刚刚完成的工作摘要")
-                            .prop("next_plan", "string", "下一步计划（引用 TODO.md 中的下一项任务）")
-                            .build(),
-                    List.of("phase_summary", "next_plan")
-            ));
-        }
 
         return tools;
     }
 
     // ========== 内部构建辅助 ==========
-
     // @anchor: toolDefinitions_defineTool
+// 定义一个工具的 schema（名称/描述/参数）
     private static Map<String, Object> defineTool(String name, String description,
                                                    Map<String, Object> parameters, List<String> required) {
         parameters.put("required", required);
@@ -251,12 +245,14 @@ public final class ToolDefinitions {
     }
 
     // @anchor: toolDefinitions_defineParams
+// 定义工具的参数对象 schema
     private static ParamsBuilder defineParams() {
         return new ParamsBuilder();
     }
 
     /** 流畅构建 parameters JSON Schema */
     // @anchor: toolDefinitions_paramsBuilder
+// 参数属性构建辅助（类型/描述/必填）
     private static class ParamsBuilder {
         private final Map<String, Object> props = new HashMap<>();
 

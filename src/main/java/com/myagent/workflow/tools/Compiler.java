@@ -23,6 +23,7 @@ import java.util.stream.Stream;
  * 从 ToolExecutor 中分离，专一管理所有“执行”逻辑。
  */
 // @anchor: compiler_class_single
+// 编译器/运行器：按语言自动编译并运行代码
 public class Compiler {
     private static final Logger logger = LoggerFactory.getLogger(Compiler.class);
 
@@ -42,6 +43,7 @@ public class Compiler {
 
     // ==================== 自动检测调度器 ====================
     // @anchor: compiler_compileAuto
+// 自动识别语言并编译运行（auto 模式）
     public String compileAuto(Path filePath, String filename, boolean run) {
         try {
             if (filename.endsWith(".html") || filename.endsWith(".htm")) {
@@ -77,6 +79,7 @@ public class Compiler {
 
     // ==================== HTML 预览 ====================
     // @anchor: compiler_previewHtml
+// HTML 预览：输出预览而不执行
     public String previewHtml(Path filePath, String filename) throws IOException {
         if (!Files.exists(filePath)) {
             return "HTML 文件不存在: " + filename;
@@ -89,7 +92,7 @@ public class Compiler {
         if (relativePath.startsWith("/sandbox/")) {
             relativePath = relativePath.substring("/sandbox/".length());
         }
-        String url = "http://localhost:8080/sandbox/" + relativePath;
+        String url = "/sandbox/" + relativePath;
 
         if (autoOpenBrowser && Desktop.isDesktopSupported()) {
             Desktop.getDesktop().browse(filePath.toFile().toURI());
@@ -101,6 +104,7 @@ public class Compiler {
 
     // ==================== 单文件 Java 编译运行 ====================
     // @anchor: compiler_compileJava
+// 编译并运行单个 Java 文件
     public String compileJava(Path filePath, String filename, boolean run) {
         try {
             // 1. 获取项目目录（源文件所在目录）
@@ -162,6 +166,7 @@ public class Compiler {
     }
     // ==================== Maven 编译（只编译，不运行）====================
     // @anchor: compiler_compileMaven
+// 编译并运行 Maven 项目
     public String compileMaven(Path filePath, boolean run) throws IOException {
         Path projectDir = filePath.toAbsolutePath().normalize();
         if (!Files.isDirectory(projectDir)) {
@@ -273,6 +278,7 @@ public class Compiler {
      * @return 全限定类名（如 com.test.Hello），如果没找到返回 null
      */
     // @anchor: compiler_findMainClass
+// 在 class 目录中定位含 main 方法的主类
     private String findMainClass(Path projectDir) throws IOException, InterruptedException {
         Path classesDir = projectDir.resolve("target/classes");
         if (!Files.exists(classesDir) || !Files.isDirectory(classesDir)) {
@@ -314,6 +320,7 @@ public class Compiler {
     // ==================== C++ 编译运行（MSVC）====================
     @SuppressWarnings("ConstantConditions")
     // @anchor: compiler_compileCpp
+// 编译并运行 C++ 源文件（MSVC/MinGW）
     public String compileAndRunCpp(Path filePath, String filename, boolean run) {
         logger.info("🔧 compileAndRunCpp 被调用: filename={}, run={}, filePath={}", filename, run, filePath);
         try {
@@ -398,6 +405,7 @@ public class Compiler {
     // ==================== Python 解释执行 ====================
 // ==================== Python 解释执行 ====================
     // @anchor: compiler_runPython
+// 运行 Python 脚本
     public String runPython(Path filePath, String filename, boolean run) {
         if (!run) {
             return "✅ Python 脚本已就绪（未运行）！\n文件: " + filename;
@@ -462,6 +470,7 @@ public class Compiler {
     }
     // ==================== Node.js 解释执行 ====================
     // @anchor: compiler_runNode
+// 运行 Node.js 脚本
     public String runNode(Path filePath, String filename, boolean run) {
         if (!run) {
             return "✅ Node.js 脚本已就绪（未运行）！\n文件: " + filename;
@@ -501,6 +510,7 @@ public class Compiler {
      * @return 执行结果
      */
     // @anchor: compiler_executeProcess
+// 执行外部进程并捕获输出（含超时/阻塞检测）
     private ProcessResult executeProcess(ProcessBuilder pb, long timeoutSeconds, boolean detectStdinStall) {
         // ========== 新增：安全加固 ==========
         try {
@@ -626,6 +636,7 @@ public class Compiler {
      * 为子进程设置安全的环境变量，将临时目录和用户主目录重定向到沙箱内。
      */
     // @anchor: compiler_secureEnvironment
+// 构建受限的安全执行环境
     private void secureEnvironment(ProcessBuilder pb) throws IOException {
         Map<String, String> env = pb.environment();
         Path sandboxRoot = Paths.get(sandboxDir).toAbsolutePath().normalize();

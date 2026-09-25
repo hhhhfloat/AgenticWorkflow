@@ -1,4 +1,6 @@
 // @anchor: modules_log_utils
+// 日志辅助：判断文本是否 Markdown、HTML 转义
+
 // ===== 日志输出工具函数 =====
 function isMarkdown(text) {
     return /(\|\s*[-:]+[\s|]+\||^#{1,6}\s|\n```|\n\s*[-*]\s|\n>\s|^---\s*$|\n---\s*$)/m.test(text);
@@ -11,6 +13,8 @@ function escapeHtml(text) {
 }
 
 // @anchor: modules_log_append
+// 将消息按类型着色渲染到 #output，支持对话气泡与迭代提示
+
 // ===== 日志输出模块（整合迭代提示） =====
 function appendLog(msg) {
     let color = 'log-info';
@@ -30,6 +34,7 @@ function appendLog(msg) {
             if (msg.startsWith('[完成] ')) {
                 cleanMsg = msg.substring(4);
             }
+            cleanMsg = linkifySandboxPaths(cleanMsg);
             renderedContent = marked.parse(cleanMsg, { gfm: true, breaks: true });
         } catch (e) {
             renderedContent = escapeHtml(msg);
@@ -60,4 +65,37 @@ function appendLog(msg) {
             output.scrollTop = output.scrollHeight;
         }
     }
+}
+/**
+ * 以"对话消息"形式追加到 #output。
+ * @param {string} role - 'user' | 'assistant' | 'system'
+ * @param {string} content - 消息内容（支持 Markdown）
+ */
+function appendMessage(role, content) {
+    if (!output || !content) return;
+
+    const wrap = document.createElement('div');
+    wrap.className = `msg msg-${role}`;
+
+    const body = document.createElement('div');
+    body.className = 'msg-body';
+
+    if (role === 'user') {
+        body.textContent = content;  // 用户消息通常不需要 Markdown
+    } else {
+        body.innerHTML = marked.parse(content);
+    }
+
+    wrap.appendChild(body);
+    output.appendChild(wrap);
+    output.scrollTop = output.scrollHeight;
+}
+
+// @anchor: modules_log_linkifySandbox
+// 将 /sandbox/xxx.html 形式的相对路径转为 Markdown 链接，供浏览器点击预览
+function linkifySandboxPaths(text) {
+    return text.replace(
+        /(?<![("'\[])(\/sandbox\/[\w\-./]+\.html?)/g,
+        (m) => `[${m}](${m})`
+    );
 }

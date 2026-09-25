@@ -1,5 +1,5 @@
 /* @anchor: style_reset */
-/* ===== 全局样式 ===== */
+/* 全局基础样式：页面底色、等宽字体与内边距 */
 body {
     font-family: 'Courier New', monospace;
     background: #1e1e1e;
@@ -8,6 +8,7 @@ body {
 }
 
 /* @anchor: style_textarea */
+/* 多行输入框：深色背景、白色文字、固定高度 */
 textarea {
     width: 100%;
     height: 80px;
@@ -19,6 +20,7 @@ textarea {
 }
 
 /* @anchor: style_buttons */
+/* 按钮基础样式：主题色、悬停与禁用态 */
 button {
     background: #0e639c;
     color: white;
@@ -36,6 +38,7 @@ button:disabled {
 }
 
 /* @anchor: style_output */
+/* 日志输出面板：固定高度、纵向滚动 */
 #output {
     background: #1e1e1e;
     border: 1px solid #444;
@@ -46,6 +49,7 @@ button:disabled {
 }
 
 /* @anchor: style_logEntry */
+/* 日志行：保留换行、长词断行 */
 .log-entry {
     margin: 2px 0;
     padding: 0;
@@ -55,12 +59,14 @@ button:disabled {
 }
 
 /* @anchor: style_logColors */
+/* 日志级别配色：info/error/success/system */
 .log-info    { color: #9cdcfe; }
 .log-error   { color: #f44747; }
 .log-success { color: #4ec9b0; }
 .log-system  { color: #d4d4d4; }
 
 /* @anchor: style_mdTable */
+/* Markdown 表格渲染样式 */
 .log-entry table {
     border-collapse: collapse;
     margin: 6px 0;
@@ -86,6 +92,7 @@ button:disabled {
 }
 
 /* @anchor: style_mdCode */
+/* Markdown 行内代码与代码块样式 */
 .log-entry code {
     background: #2d2d2d;
     padding: 1px 4px;
@@ -109,6 +116,7 @@ button:disabled {
 }
 
 /* @anchor: style_mdHeading */
+/* Markdown 标题/分割线/引用/列表样式 */
 .log-entry h1, .log-entry h2, .log-entry h3, .log-entry h4 {
     margin: 6px 0 4px 0;
     color: #4ec9b0;
@@ -131,11 +139,13 @@ button:disabled {
 }
 
 /* @anchor: style_systemPre */
+/* 系统日志预格式化：保留空白 */
 .log-system .log-entry {
     white-space: pre;
 }
 
 /* @anchor: style_logTip */
+/* 灰色斜体提示文本 */
 .log-tip {
     color: #6a6a6a;
     font-style: italic;
@@ -145,11 +155,8 @@ button:disabled {
     margin-top: 2px;
 }
 
-/* ============================================================
-   @anchor: style_layout
-   侧边栏 + 主工作区 Flex 布局
-   ============================================================ */
-
+/* @anchor: style_layout */
+/* 侧边栏 + 主工作区 Flex 布局 */
 html, body {
     height: 100%;
     margin: 0;
@@ -162,6 +169,8 @@ html, body {
     overflow: hidden;
 }
 
+/* @anchor: style_sidebar */
+/* 侧边栏容器、折叠态与头部 */
 /* ===== 侧边栏 ===== */
 #sidebar {
     width: 280px;
@@ -185,6 +194,9 @@ html, body {
     display: none;
 }
 #sidebar.collapsed #sidebarHeader span {
+    display: none;
+}
+#sidebar.collapsed > *:not(#sidebarHeader) {
     display: none;
 }
 
@@ -218,6 +230,8 @@ html, body {
     padding: 8px 0;
 }
 
+/* @anchor: style_tree */
+/* 文件树根节点、子节点与操作按钮占位 */
 /* ===== 树根节点 ===== */
 .tree-root {
     padding: 6px 12px;
@@ -260,6 +274,8 @@ html, body {
     padding-left: 16px;
 }
 
+/* @anchor: style_main */
+/* 主工作区布局：内容纵向排列、可滚动 */
 /* ===== 主工作区 ===== */
 #main {
     flex: 1;
@@ -279,6 +295,7 @@ html, body {
 }
 
 /* @anchor: style_iterationControl */
+/* 迭代次数控制行：标签与数字输入框 */
 .iteration-control {
     display: flex;
     align-items: center;
@@ -326,6 +343,7 @@ html, body {
 }
 
 /* @anchor: style_archiveBtn */
+/* 归档按钮：悬停文件项时显示 */
 .archive-btn {
     display: none;
     background: transparent;
@@ -347,6 +365,7 @@ html, body {
 }
 
 /* @anchor: style_treeActions */
+/* 文件树操作按钮：悬停时显示 */
 .tree-action-btn {
     display: none;
     background: transparent;
@@ -374,6 +393,8 @@ html, body {
     background: #666;
 }
 
+/* @anchor: style_modal */
+/* 配置弹窗遮罩、内容面板与头/体/脚 */
 /* ===== 配置弹窗 ===== */
 .modal {
     position: fixed;
@@ -439,6 +460,8 @@ html, body {
     font-size: 13px;
 }
 
+/* @anchor: style_settings */
+/* 配置行：固定标签宽度与表单控件样式 */
 /* ===== 配置行样式（统一对齐） ===== */
 .setting-row {
     display: flex;
@@ -508,4 +531,344 @@ html, body {
 .setting-row .api-key-control .hint-text {
     color: #888;
     font-size: 12px;
+}
+
+/* @anchor: style_sidebarToolbar */
+/* 侧边栏顶部视图切换按钮组 */
+/* ===== 侧边栏顶部工具栏 ===== */
+#sidebarToolbar {
+    display: flex;
+    border-bottom: 1px solid #333;
+    padding: 4px 6px;
+    gap: 4px;
+}
+#sidebarToolbar button {
+    flex: 1;
+    padding: 6px 8px;
+    background: #2a2a2a;
+    color: #aaa;
+    border: 1px solid #333;
+    cursor: pointer;
+    font-size: 12px;
+    border-radius: 3px;
+}
+#sidebarToolbar button.active {
+    background: #3a5a8a;
+    color: #fff;
+    border-color: #4a6a9a;
+}
+#sidebarToolbar button:hover {
+    background: #333;
+}
+
+/* @anchor: style_projectSelector */
+/* 工作项目选择占位区 */
+/* ===== 工作项目占位 ===== */
+#projectSelector {
+    padding: 6px 10px;
+    font-size: 12px;
+    color: #888;
+    border-bottom: 1px solid #333;
+}
+#projectSelector .value {
+    color: #666;
+}
+
+/* @anchor: style_sessionView */
+/* 会话列表视图、新建按钮与列表项 */
+/* ===== 会话视图 ===== */
+.session-header {
+    padding: 6px;
+    border-bottom: 1px solid #333;
+}
+#newSessionBtn {
+    width: 100%;
+    padding: 6px;
+    background: #2a4a2a;
+    color: #afa;
+    border: 1px solid #3a5a3a;
+    cursor: pointer;
+    font-size: 12px;
+    border-radius: 3px;
+}
+#newSessionBtn:hover {
+    background: #3a5a3a;
+}
+
+#sessionListView {
+    overflow-y: auto;
+    flex: 1;
+}
+.session-item {
+    position: relative;
+    padding: 8px 10px;
+    pending-right: 34px;
+    border-bottom: 1px solid #2a2a2a;
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.session-item:hover {
+    background: #2a2a2a;
+}
+.session-item.active {
+    background: #2a3a5a;
+    border-left: 3px solid #4a8aff;
+}
+.session-title {
+    font-size: 13px;
+    color: #ddd;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.session-time {
+    font-size: 11px;
+    color: #777;
+    margin-top: 2px;
+}
+.session-empty {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    font-size: 12px;
+}
+.session-rename-btn {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+    font-size: 12px;
+    padding: 2px 4px;
+    transition: opacity 0.15s;
+}
+
+.session-item:hover .session-rename-btn {
+    opacity: 0.7;
+}
+
+.session-rename-btn:hover {
+    opacity: 1 !important;
+}
+.session-title-input {
+    width: 100%;
+    font-size: 13px;
+    color: #ddd;
+    background: #1a1a1a;
+    border: 1px solid #4a8aff;
+    border-radius: 2px;
+    padding: 2px 4px;
+    outline: none;
+    box-sizing: border-box;
+}
+/* @anchor: style_mainColumn */
+/* 主区域纵向布局：底部固定输入区 */
+/* ===== 主区域纵向布局 ===== */
+#main {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    padding: 12px;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+#main h2 {
+    margin: 0 0 10px 0;
+    flex-shrink: 0;
+}
+
+/* ===== 日志区（顶部，占据剩余空间，可滚动） ===== */
+#output {
+    flex: 1;
+    overflow-y: auto;
+    background: #1e1e1e;
+    border: 1px solid #333;
+    padding: 12px;
+    margin-bottom: 10px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border-radius: 4px;
+    /* 滚动到底部时，最新内容可见 */
+    scroll-behavior: smooth;
+}
+
+/* @anchor: style_inputArea */
+/* 底部输入区与提示词输入框 */
+/* ===== 输入区（底部固定） ===== */
+#inputArea {
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-top: 1px solid #333;
+    padding-top: 10px;
+}
+
+#prompt {
+    width: 100%;
+    box-sizing: border-box;   /* 关键：让 padding/border 算进宽度内 */
+    resize: none;
+    min-height: 60px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+/* 迭代控制行、按钮行紧凑一些 */
+.iteration-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+}
+
+.button-row {
+    display: flex;
+    gap: 8px;
+}
+
+/* @anchor: style_runDetail */
+/* 本轮运行详情折叠块（details/summary） */
+/* ===== 本轮运行详情折叠块 ===== */
+.run-detail {
+    margin: 10px 0;
+    padding: 6px 10px;
+    background: #252525;
+    border-left: 3px solid #666;
+    border-radius: 3px;
+}
+.run-detail summary {
+    cursor: pointer;
+    color: #888;
+    font-size: 12px;
+    user-select: none;
+    list-style: none;
+}
+.run-detail summary::before {
+    content: '▸ ';
+}
+.run-detail[open] summary::before {
+    content: '▾ ';
+}
+.run-detail summary:hover {
+    color: #bbb;
+}
+.run-detail pre {
+    margin: 8px 0 0 0;
+    padding: 8px 10px;
+    background: #1a1a1a;
+    color: #bbb;
+    font-size: 12px;
+    line-height: 1.5;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    border-radius: 3px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* @anchor: style_messages */
+/* 对话消息气泡：用户/Agent/系统三种样式 */
+/* ===== 对话消息样式（微信式） ===== */
+.msg {
+    display: flex;
+    margin: 10px 0;
+}
+
+/* 用户消息：右对齐 + 绿色气泡 */
+.msg-user {
+    justify-content: flex-end;
+}
+.msg-user .msg-body {
+    background: #95ec69;      /* 微信绿 */
+    color: #111;
+    padding: 8px 12px;
+    border-radius: 8px;
+    max-width: 70%;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.5;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+/* Agent 消息：左对齐 + 无底色 + 限宽 */
+.msg-assistant {
+    justify-content: flex-start;
+}
+.msg-assistant .msg-body {
+    background: transparent;
+    color: #ddd;
+    padding: 4px 0;
+    max-width: 85%;           /* 限宽，留出右侧"呼吸空间" */
+    word-wrap: break-word;
+    font-size: 14px;
+    line-height: 1.6;
+}
+.msg-assistant .msg-body p {
+    margin: 4px 0;
+}
+.msg-assistant .msg-body pre {
+    background: #1a1a1a;
+    padding: 8px 12px;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+/* 系统/摘要：居中灰色小字 */
+.msg-system {
+    justify-content: flex-start;
+    margin: 8px 0;
+}
+.msg-system .msg-body {
+    color: #bbb;
+    background: #1e1e1e;
+    border-left: 3px solid #4a8aff;
+    padding: 8px 12px;
+    border-radius: 3px;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 85%;
+    white-space: pre-wrap;
+    text-align: left;
+}
+
+/* ===== 用户消息与 Agent 消息之间的分割线 ===== */
+.msg + .msg::before {
+    content: '';
+    position: absolute;
+    /* 用 border 代替，避免伪元素定位麻烦 */
+}
+/* @anchor: style_usagePanel */
+/* 用量面板：按会话展示 Token 与成本 */
+.usage-panel {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: #888;
+    padding: 2px 4px;
+    min-height: 16px;
+}
+.usage-panel span {
+    white-space: nowrap;
+}
+
+#mobileLockBanner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 9999;
+    background: #b8860b;
+    color: #fff;
+    padding: 10px 16px;
+    text-align: center;
+    font-size: 13px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }

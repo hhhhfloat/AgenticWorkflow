@@ -13,6 +13,30 @@ import java.util.List;
  */
 public class SearchFileFilter {
 
+    // @anchor: searchFilter_defaultExcludes
+    /** 默认排除目录名（任意段匹配） */
+    public static final List<String> DEFAULT_EXCLUDED_DIRS = List.of(
+            // 编译产物
+            "target", "build", "out", "dist", "bin", "obj", "classes",
+            // 依赖与缓存
+            "node_modules", ".gradle", ".mvn", ".cache", "vendor",
+            // 版本控制 / IDE
+            ".git", ".svn", ".hg", ".idea", ".vscode", ".settings",
+            // Python
+            "__pycache__", ".pytest_cache", "venv", ".venv",
+            // 覆盖率产物
+            "coverage", ".nyc_output"
+    );
+
+    /** 默认排除文件名（程序自动维护的元数据，不参与全文搜索） */
+    public static final List<String> DEFAULT_EXCLUDED_FILES = List.of(
+            ".anchors.json",
+            ".project_index.json",
+            ".agent_entry.json",
+            ".anchor_index.json",
+            ".anchor_index.json.bak"
+    );
+
     // @anchor: searchFilter_parsePatterns
     /**
      * 解析 filePattern（逗号分隔，支持 *.ext 前缀），返回规范化后的模式列表。
@@ -40,14 +64,13 @@ public class SearchFileFilter {
 
     // @anchor: searchFilter_isExcluded
     /**
-     * 判断相对路径是否位于排除目录之下。
+     * 判断路径中任意一段是否命中排除目录名。
      * @param relPath 相对于搜索起始目录的路径
-     * @param excludedDirs 排除目录名列表（如 "target"、"node_modules"）
+     * @param excludedDirs 排除目录名列表
      */
     public static boolean isExcludedDir(Path relPath, List<String> excludedDirs) {
-        String rel = relPath.toString().replace('\\', '/');
-        for (String excluded : excludedDirs) {
-            if (rel.startsWith(excluded + "/") || rel.startsWith(excluded + "\\")) {
+        for (Path seg : relPath) {
+            if (excludedDirs.contains(seg.toString())) {
                 return true;
             }
         }
@@ -86,13 +109,16 @@ public class SearchFileFilter {
      * @return 文件路径列表
      * @throws IOException 遍历失败时抛出
      */
-    public static List<Path> collectFiles(Path startPath, List<String> excludedDirs) throws IOException {
+    public static List<Path> collectFiles(Path startPath,
+                                          List<String> excludedDirs,
+                                          List<String> excludedFiles) throws IOException {
         List<Path> files = new ArrayList<>();
         try (var stream = Files.walk(startPath)) {
             stream.filter(Files::isRegularFile)
                     .forEach(file -> {
                         Path rel = startPath.relativize(file);
                         if (isExcludedDir(rel, excludedDirs)) return;
+                        if (excludedFiles.contains(file.getFileName().toString())) return;
                         files.add(file);
                     });
         }

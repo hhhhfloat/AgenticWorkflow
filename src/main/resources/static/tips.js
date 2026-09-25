@@ -52,6 +52,5 @@ const QUOTES = [
     "Do not go gentle into the dark night...",
     "And now I am become death, destroyer of the world.",
     "C++ 项目已支持 MSVC 和 MinGW 双编译器，配置面板自由切换",
-    "前端配置修改后自动重启，无需手动操作",
-    "一键清除 API Key，自动重启并重新输入"
+    "前端配置修改后自动重启，无需手动操作"
 ];

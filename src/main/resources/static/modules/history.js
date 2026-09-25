@@ -1,4 +1,6 @@
 // @anchor: modules_history
+// 以 localStorage 读写并渲染 prompt 历史记录
+
 // ===== 历史记录模块 =====
 function getHistory() {
     try {

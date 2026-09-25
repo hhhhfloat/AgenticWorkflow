@@ -1,3 +1,5 @@
+// @anchor: projectsHandler_tot_desc
+// 项目列表处理器：GET /projects，按版本聚合 TestProjects 下的可运行项目
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,7 +17,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+// @anchor: projectsHandler_class
+// 项目列表处理器：扫描 TestProjects 各版本目录，收集含 index.html 的项目
 public class ProjectsHandler implements HttpHandler {
+    // @anchor: projectsHandler_handle
+    // 处理列表请求：遍历版本目录并返回项目名与入口路径
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {

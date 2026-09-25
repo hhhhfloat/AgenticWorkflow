@@ -1,3 +1,5 @@
+// @anchor: htmlParser_tot_desc
+// HTML 结构解析器：提取锚点、外部资源、事件处理器、标签统计与表单项
 package com.myagent.workflow.parser;
 
 import com.myagent.workflow.model.*;
@@ -9,8 +11,12 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.regex.Pattern;
 
+// @anchor: htmlParser_class
+// HTML 解析器：把标签结构与内联事件映射为类/函数/字段信息
 public class HtmlParser implements StructureParser {
 
+    // @anchor: htmlParser_patterns
+    // HTML 锚点与各类标签/属性的匹配正则集合
     private static final Pattern ANCHOR_PATTERN = Pattern.compile(
             "<!--\\s*@anchor:\\s*(\\w+)\\s*-->"
     );
@@ -55,12 +61,16 @@ public class HtmlParser implements StructureParser {
             "(\\w+)=\"([^\"]*)\"|(\\w+)='([^']*)'|(\\w+)=([^\\s>]+)"
     );
 
+    // @anchor: htmlParser_supports
+    // 仅处理 .html / .htm 文件
     @Override
     public boolean supports(Path file) {
         String name = file.getFileName().toString().toLowerCase();
         return name.endsWith(".html") || name.endsWith(".htm");
     }
 
+    // @anchor: htmlParser_parse
+    // 解析 HTML：收集锚点、外链资源、内联事件、标签统计与表单字段
     @Override
     public FileStructure parse(Path file) throws IOException {
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
@@ -207,12 +217,17 @@ public class HtmlParser implements StructureParser {
         );
     }
 
+    // @anchor: htmlParser_isSelfClosing
+    // 判断标签是否为 HTML 空元素（无需闭合）
     private boolean isSelfClosing(String tagName) {
         return Set.of("area", "base", "br", "col", "embed", "hr", "img", "input",
                 "link", "meta", "param", "source", "track", "wbr").contains(tagName.toLowerCase());
     }
 
     // ==================== 字符串/注释清理 ====================
+
+    // @anchor: htmlParser_stripStringsOnly
+    // 移除属性值引号内的内容，仅保留标签骨架
     @Override
     public String stripStringsOnly(String rawLine) {
         // HTML 没有字符串字面量概念，但属性值用引号包裹
@@ -260,6 +275,8 @@ public class HtmlParser implements StructureParser {
         return result.toString();
     }
 
+    // @anchor: htmlParser_cleanLine
+    // 去掉 HTML 注释段，返回可用于锚点检测的代码行
     @Override
     public String cleanLine(String rawLine) {
         // HTML 注释：<!-- ... -->

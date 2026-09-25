@@ -1,4 +1,6 @@
 // @anchor: modules_heartbeat
+// 周期心跳：连续失败提示断联，恢复后提示重连并按需刷新目录
+
 // ===== 心跳机制（含断联/重连检测） =====
 
 // 新增：心跳失败计数器
@@ -11,9 +13,12 @@ function sendHeartbeat() {
         return Promise.resolve();
     }
 
+    const sessionId = getCurrentSessionId();
+
     return fetch(BASE_URL + '/heartbeat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({sessionId: sessionId})
     })
         .then(res => res.json())
         .then(data => {

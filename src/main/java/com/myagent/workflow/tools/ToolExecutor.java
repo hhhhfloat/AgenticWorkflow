@@ -1,10 +1,7 @@
 package com.myagent.workflow.tools;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.AgentConfig;
-import com.myagent.workflow.core.ContextManager;
-import com.myagent.workflow.core.Main;
 import com.myagent.workflow.model.FileStructure;
 import com.myagent.workflow.parser.FileStructureFormatter;
 import com.myagent.workflow.parser.StructureParser;
@@ -15,7 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,15 +19,13 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 /**
- * @anchor: toolExecutor_class
  * 工具执行器 —— 实现所有 Agent 可调用工具的具体逻辑。
  * 从 Main.java 中独立出来，Main 仅保留工作流编排。
  */
-// @anchor: toolExecutor_class_single
+// @anchor: toolExecutor_class
+// 工具执行器：实现全部 Agent 可调用工具的逻辑、路径校验与结果回填
 public class ToolExecutor {
     private static final Logger logger = LoggerFactory.getLogger(ToolExecutor.class);
 
@@ -40,43 +34,65 @@ public class ToolExecutor {
     private final Compiler compiler;
     private final AnchorManager anchorMgr;
     private Consumer<String> logConsumer;
-    private final Consumer<String> modelSwitcher;  // 新增：模型切换回调
     // 字段
-    private final ContextManager contextManager; // 替换原来的 Main main
     private ObjectMapper objectMapper;
 
     private final AgentConfig config;
 
-
+    // 工具名 → 需要做路径检查的参数名
+    private static final Map<String, List<String>> PATH_ARG_MAP = Map.ofEntries(
+            Map.entry("read_file",          List.of("filename")),
+            Map.entry("write_file",         List.of("filename")),
+            Map.entry("delete_file",        List.of("filename")),
+            Map.entry("get_file_structure", List.of("filename")),
+            Map.entry("compile_and_run",    List.of("filename")),
+            Map.entry("list_directory",     List.of("path")),
+            Map.entry("search_text",        List.of("path")),
+            Map.entry("find_references",    List.of("path")),
+            Map.entry("find_callers",       List.of("path")),
+            Map.entry("find_callees",       List.of("path")),
+            Map.entry("list_anchors",       List.of("project_path", "file")),
+            Map.entry("describe_anchors",   List.of("project_path", "file"))
+            // build_anchor_index 不检查（自动构建项目信息，路径本身需要访问 .anchors.json）
+            // read_between_anchors / insert_at_anchor / delete_between_anchors 不检查（无路径参数）
+    );
 
     // @anchor: toolExecutor_constructor
-    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper, Consumer<String> modelSwitcher, ContextManager contextManager) {
+    // 构造：注入配置与 ObjectMapper，并装配各工具组件
+    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper) {
         this.config = config;
         this.compiler = new Compiler(config);
         this.fileOp = new FileOperator();
         this.objectMapper = objectMapper;
         this.anchorMgr = new AnchorManager(objectMapper);
         this.searcher = new CodeSearcher(anchorMgr);
-        this.modelSwitcher = modelSwitcher;  // 初始化
-        this.contextManager = contextManager;
     }
 
     // @anchor: toolExecutor_setLogConsumer
+    // 设置日志回调，把工具执行输出实时推送给 UI
     public void setLogConsumer(Consumer<String> consumer) {
         this.logConsumer = consumer;
     }
 
     // ==================== 工具调度入口 ====================
-
     /**
-     * @anchor: toolExecutor_dispatch
      * 根据工具名和参数分发执行，返回结果字符串。
      */
-    // @anchor: toolExecutor_dispatch_single
+    // @anchor: toolExecutor_dispatch
+    // 工具调度入口：按工具名分发到具体实现，返回结果字符串
     public String dispatch(String functionName, Map<String, Object> args) throws IOException {
+
+        String violation = checkAccess(functionName, args);
+        if(violation!=null)return violation;
+
         switch (functionName) {
             case "write_file":
-                return fileOp.writeFile((String) args.get("filename"), (String) args.get("code"));
+                String writeFilename = (String) args.get("filename");
+                String writeResult = fileOp.writeFile(writeFilename, (String) args.get("code"));
+                if (writeResult != null) {
+                    anchorMgr.markDirtyByFilename(writeFilename);
+                }
+                return writeResult;
             case "compile_and_run":
                 String filename = (String) args.get("filename");
                 String mode = (String) args.getOrDefault("mode", "auto");
@@ -98,16 +114,29 @@ public class ToolExecutor {
             case "build_anchor_index":
                 return anchorMgr.buildAnchorIndex((String) args.get("project_path"));
             case "list_anchors":
-                return anchorMgr.listAnchors((String) args.get("project_path"));
+                String projectPath = (String) args.get("project_path");
+                String file = (String) args.get("file");
+                if (file != null && !file.isBlank()) {
+                    return anchorMgr.listAnchors(projectPath, file);
+                }
+                return anchorMgr.listAnchors(projectPath);
             case "insert_at_anchor":
                 return anchorMgr.insertAtAnchor(
                         (String) args.get("anchor_id"),
                         (String) args.get("content"),
-                        (String) args.getOrDefault("position", "after"));
+                        (String) args.getOrDefault("position", "after"),
+                        (String) args.get("file")
+                );
             case "delete_between_anchors":
                 return anchorMgr.deleteBetweenAnchors(
                         (String) args.get("startAnchor"),
-                        (String) args.get("endAnchor")
+                        (String) args.get("endAnchor"),
+                        (String) args.get("file")
+                );
+            case "describe_anchors":
+                return anchorMgr.describeAnchors(
+                        (String) args.get("project_path"),
+                        (String) args.get("file")
                 );
             case "find_references":
                 return searcher.findReferences(
@@ -128,30 +157,66 @@ public class ToolExecutor {
                         args.containsKey("recursive") && (boolean) args.get("recursive"),
                         args.containsKey("depth") ? (Integer) args.get("depth") : 1
                 );
-            case "switch_model":
-                return switchModel(args);
-            case "query_history":
-                return queryHistory(args);
             case "read_between_anchors":
                 return anchorMgr.readBetweenAnchors(
                         (String) args.get("startAnchor"),
-                        (String) args.get("endAnchor")
+                        (String) args.get("endAnchor"),
+                        (String) args.get("file")
                 );
             case "get_file_structure":
                 return getFileStructure((String) args.get("filename"));
-            case "request_checkpoint":
-                String phaseSummary = (String) args.get("phase_summary");
-                String nextPlan = (String) args.get("next_plan");
-                return contextManager.requestCheckpoint(phaseSummary, nextPlan);
             default:
                 return "未知工具: " + functionName;
         }
     }
+    // @anchor: toolExecutor_checkAccess
+    // 按工具类型校验其路径参数，违规时返回错误消息
+    private String checkAccess(String toolName, Map<String, Object> args) {
+        List<String> pathArgs = PATH_ARG_MAP.get(toolName);
+        if (pathArgs == null) return null;
 
+        for (String argName : pathArgs) {
+            Object val = args.get(argName);
+            if (!(val instanceof String path) || path.isBlank()) continue;
+
+            String err = checkPath(toolName, path);
+            if (err != null) return err;
+        }
+        return null;
+    }
+
+    // @anchor: toolExecutor_checkPath
+    // 沙箱路径校验：拒绝 ".." 穿越、点开头路径与 UPDATE.md 危险读取/删除
+    private String checkPath(String toolName, String path) {
+        String normalized = path.replace('\\', '/');
+        String[] segments = normalized.split("/");
+
+        for (String seg : segments) {
+            if ("..".equals(seg)) {
+                return "❌ 路径中不允许出现 \"..\"：" + path;
+            }
+            if (seg.startsWith(".") && !seg.equals(".")) {
+                return "❌ 不允许访问以 . 开头的文件/目录：" + path
+                        + "。如需项目结构信息，请使用 list_anchors / describe_anchors / get_file_structure。";
+            }
+        }
+
+        String fileName = normalized.substring(normalized.lastIndexOf('/') + 1);
+        if ("UPDATE.md".equalsIgnoreCase(fileName)) {
+            return switch (toolName) {
+                case "read_file" -> "❌ UPDATE.md 不支持完整读取。请使用 read_between_anchors 按锚点读取。";
+                case "delete_file" -> "❌ UPDATE.md 不允许删除。";
+                default -> null;
+            };
+        }
+
+        return null;
+    }
 
     // ==================== 工具 : compile_and_run ====================
 
     // @anchor: toolExecutor_compileAndRun
+    // 编译并运行：先安全扫描，再按模式调度编译器，成功后写入口注册表
     private String compileAndRun(String filename, String mode, boolean run) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -225,6 +290,7 @@ public class ToolExecutor {
 
     // 辅助判断：检查结果是否包含错误标识
     // @anchor: toolExecutor_isError
+    // 判断编译/运行结果字符串是否表示失败
     private boolean isErrorResult(String result) {
         if (result == null) return true;
         // 不再检查 "error"，因为编译输出可能包含它但编译是成功的
@@ -237,6 +303,7 @@ public class ToolExecutor {
 
     // 写入注册表
     // @anchor: toolExecutor_writeEntry
+    // 把最近一次成功运行的入口信息写入 .agent_entry.json
     private void writeEntryFile(Path projectDir, String filename, String mode) {
         try {
             Path entryFile = projectDir.resolve(".agent_entry.json");
@@ -255,77 +322,8 @@ public class ToolExecutor {
         }
     }
 
-    // @anchor: toolExecutor_switchModel
-    private String switchModel(Map<String, Object> args) {
-        if (modelSwitcher == null) {
-            return "⚠️ 模型切换功能未启用（回调未设置）";
-        }
-        String target = (String) args.get("target");
-        if (target == null) {
-            return "❌ 缺少参数 'target'，请指定 'pro' 或 'flash'";
-        }
-        String modelName;
-        if ("pro".equalsIgnoreCase(target)) {
-            modelName = "deepseek-v4-pro";
-        } else if ("flash".equalsIgnoreCase(target)) {
-            modelName = "deepseek-v4-flash";
-        } else {
-            return "❌ 不支持的模型类型: " + target + "，请使用 'pro' 或 'flash'";
-        }
-        modelSwitcher.accept(modelName);
-        return "✅ 模型已切换至: " + modelName;
-    }
-
-    // queryHistory 方法
-    // @anchor: toolExecutor_queryHistory
-    private String queryHistory(Map<String, Object> args) {
-        String keyword = (String) args.get("keyword");
-        int limit = args.containsKey("limit") ? (int) args.get("limit") : 10;
-        if (limit <= 0) limit = 10;
-
-        Path historyFile = contextManager.getHistoryFile();
-        if (historyFile == null || !Files.exists(historyFile)) {
-            return "[]";
-        }
-
-        List<Map<String, Object>> results = new ArrayList<>();
-        try (Stream<String> lines = Files.lines(historyFile, StandardCharsets.UTF_8)) {
-            Iterator<String> iterator = lines.iterator();
-            while (iterator.hasNext()) {
-                String line = iterator.next();
-                if (line.trim().isEmpty()) continue;
-                JsonNode node = objectMapper.readTree(line);
-                if (node.has("content")) {
-                    String content = node.get("content").asText();
-                    boolean matched = false;
-                    try {
-                        matched = Pattern.compile(keyword, Pattern.CASE_INSENSITIVE)
-                                .matcher(content).find();
-                    } catch (Exception e) {
-                        matched = content.toLowerCase().contains(keyword.toLowerCase());
-                    }
-                    if (matched) {
-                        Map<String, Object> entry = new LinkedHashMap<>();
-                        entry.put("role", node.get("role").asText());
-                        String snippet = content.length() > 200 ? content.substring(0, 200) + "..." : content;
-                        entry.put("snippet", snippet);
-                        results.add(entry);
-                        if (results.size() >= limit) break;
-                    }
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("⚠️ 查询历史失败: " + e.getMessage());
-            return "[]";
-        }
-        try {
-            return objectMapper.writeValueAsString(results);
-        } catch (Exception e) {
-            return "[]";
-        }
-    }
-
     // @anchor: toolExecutor_getFileStructure
+    // 解析文件并用格式化器输出精简的代码结构
     private String getFileStructure(String filename) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -342,6 +340,47 @@ public class ToolExecutor {
         } catch (IOException e) {
             return "❌ 解析文件结构失败: " + e.getMessage();
         }
+    }
+
+    /**
+     * 遍历沙箱下所有项目，逐个重建 .project_index.json。
+     * 由 Main.run() 的 finally 块调用，一次运行结束刷新一次。
+     */
+    // @anchor: toolExecutor_refreshAllProjectIndexes
+    // 一次运行结束后遍历沙箱各项目，重建其 .project_index.json
+    public void refreshAllProjectIndexes() {
+        try {
+            Path sandbox = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
+            if (!Files.isDirectory(sandbox)) return;
+
+            try (var stream = Files.list(sandbox)) {
+                for (Path projectDir : (Iterable<Path>) stream::iterator) {
+                    if (!Files.isDirectory(projectDir)) continue;
+                    String name = projectDir.getFileName().toString();
+                    if (name.startsWith(".")) continue;
+
+                    Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
+                    if (!Files.exists(anchorsFile)) continue;
+
+                    try {
+                        anchorMgr.rebuildProjectIndex(name);
+                    } catch (Exception e) {
+                        logger.warn("刷新项目索引失败: {} -> {}", name, e.getMessage());
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger.warn("刷新所有项目索引失败: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * 由 Main 在一轮工具调用结束后触发，批量刷新锚点索引。
+     */
+    // @anchor: toolExecutor_flushDirtyAnchors
+    // 一轮工具调用结束后批量刷新锚点索引中的脏文件
+    public void flushDirtyAnchors() {
+        anchorMgr.flushDirty();
     }
 
 }
