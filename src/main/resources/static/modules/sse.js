@@ -97,13 +97,6 @@ function handleSpecialEvent(data) {
         try {
             const obj = JSON.parse(data);
             if (obj.type === 'usage' && obj.sessionId) {
-                addSessionUsage(obj.sessionId, {
-                    promptTokens: obj.promptTokens || 0,
-                    cachedTokens: obj.cachedTokens || 0,
-                    completionTokens: obj.completionTokens || 0,
-                    apiCalls: obj.apiCalls || 0,
-                    cost: obj.cost || 0
-                });
                 renderUsagePanel();
                 return true;
             }

@@ -98,6 +98,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     await restoreCurrentSession();
     // 加载会话列表
     await loadSessionList();
+    // 渲染用量面板（从后端拉）
+    renderUsagePanel();
 
     const history = getHistory();
     if (history.length > 0) {

@@ -10,6 +10,7 @@ import com.myagent.workflow.http.HttpServerMain;
 import com.myagent.workflow.http.LogFileWriter;
 import com.myagent.workflow.session.Session;
 import com.myagent.workflow.session.SessionManager;
+import com.myagent.workflow.session.SessionUsage;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
@@ -176,12 +177,15 @@ public class RunHandler implements HttpHandler {
                     // 发 usage 事件
                     Main.TaskUsage usage = agent.getLastTaskUsage();
                     if (usage != null) {
+                        SessionUsage delta = new SessionUsage(usage.promptTokens(), usage.cachedTokens(), usage.completionTokens(),
+                                usage.apiCalls(), usage.cost());
+                        SessionUsage total = sessionManager.appendUsage(session.getSessionId(), delta);
                         String usageJson = String.format(
-                                "{\"type\":\"usage\",\"sessionId\":\"%s\",\"promptTokens\":%d,\"cachedTokens\":%d," +
-                                        "\"completionTokens\":%d,\"apiCalls\":%d,\"cost\":%.6f}",
+                                "{\"type\":\"usage\",\"sessionId\":\"%s\",\"promptTokens\":%d,\"cachedTokens\":%d,"
+                                        + "\"completionTokens\":%d,\"apiCalls\":%d,\"cost\":%.6f}",
                                 session.getSessionId(),
-                                usage.promptTokens(), usage.cachedTokens(), usage.completionTokens(),
-                                usage.apiCalls(), usage.cost()
+                                total.promptTokens(), total.cachedTokens(), total.completionTokens(),
+                                total.apiCalls(), total.cost()
                         );
                         sendEvent(out, usageJson);
                     }

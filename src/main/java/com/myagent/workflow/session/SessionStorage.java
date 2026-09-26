@@ -45,6 +45,7 @@ public class SessionStorage {
     private static final String META_FILE = "meta.json";
     private static final String BASE_FILE = "immutable_base.jsonl";
     private static final String WORKING_FILE = "volatile_working.jsonl";
+    private static final String USAGE_FILE = "usage.json";
 
     // @anchor: sessionStorage_mappers
     // 元数据/索引用的缩进 JSON 映射器与 JSONL 单行映射器
@@ -258,6 +259,30 @@ public class SessionStorage {
             result.add(msg);
         }
         return result;
+    }
+
+    // @anchor: sessionStorage_loadUsage
+// 读取会话级用量；文件不存在时返回空记录
+    public SessionUsage loadUsage(String sessionId) {
+        Path file = SESSIONS_DIR.resolve(sessionId).resolve(USAGE_FILE);
+        if (!Files.exists(file)) return SessionUsage.empty();
+        try {
+            return objectMapper.readValue(Files.readString(file, StandardCharsets.UTF_8),
+                    SessionUsage.class);
+        } catch (IOException e) {
+            return SessionUsage.empty();
+        }
+    }
+
+    // @anchor: sessionStorage_appendUsage
+// 累加会话用量并立即落盘，返回累加后的完整记录
+    public SessionUsage appendUsage(String sessionId, SessionUsage delta) throws IOException {
+        Path sessionDir = SESSIONS_DIR.resolve(sessionId);
+        Files.createDirectories(sessionDir);
+        SessionUsage cur = loadUsage(sessionId);
+        SessionUsage next = cur.add(delta);
+        writeJson(sessionDir.resolve(USAGE_FILE), next);
+        return next;
     }
 
     // ==================== 内部类：索引结构 ====================
