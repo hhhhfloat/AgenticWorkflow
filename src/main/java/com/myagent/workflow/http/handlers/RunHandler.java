@@ -171,47 +171,56 @@ public class RunHandler implements HttpHandler {
             final int finalMaxIterations = maxIterations;
 
             new Thread(() -> {
-                try {
-                    String result = agent.run(userRequest, finalMaxIterations);
+                String result = null;
+                Exception error = null;
 
-                    // 发 usage 事件
-                    Main.TaskUsage usage = agent.getLastTaskUsage();
-                    if (usage != null) {
-                        SessionUsage delta = new SessionUsage(usage.promptTokens(), usage.cachedTokens(), usage.completionTokens(),
+                try {
+                    result = agent.run(userRequest, finalMaxIterations);
+                } catch (Exception e) {
+                    error = e;
+                }
+
+                // ===== 无论成败，都写 usage =====
+                Main.TaskUsage usage = agent.getLastTaskUsage();
+                if (usage != null) {
+                    try {
+                        SessionUsage delta = new SessionUsage(
+                                usage.promptTokens(), usage.cachedTokens(), usage.completionTokens(),
                                 usage.apiCalls(), usage.cost());
                         SessionUsage total = sessionManager.appendUsage(session.getSessionId(), delta);
+
                         String usageJson = String.format(
-                                "{\"type\":\"usage\",\"sessionId\":\"%s\",\"promptTokens\":%d,\"cachedTokens\":%d,"
-                                        + "\"completionTokens\":%d,\"apiCalls\":%d,\"cost\":%.6f}",
+                                "{\"type\":\"usage\",\"sessionId\":\"%s\",\"promptTokens\":%d,\"cachedTokens\":%d," +
+                                        "\"completionTokens\":%d,\"apiCalls\":%d,\"cost\":%.6f}",
                                 session.getSessionId(),
                                 total.promptTokens(), total.cachedTokens(), total.completionTokens(),
                                 total.apiCalls(), total.cost()
                         );
                         sendEvent(out, usageJson);
+                    } catch (Exception ignored) {
+                        // usage 写失败不应影响任务结束流程
                     }
-
-                    sendEvent(out, "[完成] " + result);
-                    sendEvent(out, "[结束]");
-                } catch (Exception e) {
-                    try {
-                        sendEvent(out, "[错误] " + e.getMessage());
-                        sendEvent(out, "[结束]");
-                    } catch (IOException ignored) {}
-                } finally {
-                    // 清理：解绑日志、释放许可、关闭流、关闭日志文件
-                    session.setLogConsumer(null);
-                    sessionManager.releaseRunningPermit();
-                    sessionManager.save(session);
-
-                    if (finalLogWriter != null) {
-                        try {
-                            finalLogWriter.close();
-                        } catch (IOException ignored) {}
-                    }
-                    try {
-                        out.close();
-                    } catch (IOException ignored) {}
                 }
+
+                // ===== 发结束事件 =====
+                try {
+                    if (error != null) {
+                        sendEvent(out, "[错误] " + error.getMessage());
+                    } else {
+                        sendEvent(out, "[完成] " + result);
+                    }
+                    sendEvent(out, "[结束]");
+                } catch (IOException ignored) {}
+
+                // ===== 清理 =====
+                session.setLogConsumer(null);
+                sessionManager.releaseRunningPermit();
+                sessionManager.save(session);
+
+                if (finalLogWriter != null) {
+                    try { finalLogWriter.close(); } catch (IOException ignored) {}
+                }
+                try { out.close(); } catch (IOException ignored) {}
             }, "AgentRunner-" + session.getSessionId()).start();
 
         } catch (Exception e) {
