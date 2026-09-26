@@ -133,17 +133,6 @@ public final class ToolDefinitions {
                 List.of("project_path")
         ));
 
-        // @anchor: toolDef_listAnchors
-// 工具：list_anchors 列出锚点
-        tools.add(defineTool(
-                "list_anchors",
-                "列出指定项目中的所有锚点，返回锚点ID、所在文件、行号和内容预览。可指定文件参数仅列出该文件的锚点。",
-                defineParams()
-                        .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
-                        .prop("file", "string", "可选，指定文件名（如 'task.py'），仅列出该文件的锚点。")
-                        .build(),
-                List.of("project_path")
-        ));
 
         // @anchor: toolDef_insertAnchor
 // 工具：insert_at_anchor 在锚点处插入代码
@@ -176,7 +165,7 @@ public final class ToolDefinitions {
 // 工具：find_references 查找符号引用
         tools.add(defineTool(
                 "find_references",
-                "查找函数、变量、类、方法在项目中的所有引用位置。返回文件、行号和代码预览。修改代码前先用此工具评估影响范围。",
+                "全文匹配：查找符号在项目中的所有出现位置（含定义行、声明、字符串）。返回文件、行号和代码预览。偏向全面覆盖，可能包含非调用点。",
                 defineParams()
                         .prop("symbol", "string", "要查找的符号名称，如 'handleNumber'、'renderTimeline'")
                         .prop("path", "string", "搜索起始相对路径，默认为项目根目录")
@@ -189,7 +178,7 @@ public final class ToolDefinitions {
 // 工具：find_callers 查找调用者
         tools.add(defineTool(
                 "find_callers",
-                "查找函数被调用的所有位置。返回文件路径、行号、调用所在函数上下文和参数预览。比 search_text 更精准，只会匹配函数调用表达式，跳过定义、声明和注释。",
+                "调用形态匹配：查找函数被调用的位置，跳过定义、字符串、注释。识别 NAME( / NAME?.( / NAME.call( / NAME.apply(，并返回所在函数上下文。比 find_references 精准，但字符串内容与无括号回调可能被忽略，需要时可两个工具交叉使用。",
                 defineParams()
                         .prop("functionName", "string", "要查找的函数名称")
                         .prop("path", "string", "搜索起始相对路径，默认为项目根目录")
@@ -216,10 +205,10 @@ public final class ToolDefinitions {
 // 工具：describe_anchors 列出锚点及其职责描述
         tools.add(defineTool(
                 "describe_anchors",
-                "返回指定文件中所有功能性锚点及其对应描述。仅返回非 _end 锚点，并额外提供每个锚点的功能描述（来自锚点下方紧邻的注释）。用于快速理解文件中各部分的职责，避免读取整份源码。",
+                "返回锚点信息。file 支持逗号分隔多个片段。每个片段：先按文件匹配（精确或后缀），命中则列出该文件的全部功能锚点（id / 行号 / symbol / 描述）；未命中则按目录匹配，列出该目录下所有文件的 _intro 锚点描述（文件职责概览）；传 '.' 表示整个项目。不返回 _end 锚点。",
                 defineParams()
                         .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
-                        .prop("file", "string", "文件相对路径（如 src/main/java/Main.java），需要完整以避免歧义")
+                        .prop("file", "string", "必填。文件相对路径（逗号分隔多个文件）或目录路径（如 'src/main/java/game'）。传 '.' 表示整个项目。")
                         .build(),
                 List.of("project_path", "file")
         ));

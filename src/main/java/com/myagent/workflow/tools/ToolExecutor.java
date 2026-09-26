@@ -51,7 +51,6 @@ public class ToolExecutor {
             Map.entry("find_references",    List.of("path")),
             Map.entry("find_callers",       List.of("path")),
             Map.entry("find_callees",       List.of("path")),
-            Map.entry("list_anchors",       List.of("project_path", "file")),
             Map.entry("describe_anchors",   List.of("project_path", "file"))
             // build_anchor_index 不检查（自动构建项目信息，路径本身需要访问 .anchors.json）
             // read_between_anchors / insert_at_anchor / delete_between_anchors 不检查（无路径参数）
@@ -113,13 +112,6 @@ public class ToolExecutor {
                         (String) args.getOrDefault("path", "."));
             case "build_anchor_index":
                 return anchorMgr.buildAnchorIndex((String) args.get("project_path"));
-            case "list_anchors":
-                String projectPath = (String) args.get("project_path");
-                String file = (String) args.get("file");
-                if (file != null && !file.isBlank()) {
-                    return anchorMgr.listAnchors(projectPath, file);
-                }
-                return anchorMgr.listAnchors(projectPath);
             case "insert_at_anchor":
                 return anchorMgr.insertAtAnchor(
                         (String) args.get("anchor_id"),
@@ -197,7 +189,7 @@ public class ToolExecutor {
             }
             if (seg.startsWith(".") && !seg.equals(".")) {
                 return "❌ 不允许访问以 . 开头的文件/目录：" + path
-                        + "。如需项目结构信息，请使用 list_anchors / describe_anchors / get_file_structure。";
+                        + "。如需项目结构信息，请使用 describe_anchors / get_file_structure。";
             }
         }
 
