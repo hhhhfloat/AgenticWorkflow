@@ -16,7 +16,7 @@
 ## 关键决策
 - **工具即能力边界**：Agent 对环境的全部交互收敛为 `ToolDefinitions` 声明、`ToolExecutor` 按名分发的函数工具，模型只面对稳定契约而非直接文件/进程操作；所有路径参数统一经 `checkPath` → `PathUtils.safeResolve` 做沙箱校验，穿越直接拒绝。工具分四组：
   - **文件目录**：`list_directory` 列目录树（可递归）、`read_file` 读文本（5000 字上限）、`write_file` 整文件写入/覆盖并标脏、`delete_file` 删文件。
-  - **锚点编辑**：`list_anchors` 列锚点、`describe_anchors` 列锚点+职责描述、`build_anchor_index` 重建索引、`read_between_anchors` 按区间精读、`insert_at_anchor` 在锚点前/后插入、`delete_between_anchors` 删区间（配合 insert 即区间替换）。
+  - **锚点编辑**：`describe_anchors` 列锚点+职责描述、`build_anchor_index` 重建索引、`read_between_anchors` 按区间精读、`insert_at_anchor` 在锚点前/后插入、`delete_between_anchors` 删区间（配合 insert 即区间替换）。
   - **检索理解**：`get_file_structure` 取类/方法/字段/锚点结构、`search_text` 正则全文检索（≤30 条）、`find_references` 查符号引用、`find_callers`/`find_callees` 查调用链（可递归）。
   - **执行**：`compile_and_run` 按 html/java/maven/cpp/python/node 编译运行，可仅编译不运行。
 - **锚点即坐标**：以单行注释 `// @anchor: 模块_功能` 作为 Agent 精准读写的坐标（`_start`/`_end` 括出区间），替代脆弱的行号定位；`insert`/`delete`/`read_between` 均基于锚点 ID 完成。
