@@ -33,6 +33,87 @@ public class ReferenceFinder {
             ".java", ".js", ".jsx", ".ts", ".tsx", ".py", ".go", ".rs",
             ".c", ".cpp", ".h", ".php", ".rb", ".kt", ".vue");
 
+    // @anchor: referenceFinder_stripStringsAndComments
+// 剥离行内字符串与注释，用等长空格占位以保留列号。
+// inBlockComment[0] 作为跨行块注释状态，传入传出。
+    private static String stripStringsAndComments(String line, boolean[] inBlockComment) {
+        StringBuilder sb = new StringBuilder(line.length());
+        boolean inBlock = inBlockComment[0];
+        char quote = 0;
+        int i = 0;
+        while (i < line.length()) {
+            char c = line.charAt(i);
+
+            if (inBlock) {
+                if (c == '*' && i + 1 < line.length() && line.charAt(i + 1) == '/') {
+                    inBlock = false;
+                    sb.append("  ");
+                    i += 2;
+                    continue;
+                }
+                sb.append(' ');
+                i++;
+                continue;
+            }
+
+            if (quote != 0) {
+                if (c == '\\' && i + 1 < line.length()) {
+                    sb.append("  ");
+                    i += 2;
+                    continue;
+                }
+                if (c == quote) quote = 0;
+                sb.append(' ');
+                i++;
+                continue;
+            }
+
+            // 块注释开始
+            if (c == '/' && i + 1 < line.length() && line.charAt(i + 1) == '*') {
+                inBlock = true;
+                sb.append("  ");
+                i += 2;
+                continue;
+            }
+            // // 行注释
+            if (c == '/' && i + 1 < line.length() && line.charAt(i + 1) == '/') {
+                while (i < line.length()) { sb.append(' '); i++; }
+                break;
+            }
+            // # 行注释（Python/Shell）：行首或前导空白后
+            if (c == '#' && (i == 0 || Character.isWhitespace(line.charAt(i - 1)))) {
+                while (i < line.length()) { sb.append(' '); i++; }
+                break;
+            }
+            // 字符串开始
+            if (c == '"' || c == '\'' || c == '`') {
+                quote = c;
+                sb.append(' ');
+                i++;
+                continue;
+            }
+
+            sb.append(c);
+            i++;
+        }
+        inBlockComment[0] = inBlock;
+        return sb.toString();
+    }
+
+    // @anchor: referenceFinder_isControlKeyword
+// 排除控制流关键字，避免在 extractContext 中被误判为函数名
+    private static boolean isControlKeyword(String name) {
+        switch (name) {
+            case "if": case "else": case "for": case "while": case "switch":
+            case "case": case "catch": case "try": case "do": case "return":
+            case "new": case "typeof": case "instanceof": case "await":
+            case "yield": case "throw": case "super": case "this":
+                return true;
+            default:
+                return false;
+        }
+    }
+
     // @anchor: referenceFinder_findReferences
 // 查找某符号在项目内的所有引用位置
     String findReferences(String symbol, String path, String filePattern) {
@@ -44,7 +125,16 @@ public class ReferenceFinder {
 
             // 构建匹配模式：精确匹配符号，支持常见边界
             Pattern pattern = Pattern.compile(
-                    "\\b" + Pattern.quote(symbol) + "\\b"
+                    "(?<![\\w$])" + Pattern.quote(symbol) + "(?![\\w$])",
+                    Pattern.UNICODE_CHARACTER_CLASS
+            );
+
+            // @anchor: referenceFinder_defPattern
+            // 明确的定义形式（JS 风格）；用于跳过定义行，其余一律视为引用
+            Pattern defPattern = Pattern.compile(
+                    "(^|\\s)function\\s+" + Pattern.quote(symbol) + "\\s*\\(" +
+                            "|" + Pattern.quote(symbol) + "\\s*[=:]\\s*function\\s*\\(" +
+                            "|" + Pattern.quote(symbol) + "\\s*=\\s*\\("
             );
 
             List<String> patterns = SearchFileFilter.parseFilePatterns(filePattern);
@@ -74,9 +164,8 @@ public class ReferenceFinder {
                         if (trimmed.startsWith("import ") || trimmed.startsWith("require(")) {
                             continue;
                         }
-                        // 跳过符号定义本身（如 function handleNumber() {）
-                        if (trimmed.matches(".*\\b" + Pattern.quote(symbol) + "\\s*[=:(].*")) {
-                            // 这可能是定义，跳过
+                        // 只跳过明确像定义的行（JS 风格：function foo / foo = function / foo: function / foo = (）
+                        if(defPattern.matcher(line).find()){
                             continue;
                         }
 
@@ -137,27 +226,49 @@ public class ReferenceFinder {
                 return "路径不存在或不是目录: " + path;
             }
 
-            // 构建匹配模式：识别函数调用（包括链式调用、带参数等场景）
-            // 匹配 foo()、foo(arg)、obj.foo()、this.foo()、foo?.()、foo() 等
+            String quoted = Pattern.quote(functionName);
+
+            // 调用形态：
+            //   NAME(      —— 直接调用
+            //   NAME?.(    —— 可选链调用
+            //   NAME.call( / NAME.apply( —— 显式调用
+            // 优先匹配最长形态，避免 .call 被 NAME( 抢走
             Pattern callerPattern = Pattern.compile(
-                    "\\b" + Pattern.quote(functionName) +
-                            "\\s*[\\(\\?]\\s*[^\\);]*\\)?"
+                    "(?<![\\w$])" + quoted + "\\s*\\.\\s*(?:call|apply)\\s*\\(" +
+                            "|(?<![\\w$])" + quoted + "\\s*\\?\\.\\s*\\(" +
+                            "|(?<![\\w$])" + quoted + "\\s*\\(",
+                    Pattern.UNICODE_CHARACTER_CLASS
             );
 
-            // 排除定义模式：function foo()、foo = function()、foo: function()
+            // 定义形态（保守收窄）：
+            //   function NAME(
+            //   NAME = function( / NAME: function(
+            //   NAME = (
+            //   def NAME(          —— Python
+            //   行首（可选修饰符）后的 NAME(...) { —— ES6 简写方法 / 类方法 / Java 方法签名
+            //   修饰符列表后的 NAME(  —— Java 常见写法
             Pattern defPattern = Pattern.compile(
-                    "(function\\s+" + Pattern.quote(functionName) + "\\s*\\()|" +
-                            "(" + Pattern.quote(functionName) + "\\s*[=:]\\s*function\\s*\\()|" +
-                            "(" + Pattern.quote(functionName) + "\\s*=\\s*\\()"
+                    "(^|[\\s;(])function\\s+" + quoted + "\\s*\\(" +
+                            "|" + quoted + "\\s*[=:]\\s*function\\s*\\(" +
+                            "|" + quoted + "\\s*=\\s*\\(" +
+                            "|\\bdef\\s+" + quoted + "\\s*\\(" +
+                            "|^\\s*(?:[\\w@<>\\[\\],\\s]+\\s)?" + quoted
+                            + "\\s*\\([^)]*\\)\\s*(?:throws\\s+[\\w\\s,]+\\s*)?\\{" +
+                            "|^\\s*(?:public|private|protected|static|final|abstract|"
+                            + "synchronized)\\b[^;{}]*\\b" + quoted + "\\s*\\(",
+                    Pattern.UNICODE_CHARACTER_CLASS
             );
 
             List<String> patterns = SearchFileFilter.parseFilePatterns(filePattern);
 
-            // 结果存储：每个文件一个列表
             Map<String, List<Map<String, Object>>> results = new LinkedHashMap<>();
             AtomicInteger totalCallers = new AtomicInteger(0);
 
-            List<Path> files = SearchFileFilter.collectFiles(startPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS, SearchFileFilter.DEFAULT_EXCLUDED_FILES);
+            List<Path> files = SearchFileFilter.collectFiles(
+                    startPath,
+                    SearchFileFilter.DEFAULT_EXCLUDED_DIRS,
+                    SearchFileFilter.DEFAULT_EXCLUDED_FILES);
+
             for (Path file : files) {
                 try {
                     String fileName = file.getFileName().toString();
@@ -166,37 +277,34 @@ public class ReferenceFinder {
                     String relPathStr = startPath.relativize(file).toString().replace('\\', '/');
                     List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
                     List<Map<String, Object>> fileCallers = new ArrayList<>();
+                    boolean[] inBlockComment = new boolean[]{false};
 
                     for (int i = 0; i < lines.size(); i++) {
-                        String line = lines.get(i);
-                        String trimmed = line.trim();
+                        String raw = lines.get(i);
+                        String stripped = stripStringsAndComments(raw, inBlockComment);
 
-                        // 跳过注释行
-                        if (trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
-                            continue;
-                        }
-                        // 跳过 import/require
-                        if (trimmed.startsWith("import ") || trimmed.startsWith("require(")) {
-                            continue;
-                        }
-                        // 跳过定义行（function foo()、foo = function()、foo: function()）
-                        if (defPattern.matcher(line).find()) {
-                            continue;
-                        }
+                        // 整行全是注释/字符串/空白 → 跳过
+                        if (stripped.trim().isEmpty()) continue;
 
-                        // 匹配调用模式
-                        java.util.regex.Matcher matcher = callerPattern.matcher(line);
-                        if (matcher.find()) {
-                            // 获取调用所在的函数上下文（分析调用发生的位置）
-                            String context = extractContext(lines, i);
+                        String trimmed = stripped.trim();
+                        // 跳过 import / require
+                        if (trimmed.startsWith("import ") || trimmed.startsWith("require(")) continue;
+                        // 跳过定义行
+                        if (defPattern.matcher(stripped).find()) continue;
 
+                        // 匹配调用（同一行可能有多处）
+                        java.util.regex.Matcher m = callerPattern.matcher(stripped);
+                        String context = null;
+                        while (m.find()) {
+                            if (context == null) {
+                                context = extractContext(lines, i);
+                            }
                             Map<String, Object> caller = new LinkedHashMap<>();
                             caller.put("line", i + 1);
-                            String preview = line.trim();
-                            if (preview.length() > 120) {
-                                preview = preview.substring(0, 120) + "...";
-                            }
-                            caller.put("preview", preview);
+                            String preview = raw.trim();
+                            if (preview.length() > 120) preview = preview.substring(0, 120) + "...";
+                            // 标注本行第几处
+                            caller.put("preview", "（第 " + (fileCallers.size() + 1) + " 处）" + preview);
                             caller.put("context", context);
                             fileCallers.add(caller);
                             totalCallers.incrementAndGet();
@@ -213,11 +321,11 @@ public class ReferenceFinder {
                 return "🔍 未找到函数 \"" + functionName + "\" 的调用点。";
             }
 
-            // 构建输出
             StringBuilder sb = new StringBuilder();
             int total = totalCallers.get();
             int fileCount = results.size();
-            sb.append("🔍 找到 ").append(total).append(" 个调用点，分布在 ").append(fileCount).append(" 个文件中：\n\n");
+            sb.append("🔍 找到 ").append(total).append(" 个调用点，分布在 ")
+                    .append(fileCount).append(" 个文件中：\n\n");
 
             for (Map.Entry<String, List<Map<String, Object>>> entry : results.entrySet()) {
                 String filePath = entry.getKey();
@@ -246,22 +354,28 @@ public class ReferenceFinder {
     // ===== 内部辅助 =====
 
     // @anchor: referenceFinder_extractContext
-// 抽取命中行周围的上下文代码
+// 向上查找最近的函数定义行，提取函数名作为上下文
+    private static final Pattern CONTEXT_DEF_LINE = Pattern.compile(
+            "\\bfunction\\s+(\\w+)\\s*\\(" +
+                    "|(\\w+)\\s*[=:]\\s*function\\s*\\(" +
+                    "|\\bdef\\s+(\\w+)\\s*\\(" +
+                    "|(\\w+)\\s*\\([^)]*\\)\\s*\\{",
+            Pattern.UNICODE_CHARACTER_CLASS
+    );
+
     private String extractContext(List<String> lines, int lineIndex) {
-        // 向上查找最近的函数定义
-        int searchLimit = Math.max(0, lineIndex - 20);
+        int searchLimit = Math.max(0, lineIndex - 30);
         for (int i = lineIndex - 1; i >= searchLimit; i--) {
             String line = lines.get(i).trim();
-            // 检测函数定义：function foo()、foo() {、foo = function()、foo: function()
-            if (line.matches(".*\\bfunction\\s+\\w+\\s*\\(") ||
-                    line.matches("\\w+\\s*[=:]\\s*function\\s*\\(") ||
-                    line.matches("\\w+\\s*\\(\\s*[^)]*\\s*\\)\\s*\\{")) {
-                // 提取函数名
-                java.util.regex.Matcher m = Pattern.compile("\\b(\\w+)\\s*[=:(\\.]").matcher(line);
-                if (m.find()) {
-                    return m.group(1);
+            if (line.isEmpty() || line.startsWith("//") || line.startsWith("*")) continue;
+            java.util.regex.Matcher m = CONTEXT_DEF_LINE.matcher(line);
+            if (m.find()) {
+                for (int g = 1; g <= m.groupCount(); g++) {
+                    String name = m.group(g);
+                    if (name != null && !isControlKeyword(name)) {
+                        return name;
+                    }
                 }
-                return line.trim();
             }
         }
         return "全局";

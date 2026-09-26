@@ -165,7 +165,7 @@ public final class ToolDefinitions {
 // 工具：find_references 查找符号引用
         tools.add(defineTool(
                 "find_references",
-                "查找函数、变量、类、方法在项目中的所有引用位置。返回文件、行号和代码预览。修改代码前先用此工具评估影响范围。",
+                "全文匹配：查找符号在项目中的所有出现位置（含定义行、声明、字符串）。返回文件、行号和代码预览。偏向全面覆盖，可能包含非调用点。",
                 defineParams()
                         .prop("symbol", "string", "要查找的符号名称，如 'handleNumber'、'renderTimeline'")
                         .prop("path", "string", "搜索起始相对路径，默认为项目根目录")
@@ -178,7 +178,7 @@ public final class ToolDefinitions {
 // 工具：find_callers 查找调用者
         tools.add(defineTool(
                 "find_callers",
-                "查找函数被调用的所有位置。返回文件路径、行号、调用所在函数上下文和参数预览。比 search_text 更精准，只会匹配函数调用表达式，跳过定义、声明和注释。",
+                "调用形态匹配：查找函数被调用的位置，跳过定义、字符串、注释。识别 NAME( / NAME?.( / NAME.call( / NAME.apply(，并返回所在函数上下文。比 find_references 精准，但字符串内容与无括号回调可能被忽略，需要时可两个工具交叉使用。",
                 defineParams()
                         .prop("functionName", "string", "要查找的函数名称")
                         .prop("path", "string", "搜索起始相对路径，默认为项目根目录")

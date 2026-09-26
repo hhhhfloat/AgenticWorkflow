@@ -224,11 +224,21 @@ html, body {
     color: #fff;
 }
 
+#filesView,
+#sessionsView {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
 #sidebarContent {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 8px 0;
 }
+
 
 /* @anchor: style_tree */
 /* 文件树根节点、子节点与操作按钮占位 */
@@ -598,6 +608,7 @@ html, body {
 #sessionListView {
     overflow-y: auto;
     flex: 1;
+    min-height: 0;
 }
 .session-item {
     position: relative;

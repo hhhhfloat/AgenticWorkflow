@@ -70,6 +70,8 @@ public class ExternalFileHandler implements HttpHandler {
         if (name.endsWith(".css")) contentType = "text/css";
         else if (name.endsWith(".js")) contentType = "application/javascript";
         else if (name.endsWith(".png")) contentType = "image/png";
+        else if (name.endsWith(".md")) contentType = "text/markdown; charset=utf-8";
+        else if (name.endsWith(".txt") || name.endsWith(".json") || name.endsWith(".yml") || name.endsWith(".yaml")) contentType = "text/plain; charset=utf-8";
 
         exchange.getResponseHeaders().set("Content-Type", contentType);
         exchange.sendResponseHeaders(200, file.length());

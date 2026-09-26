@@ -21,14 +21,19 @@ import java.util.*;
  */
 public class AnchorManager {
     private static final Logger logger = LoggerFactory.getLogger(AnchorManager.class);
-    private final AnchorIndex anchorIndex;
 
     private final Map<String, Set<String>> dirtyFiles = new LinkedHashMap<>();
+
+    private final AnchorIndex anchorIndex;
+    private final AnchorQuery anchorQuery;
+    private final AnchorFormatter anchorFormatter;
 
     // @anchor: anchorManager_constructor
 // 构造：创建内部 AnchorIndex
     public AnchorManager(ObjectMapper objectMapper) {
         this.anchorIndex = new AnchorIndex(objectMapper);
+        this.anchorQuery = new AnchorQuery(objectMapper);
+        this.anchorFormatter = new AnchorFormatter(objectMapper);
     }
 
     // ===== 转发：索引构建 =====
@@ -258,10 +263,10 @@ public class AnchorManager {
      */
     private AnchorLocation resolveAnchor(String anchorId, String fileHint) {
         if (fileHint == null || fileHint.isBlank()) {
-            List<AnchorLocation> all = anchorIndex.findAllGlobally(anchorId);
+            List<AnchorLocation> all = anchorQuery.findAllGlobally(anchorId);
             return all.size() == 1 ? all.get(0) : null;
         }
-        return anchorIndex.findInFile(anchorId, fileHint);
+        return anchorQuery.findInFile(anchorId, fileHint);
     }
 
 // @anchor: anchorManager_buildResolveError
@@ -272,7 +277,7 @@ public class AnchorManager {
         if (fileHint != null && !fileHint.isBlank()) {
             return "❌ 在文件 " + fileHint + " 中未找到唯一锚点: " + anchorId;
         }
-        List<AnchorLocation> all = anchorIndex.findAllGlobally(anchorId);
+        List<AnchorLocation> all = anchorQuery.findAllGlobally(anchorId);
         if (all.isEmpty()) return "❌ 锚点不存在: " + anchorId;
 
         StringBuilder sb = new StringBuilder();
@@ -296,7 +301,7 @@ public class AnchorManager {
      * 由 CallGraphAnalyzer 等模块通过 AnchorManager 调用，避免它们直接依赖 AnchorIndex。
      */
     AnchorLocation findAnchor(String projectPath, String anchorId) {
-        return anchorIndex.find(projectPath, anchorId);
+        return anchorQuery.find(projectPath, anchorId);
     }
 
     // @anchor: anchorManager_rebuildProjectIndex
@@ -308,7 +313,7 @@ public class AnchorManager {
     // @anchor: anchorManager_describeAnchors
 // 返回各锚点及其紧邻描述
     String describeAnchors(String projectPath, String filePath) {
-        return anchorIndex.describe(projectPath, filePath);
+        return anchorFormatter.describe(projectPath, filePath);
     }
 
     // @anchor: anchorManager_rebuildFile

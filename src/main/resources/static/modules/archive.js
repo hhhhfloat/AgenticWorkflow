@@ -115,25 +115,7 @@ async function refreshRoot(rootPath) {
                 if(data.entries.length === 0){
                     showEmptyMessage(childrenContainer);
                 } else {
-                    const fragment = document.createDocumentFragment();
-                    for (const entry of data.entries) {
-                        const childPath = rootPath + '/' + entry.name;
-                        if (entry.type === 'dir') {
-                            const wrapper = document.createElement('div');
-                            // 使用同步渲染，传入 cache 和 targetPaths 以支持二级缓存展开
-                            renderTreeNodeSync(
-                                childPath, wrapper, false,
-                                entry.hasIndexHtml || false,
-                                childPath.startsWith('TestProjects/'),
-                                cache, targetPaths
-                            );
-                            fragment.appendChild(wrapper);
-                        } else {
-                            const fileNode = createFileNode(childPath, entry.name);
-                            fragment.appendChild(fileNode);
-                        }
-                    }
-                    childrenContainer.appendChild(fragment);
+                    renderAndExpand(childrenContainer, rootPath, data.entries, cache, targetPaths);
                 }
             } else {
                 showEmptyMessage(childrenContainer);
@@ -147,49 +129,7 @@ async function refreshRoot(rootPath) {
     }
 }
 
-/**
- * 从缓存中递归渲染树节点（一次性渲染，不触发网络请求）
- */
-function renderFromCache(path, container, cache, targetPaths) {
-    const data = cache.get(path);
-    if (!data || !data.entries) return;
 
-    const fragment = document.createDocumentFragment();
-
-    for (const entry of data.entries) {
-        const childPath = path + '/' + entry.name;
-        if (entry.type === 'dir') {
-            const childIsTestProjects = childPath.startsWith('TestProjects/');
-            // 创建目录节点
-            const wrapper = document.createElement('div');
-            wrapper.className = 'tree-node';
-            wrapper.dataset.path = childPath;
-
-            // ... 创建 label（这部分可以和 renderTreeNode 复用，但需要去掉异步加载逻辑）
-            // 这里为了简洁，调用一个改造后的 renderTreeNodeSync 方法
-            renderTreeNodeSync(childPath, wrapper, false, entry.hasIndexHtml || false, childIsTestProjects, cache, targetPaths);
-
-            // 如果该目录在目标展开集合中，展开其子节点
-            if (targetPaths.has(childPath)) {
-                const childContainer = wrapper.querySelector('.tree-children');
-                if (childContainer) {
-                    childContainer.dataset.loaded = 'true';
-                    childContainer.style.display = 'block';
-                    // 递归渲染子节点
-                    renderFromCache(childPath, childContainer, cache, targetPaths);
-                }
-            }
-
-            fragment.appendChild(wrapper);
-        } else {
-            // 文件节点
-            const fileDiv = createFileNode(childPath, entry.name);
-            fragment.appendChild(fileDiv);
-        }
-    }
-
-    container.appendChild(fragment);
-}
 /**
  * 刷新沙箱目录树（保持展开状态）
  */
