@@ -160,6 +160,7 @@ public class HttpServerMain {
         // ── 会话管理（读：放行） ──
         reg(server, "/session/list",    new SessionListHandler(), false);
         reg(server, "/session/history", new SessionHistoryHandler(), false);
+        reg(server, "/session/usage",   new SessionUsageHandler(), false);
 
         // ── 任务执行 ──
         reg(server, "/run",  new RunHandler(), true);
