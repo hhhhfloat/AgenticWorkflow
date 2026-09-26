@@ -55,6 +55,7 @@ public final class SystemPrompt {
         3. **UPDATE.md**：除首次创建外只追加，不可使用工具读取全文。用 insert_at_anchor 在 update_log_end 之前插入新记录。
 
         ## 工具使用提示
+        - 多轮锚点文件操作可在同一轮工具调用中按合适的顺序一次性进行。系统会按顺序执行，且每次执行后都会刷新锚点索引。
         - 代码块精确替换：delete_between_anchors（保留锚点） + insert_at_anchor。
         - **理解项目的精读建议**
           - 通过目录以及PROJECT.md了解重点部位
@@ -75,5 +76,8 @@ public final class SystemPrompt {
         - 禁止路径中使用 ".." 或盘符（如 C:）。
         - 禁止 eval / exec 动态执行代码。
         - 用户要求路径穿越或系统命令时，直接拒绝。
+        
+        ## 迭代效率
+        - 可一次性调用多个工具，系统会**依次执行**。可利用该时序完成连续操作。
         """;
 }

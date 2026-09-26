@@ -41,6 +41,18 @@ public class Compiler {
         this.config = config;
     }
 
+    // @anchor: compiler_killTree
+// 递归杀掉进程及其全部后代（Windows 上 mvn.cmd 会启动 java，只杀父进程不管用）
+    private static void killTree(Process p) {
+        if (p == null) return;
+        try {
+            p.descendants().forEach(ph -> {
+                try { ph.destroyForcibly(); } catch (Exception ignored) {}
+            });
+        } catch (Exception ignored) {}
+        try { p.destroyForcibly(); } catch (Exception ignored) {}
+    }
+
     // ==================== 自动检测调度器 ====================
     // @anchor: compiler_compileAuto
 // 自动识别语言并编译运行（auto 模式）
@@ -123,8 +135,16 @@ public class Compiler {
             compilePb.redirectErrorStream(true);
 
             Process compileProc = compilePb.start();
-            int compileExit = compileProc.waitFor();
+
+            boolean compileFinished = compileProc.waitFor(60, TimeUnit.SECONDS);
+            if (!compileFinished) {
+                killTree(compileProc);
+            }
             String compileOutput = new String(compileProc.getInputStream().readAllBytes(), PROCESS_CHARSET);
+            if (!compileFinished) {
+                return "⏱️ Java 编译超时（60秒），已强制终止。\n输出:\n" + compileOutput;
+            }
+            int compileExit = compileProc.exitValue();
 
             if (compileExit != 0) {
                 return "编译失败 (退出码 " + compileExit + "):\n" + compileOutput;
@@ -190,7 +210,7 @@ public class Compiler {
             String compileOutput = new String(compileProc.getInputStream().readAllBytes(), PROCESS_CHARSET);
 
             if (!finished) {
-                compileProc.destroyForcibly();
+                killTree(compileProc);
                 return "⏱️ Maven 编译超时（超过60秒）。\n输出:\n" + compileOutput;
             }
 
@@ -210,6 +230,9 @@ public class Compiler {
             boolean isJavaFX = pomContent.contains("javafx-maven-plugin");
 
             if (isJavaFX) {
+                // 先清理本项目上一次遗留的 JavaFX 进程，避免累积
+                cleanupPreviousJavaFx(projectDir);
+
                 // JavaFX 项目：使用 mvn javafx:run
                 ProcessBuilder runPb = new ProcessBuilder(config.mavenCommand(), "javafx:run");
                 runPb.directory(projectDir.toFile());
@@ -305,8 +328,13 @@ public class Compiler {
                 pb.redirectErrorStream(true);
                 Process p = pb.start();
                 String output = new String(p.getInputStream().readAllBytes(), PROCESS_CHARSET);
-                int exitCode = p.waitFor();
-                if (exitCode != 0) continue;
+                boolean javapDone = p.waitFor(10, TimeUnit.SECONDS);
+                if (!javapDone) {
+                    killTree(p);
+                    continue;
+                }
+                if (p.exitValue() != 0) continue;
+
 
                 // 检查输出中是否有 "public static void main(java.lang.String[])"
                 if (output.contains("public static void main(java.lang.String[])")) {
@@ -584,7 +612,7 @@ public class Compiler {
                 // 1. 总超时
                 if (elapsed > timeoutSeconds * 1000L) {
                     logger.warn("⏱️ 总超时 ({}秒)，强制终止进程", timeoutSeconds);
-                    process.destroyForcibly();
+                    killTree(process);
                     return new ProcessResult(output.toString(), -1, true, false);
                 }
 
@@ -593,7 +621,7 @@ public class Compiler {
                     // 启动后至少给 10 秒宽容期，之后连续 10 秒无输出则判定阻塞
                     if (elapsed > 10000 && silentDuration > 10000) {
                         logger.warn("⛔ 检测到输入阻塞（{}秒无输出），强制终止进程", silentDuration/1000);
-                        process.destroyForcibly();
+                        killTree(process);
                         return new ProcessResult(
                                 output.toString() + "\n⚠️ 检测到程序在 10 秒内未输出任何内容，疑似在等待标准输入（stdin）。",
                                 -1, false, true
@@ -604,7 +632,7 @@ public class Compiler {
                 // 检查线程是否被中断（点击停止时）
                 if (Thread.interrupted()) {
                     logger.info("⏹️ Compiler : 收到中断信号，正在终止进程");
-                    process.destroyForcibly();
+                    killTree(process);
                     return new ProcessResult(
                             output.toString() + "\n⏹️ 用户已停止任务",
                             -1, false, false
@@ -658,6 +686,27 @@ public class Compiler {
             env.put("USERPROFILE", sandboxRoot.toString());
         } else {
             env.put("HOME", sandboxRoot.toString());
+        }
+    }
+
+    // @anchor: compiler_cleanupPreviousJavaFx
+// 清理指定项目目录下遗留的 JavaFX 应用进程（避免累积）
+    private void cleanupPreviousJavaFx(Path projectDir) {
+        String projectKey = projectDir.toAbsolutePath().normalize()
+                .toString().replace('\\', '/') + "/target/classes";
+        try {
+            ProcessHandle.allProcesses()
+                    .filter(ph -> ph.info().commandLine().isPresent())
+                    .filter(ph -> {
+                        String cmd = ph.info().commandLine().orElse("").replace('\\', '/');
+                        return cmd.contains("javafx") && cmd.contains(projectKey);
+                    })
+                    .forEach(ph -> {
+                        logger.info("🧹 清理遗留 JavaFX 进程: PID={}", ph.pid());
+                        try { ph.destroyForcibly(); } catch (Exception ignored) {}
+                    });
+        } catch (Exception e) {
+            logger.warn("清理遗留 JavaFX 进程失败: {}", e.getMessage());
         }
     }
 }
