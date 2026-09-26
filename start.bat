@@ -32,7 +32,7 @@ goto :parse_args
 set CONFIG_FILE=agent-config.properties
 
 echo ========================================
-echo  Agentic Workflow v4.0
+echo  Agentic Workflow v5.0
 echo  基于 DeepSeek API 的本地 AI 编程助手
 echo ========================================
 echo.

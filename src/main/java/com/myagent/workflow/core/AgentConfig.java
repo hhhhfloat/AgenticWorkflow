@@ -30,7 +30,7 @@ public record AgentConfig(
     // ===== 系统级常量（与机器无关，不需要外部化） =====
     // @anchor: agentConfig_constants
     // 系统级常量：沙箱目录、API 地址、模型名、锚点索引文件名等
-    private static final String ARCHIVE_VERSION = "v4_2";
+    private static final String ARCHIVE_VERSION = "v5_0";
     private static final String SANDBOX_DIR     = "./sandbox";
     private static final String API_URL         = "https://api.deepseek.com/chat/completions";
     private static final String MODEL_FLASH     = "deepseek-flash";
