@@ -544,95 +544,14 @@ class AnchorIndex {
 
     // ===== 列出锚点 =====
 
-    // @anchor: anchorIndex_list
-// 列出指定项目/文件的所有锚点
-    String list(String projectPath, String filePath) {
-        try {
-            Path projectDir = PathUtils.safeResolve(projectPath);
-            if (!Files.exists(projectDir) || !Files.isDirectory(projectDir)) {
-                return "❌ 项目目录不存在: " + projectPath;
-            }
-
-            Path indexFile = getIndexPath(projectPath);
-            if (indexFile == null) {
-                return "❌ 项目路径无效: " + projectPath;
-            }
-            if (!Files.exists(indexFile)) {
-                return "📌 项目 " + projectPath + " 没有锚点记录。请先运行 build_anchor_index。";
-            }
-
-            String content = new String(Files.readAllBytes(indexFile), StandardCharsets.UTF_8);
-            Map<String, List<Map<String, Object>>> projectAnchors =
-                    objectMapper.readValue(content, new TypeReference<>() {});
-
-            if (projectAnchors.isEmpty()) {
-                return "📌 项目 " + projectPath + " 没有锚点记录。";
-            }
-
-            boolean isFileSpecified = filePath != null && !filePath.isBlank();
-
-            Map<String, List<Map<String, Object>>> matched = new LinkedHashMap<>();
-            for (Map.Entry<String, List<Map<String, Object>>> entry : projectAnchors.entrySet()) {
-                String file = entry.getKey();
-                if (isFileSpecified) {
-                    if (!file.equals(filePath) && !file.endsWith("/" + filePath)) {
-                        continue;
-                    }
-                }
-                if (!entry.getValue().isEmpty()) {
-                    matched.put(file, entry.getValue());
-                }
-            }
-
-            if (matched.isEmpty()) {
-                if (isFileSpecified) {
-                    return "📌 项目 " + projectPath + " 中没有找到文件 " + filePath + " 的锚点记录。";
-                }
-                return "📌 项目 " + projectPath + " 没有锚点记录。";
-            }
-
-            StringBuilder sb = new StringBuilder();
-
-            if (isFileSpecified) {
-                sb.append("📌 ").append(projectPath).append(" 的锚点（文件: ").append(filePath).append("）：\n\n");
-                for (List<Map<String, Object>> anchors : matched.values()) {
-                    appendAnchorLines(sb, anchors);
-                }
-            } else {
-                sb.append("📌 项目 ").append(projectPath).append(" 的锚点列表：\n");
-                for (Map.Entry<String, List<Map<String, Object>>> entry : matched.entrySet()) {
-                    sb.append("\n📄 ").append(entry.getKey()).append("\n");
-                    appendAnchorLines(sb, entry.getValue());
-                }
-            }
-
-            return sb.toString();
-
-        } catch (IOException e) {
-            logger.error("列出锚点失败", e);
-            return "❌ 列出锚点失败: " + e.getMessage();
-        }
-    }
-
-    // @anchor: anchorIndex_appendAnchorLines
-// 把锚点列表按 id 与行号逐行追加到输出缓冲区
-    private void appendAnchorLines(StringBuilder sb, List<Map<String, Object>> anchors) {
-        for (Map<String, Object> anchor : anchors) {
-            String id = (String) anchor.get("id");
-            int line = (int) anchor.get("line");
-            sb.append("   L").append(line).append("   ").append(id).append("\n");
-        }
-    }
-
-    /**
-     * 描述指定文件的锚点：返回 id + line + desc。
-     * 如果 file 匹配多个文件，返回冲突提示并列出全部路径。
-     */
     // @anchor: anchorIndex_describe
-    // 返回指定文件各锚点的行号、描述与所属符号
+    // 描述锚点：
+    //   filePath 逗号分隔多个片段；
+    //   每个片段若匹配目录 → 列出该目录下文件的 _intro 描述
+    //   每个片段若匹配单个文件 → 列出该文件的全部锚点
     String describe(String projectPath, String filePath) {
         if (filePath == null || filePath.isBlank()) {
-            return "❌ 必须指定 file 参数";
+            return "❌ 必须指定 file 参数（目录路径或文件名，多个用逗号分隔）";
         }
         try {
             Path projectDir = PathUtils.safeResolve(projectPath);
@@ -648,59 +567,126 @@ class AnchorIndex {
             Map<String, List<Map<String, Object>>> projectAnchors =
                     objectMapper.readValue(content, new TypeReference<>() {});
 
-            // 匹配
-            List<String> matched = new ArrayList<>();
-            for (String key : projectAnchors.keySet()) {
-                if (key.equals(filePath)
-                        || key.endsWith("/" + filePath)) {
-                    matched.add(key);
-                }
-            }
-
-            if (matched.isEmpty()) {
-                return "📌 项目 " + projectPath + " 中没有找到文件 " + filePath + " 的锚点记录。";
-            }
-            if (matched.size() > 1) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("❌ 文件名有歧义：").append(filePath).append(" 匹配到多个文件。\n");
-                sb.append("请使用完整路径重新调用：\n");
-                for (String m : matched) {
-                    sb.append("   - ").append(m).append("\n");
-                }
-                return sb.toString();
-            }
-
-            String key = matched.get(0);
-            List<Map<String, Object>> anchors = projectAnchors.get(key);
-            if (anchors == null || anchors.isEmpty()) {
-                return "📌 文件 " + key + " 中没有锚点记录。";
-            }
-
             StringBuilder sb = new StringBuilder();
-            sb.append("📄 ").append(key).append("\n");
-            for (Map<String, Object> a : anchors) {
-                String id = (String) a.get("id");
-                int line = (int) a.get("line");
-                String desc = (String) a.getOrDefault("desc", "");
-                String symbol = (String) a.get("symbol");
-                if (desc == null || desc.isEmpty()) desc = "（无描述）";
-                sb.append("L").append(line).append(" | ").append(id);
-                if (symbol != null && !symbol.isEmpty()) {
-                    sb.append(" | ").append(symbol);
-                }
-                sb.append(" | ").append(desc).append("\n");
+            for (String raw : filePath.split("[,;]")) {
+                String hint = raw.trim();
+                if (hint.isEmpty()) continue;
+                appendDescribeOne(sb, hint, projectAnchors);
             }
             return sb.toString();
+
         } catch (IOException e) {
             logger.error("描述锚点失败", e);
             return "❌ 描述锚点失败: " + e.getMessage();
         }
     }
 
+    // @anchor: anchorIndex_appendDescribeOne
+    // 单个片段的解析：
+    //   1. 先尝试按文件匹配（精确 / 后缀）
+    //   2. 未命中则按目录匹配，列出该目录下所有文件的 _intro
+    private void appendDescribeOne(StringBuilder sb, String hint,
+                                   Map<String, List<Map<String, Object>>> projectAnchors) {
+        // 1. 文件匹配
+        List<String> fileMatches = new ArrayList<>();
+        for (String key : projectAnchors.keySet()) {
+            if (key.equals(hint) || key.endsWith("/" + hint)) fileMatches.add(key);
+        }
+
+        if (!fileMatches.isEmpty()) {
+            if (fileMatches.size() > 1) {
+                sb.append("❌ 文件 ").append(hint).append(" 有歧义，匹配到多个：\n");
+                for (String m : fileMatches) sb.append("   - ").append(m).append("\n");
+                sb.append("\n");
+                return;
+            }
+            appendFileDetail(sb, fileMatches.get(0), projectAnchors.get(fileMatches.get(0)));
+            return;
+        }
+
+        // 2. 目录匹配
+        String dirPrefix = normalizeDirHint(hint);
+        appendDirIntro(sb, dirPrefix, projectAnchors);
+    }
+
+    // 归一化目录 hint："" 或 "." → ""（表示整个项目）
+    private String normalizeDirHint(String hint) {
+        if (hint == null || hint.isEmpty() || ".".equals(hint)) return "";
+        return hint.replace('\\', '/');
+    }
+
+    // 判断文件的 key 是否落在指定目录下
+    private boolean matchesDir(String fileKey, String dirPrefix) {
+        if (dirPrefix.isEmpty()) return true;
+        if (fileKey.equals(dirPrefix)) return true;
+        return fileKey.startsWith(dirPrefix + "/") || fileKey.endsWith("/" + dirPrefix)
+                || fileKey.contains("/" + dirPrefix + "/");
+    }
+
+    // 列出目录下所有文件的 _intro 描述
+    private void appendDirIntro(StringBuilder sb, String dirPrefix,
+                                Map<String, List<Map<String, Object>>> projectAnchors) {
+        int total = 0, withIntro = 0;
+        StringBuilder body = new StringBuilder();
+        for (Map.Entry<String, List<Map<String, Object>>> e : projectAnchors.entrySet()) {
+            if (!matchesDir(e.getKey(), dirPrefix)) continue;
+            total++;
+            Map<String, Object> intro = findIntroAnchor(e.getValue());
+            body.append("\n📄 ").append(e.getKey()).append("\n");
+            if (intro != null) {
+                withIntro++;
+                String desc = (String) intro.getOrDefault("desc", "");
+                if (desc == null || desc.isEmpty()) desc = "（无描述）";
+                body.append("   ").append(desc).append("\n");
+            } else {
+                body.append("   （无 _intro 锚点）\n");
+            }
+        }
+
+        String label = dirPrefix.isEmpty() ? "整个项目" : dirPrefix;
+        if (total == 0) {
+            sb.append("📌 ").append(label).append(" 下没有锚点记录。\n\n");
+            return;
+        }
+        sb.append("📌 ").append(label).append(" 文件职责概览（")
+                .append(withIntro).append("/").append(total).append(" 已标注 _intro）\n")
+                .append(body).append("\n");
+    }
+
+    // 判定文件是否有合规 _intro 锚点：名字以 _intro 结尾且位于列表首位
+    private Map<String, Object> findIntroAnchor(List<Map<String, Object>> anchors) {
+        if (anchors == null || anchors.isEmpty()) return null;
+        Map<String, Object> first = anchors.get(0);
+        String id = (String) first.get("id");
+        if (id != null && id.endsWith("_intro")) return first;
+        return null;
+    }
+
+    // 列出单个文件的全部锚点
+    private void appendFileDetail(StringBuilder sb, String fileKey,
+                                  List<Map<String, Object>> anchors) {
+        sb.append("📄 ").append(fileKey).append("\n");
+        if (anchors == null || anchors.isEmpty()) {
+            sb.append("   （无锚点）\n\n");
+            return;
+        }
+        for (Map<String, Object> a : anchors) {
+            String id = (String) a.get("id");
+            int line = (int) a.get("line");
+            String desc = (String) a.getOrDefault("desc", "");
+            String symbol = (String) a.get("symbol");
+            if (desc == null || desc.isEmpty()) desc = "（无描述）";
+            sb.append("L").append(line).append(" | ").append(id);
+            if (symbol != null && !symbol.isEmpty()) sb.append(" | ").append(symbol);
+            sb.append(" | ").append(desc).append("\n");
+        }
+        sb.append("\n");
+    }
+
     // ===== 查找锚点 =====
 
     // @anchor: anchorIndex_find
-// 按锚点 ID 在文件内查找锚点
+    // 按锚点 ID 在文件内查找锚点
     AnchorLocation find(String projectPath, String anchorId) {
         try {
             Path indexFile = getIndexPath(projectPath);

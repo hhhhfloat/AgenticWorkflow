@@ -40,20 +40,6 @@ public class AnchorManager {
         return anchorIndex.rebuild(projectPath);
     }
 
-    // ===== 转发：锚点列表 =====
-
-    // @anchor: anchorManager_listAnchors
-// 列出锚点（可选按文件过滤）
-    String listAnchors(String projectPath) {
-        return anchorIndex.list(projectPath, null);
-    }
-
-    // @anchor: anchorManager_listAnchorsByFile
-// 按文件列出锚点
-    String listAnchors(String projectPath, String filePath) {
-        return anchorIndex.list(projectPath, filePath);
-    }
-
     // ===== 文件内容操作 =====
 
     // @anchor: anchorManager_insertAtAnchor

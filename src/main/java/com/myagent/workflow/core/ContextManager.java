@@ -65,9 +65,6 @@ public class ContextManager {
     public void init(String systemPrompt, String userRequest) {
         immutableBase.add(Map.of("role", "system", "content", systemPrompt));
         immutableBase.add(Map.of("role", "user", "content", userRequest));
-        for (Map<String, Object> msg : immutableBase) {
-            historyRecorder.appendMessage(msg);
-        }
         log("📌 [系统] 上下文初始化完成，基础区大小: " + immutableBase.size() + " 条消息");
     }
 
@@ -84,7 +81,6 @@ public class ContextManager {
         }
         Map<String, Object> msg = Map.of("role", "user", "content", userMessage);
         immutableBase.add(msg);
-        historyRecorder.appendMessage(msg);
         log("📌 [系统] 用户消息已追加到基础区，当前基础区大小: " + immutableBase.size() + " 条消息");
     }
 
@@ -108,7 +104,6 @@ public class ContextManager {
                 "content", "【任务摘要】\n" + summary
         );
         immutableBase.add(summaryMsg);
-        historyRecorder.appendMessage(summaryMsg);
 
         int workingBefore = volatileWorking.size();
         volatileWorking.clear();
@@ -125,9 +120,6 @@ public class ContextManager {
     public void appendToWorking(List<Map<String, Object>> round) {
         if (round == null || round.isEmpty()) return;
         volatileWorking.addAll(round);
-        for (Map<String, Object> msg : round) {
-            historyRecorder.appendMessage(msg);
-        }
     }
 
     // ==================== 构建 ====================

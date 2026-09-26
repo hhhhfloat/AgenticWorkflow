@@ -133,17 +133,6 @@ public final class ToolDefinitions {
                 List.of("project_path")
         ));
 
-        // @anchor: toolDef_listAnchors
-// 工具：list_anchors 列出锚点
-        tools.add(defineTool(
-                "list_anchors",
-                "列出指定项目中的所有锚点，返回锚点ID、所在文件、行号和内容预览。可指定文件参数仅列出该文件的锚点。",
-                defineParams()
-                        .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
-                        .prop("file", "string", "可选，指定文件名（如 'task.py'），仅列出该文件的锚点。")
-                        .build(),
-                List.of("project_path")
-        ));
 
         // @anchor: toolDef_insertAnchor
 // 工具：insert_at_anchor 在锚点处插入代码
@@ -216,10 +205,10 @@ public final class ToolDefinitions {
 // 工具：describe_anchors 列出锚点及其职责描述
         tools.add(defineTool(
                 "describe_anchors",
-                "返回指定文件中所有功能性锚点及其对应描述。仅返回非 _end 锚点，并额外提供每个锚点的功能描述（来自锚点下方紧邻的注释）。用于快速理解文件中各部分的职责，避免读取整份源码。",
+                "返回锚点信息。file 支持逗号分隔多个片段。每个片段：先按文件匹配（精确或后缀），命中则列出该文件的全部功能锚点（id / 行号 / symbol / 描述）；未命中则按目录匹配，列出该目录下所有文件的 _intro 锚点描述（文件职责概览）；传 '.' 表示整个项目。不返回 _end 锚点。",
                 defineParams()
                         .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
-                        .prop("file", "string", "文件相对路径（如 src/main/java/Main.java），需要完整以避免歧义")
+                        .prop("file", "string", "必填。文件相对路径（逗号分隔多个文件）或目录路径（如 'src/main/java/game'）。传 '.' 表示整个项目。")
                         .build(),
                 List.of("project_path", "file")
         ));
