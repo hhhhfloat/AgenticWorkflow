@@ -282,4 +282,20 @@ public class SessionManager {
         activeSessions.clear();
         logger.info("📂 SessionManager 已关闭");
     }
+
+    // 转发方法
+    // @anchor: sessionManager_getUsage
+    public SessionUsage getUsage(String sessionId) {
+        return storage.loadUsage(sessionId);
+    }
+
+    // @anchor: sessionManager_appendUsage
+    public SessionUsage appendUsage(String sessionId, SessionUsage delta) {
+        try {
+            return storage.appendUsage(sessionId, delta);
+        } catch (IOException e) {
+            logger.error("累加 usage 失败: {}", sessionId, e);
+            return storage.loadUsage(sessionId);
+        }
+    }
 }
