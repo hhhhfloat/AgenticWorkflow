@@ -332,4 +332,25 @@ public class AnchorManager {
         anchorIndex.refreshAnchorsFile(projectPath, fileRelPath);
         markDirty(projectPath, fileRelPath);
     }
+
+    // @anchor: anchorManager_describeByPath
+    // 从沙箱相对路径推导 (project, file) 并转发给 describeAnchors。
+    // 用于 get_file_structure 在 .md 分支上的转发。
+    String describeAnchorsByPath(String filename) {
+        String normalized = filename.replace('\\', '/');
+        if (normalized.startsWith("sandbox/")) {
+            normalized = normalized.substring("sandbox/".length());
+        }
+        int slash = normalized.indexOf('/');
+        if (slash <= 0) return "❌ 无法推导项目: " + filename;
+
+        String project = normalized.substring(0, slash);
+        String file = normalized.substring(slash + 1);
+
+        String result = describeAnchors(project, file);
+        if (result.startsWith("📌") && result.contains("中没有找到文件")) {
+            return "📄 " + file + " 是纯文本文件，无代码结构，且未标注任何锚点。";
+        }
+        return result;
+    }
 }
