@@ -323,6 +323,12 @@ public class ToolExecutor {
                 return "❌ 文件不存在: " + filename;
             }
 
+            String lower = filename.toLowerCase();
+            // md,txt 之类无代码结构，直接转发锚点描述
+            if(lower.endsWith(".md") || lower.endsWith(".markdown") || lower.endsWith(".txt")){
+                return anchorMgr.describeAnchorsByPath(filename);
+            }
+
             StructureParser parser = StructureParserRegistry.getInstance().getParser(filePath);
             FileStructure structure = parser.parse(filePath);
 
