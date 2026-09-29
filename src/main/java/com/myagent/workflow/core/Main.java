@@ -265,24 +265,48 @@ public class Main {
             return finalContent;
 
         } finally {
-            this.lastTaskUsage = new TaskUsage(
-                    contextManager.getTotalPromptTokens() - startPrompt,
-                    contextManager.getTotalCachedTokens() - startCached,
-                    contextManager.getTotalCompletionTokens() - startCompletion,
-                    contextManager.getApiCallCount() - startCalls,
-                    contextManager.getTotalPrice() - startPrice
-            );
-            if (finalContent != null) {
-                contextManager.mergeSummaryToBase(buildTaskSummary(finalContent));
+            // ===== best-effort 阶段：任何一步失败不影响清理 =====
+
+            try {
+                this.lastTaskUsage = new TaskUsage(
+                        contextManager.getTotalPromptTokens() - startPrompt,
+                        contextManager.getTotalCachedTokens() - startCached,
+                        contextManager.getTotalCompletionTokens() - startCompletion,
+                        contextManager.getApiCallCount() - startCalls,
+                        contextManager.getTotalPrice() - startPrice
+                );
+            } catch (Exception e) {
+                logger.warn("记录 usage 失败", e);
             }
+
+            try {
+                if (finalContent != null) {
+                    contextManager.mergeSummaryToBase(buildTaskSummary(finalContent));
+                }
+            } catch (Exception e) {
+                logger.warn("合并任务摘要失败", e);
+            }
+
             try {
                 toolExecutor.refreshAllProjectIndexes();
             } catch (Exception e) {
                 logger.warn("刷新项目索引失败", e);
             }
-            contextManager.flushRawLog();
-            contextManager.compressRawLog();
-            contextManager.printStats();
+
+            try {
+                contextManager.flushRawLog();
+                contextManager.compressRawLog();
+            } catch (Exception e) {
+                logger.warn("落盘原始日志失败", e);
+            }
+
+            try {
+                contextManager.printStats();
+            } catch (Exception e) {
+                logger.warn("打印统计失败", e);
+            }
+
+            // ===== 关键清理：必须执行 =====
             session.markIdle();
             this.runningThread = null;
         }

@@ -70,6 +70,14 @@ function buildNodeShell(path, opts) {
 
     const icon = document.createElement('span');
     icon.textContent = '📁 ';
+    if (!isRoot) {
+        icon.className = 'folder-icon-btn';
+        icon.title = '在文件管理器中打开';
+        icon.addEventListener('click', (e) => {
+                e.stopPropagation();
+                openFolder(path);
+            });
+    }
     label.appendChild(icon);
 
     const nameSpan = document.createElement('span');

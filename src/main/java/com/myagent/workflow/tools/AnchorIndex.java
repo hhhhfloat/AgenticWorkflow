@@ -131,23 +131,26 @@ class AnchorIndex {
 
             Map<String, List<Map<String, Object>>> projectAnchors = new LinkedHashMap<>();
 
-            Files.walk(projectDir)
-                    .filter(Files::isRegularFile)
-                    .forEach(file -> {
-                        String name = file.getFileName().toString();
-                        if (name.equals(AgentConfig.getAnchorIndexName())) return;
-                        if (name.equals(".anchor_index.json")) return;
-                        if (name.equals(".agent_entry.json")) return;
-                        if (name.startsWith(".")) return;
+            try(var stream = Files.walk(projectDir)){
+                stream.filter(Files::isRegularFile)
+                        .forEach(file -> {
+                            String name = file.getFileName().toString();
+                            if (name.equals(AgentConfig.getAnchorIndexName())) return;
+                            if (name.equals(".anchor_index.json")) return;
+                            if (name.equals(".agent_entry.json")) return;
+                            if (name.startsWith(".")) return;
 
-                        try {
-                            Path relPath = projectDir.relativize(file);
-                            if (SearchFileFilter.isExcludedDir(relPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS)) return;
-                            String rel = projectDir.relativize(file).toString().replace('\\', '/');
-                            List<Map<String, Object>> anchors = AnchorScanner.scan(file);
-                            if (!anchors.isEmpty()) projectAnchors.put(rel, anchors);
-                        } catch (IOException ignored) {}
-                    });
+                            try {
+                                Path relPath = projectDir.relativize(file);
+                                if (SearchFileFilter.isExcludedDir(relPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS))
+                                    return;
+                                String rel = projectDir.relativize(file).toString().replace('\\', '/');
+                                List<Map<String, Object>> anchors = AnchorScanner.scan(file);
+                                if (!anchors.isEmpty()) projectAnchors.put(rel, anchors);
+                            } catch (IOException ignored) {
+                            }
+                        });
+            }
 
             // 写 .anchors.json（精简版：id + line + preview）
             Path indexFile = getIndexPath(projectPath);
@@ -243,7 +246,13 @@ class AnchorIndex {
             if (!Files.exists(file) || !Files.isRegularFile(file)) {
                 anchors = List.of();
             } else {
-                anchors = AnchorScanner.scan(file);
+                // 排除目录里的文件不进索引（与 rebuild / refreshAnchorsFile 保持同一口径）
+                Path rel = projectDir.relativize(file);
+                if (SearchFileFilter.isExcludedDir(rel, SearchFileFilter.DEFAULT_EXCLUDED_DIRS)) {
+                    anchors = List.of();
+                } else {
+                    anchors = AnchorScanner.scan(file);
+                }
             }
 
             if (anchors.isEmpty()) {

@@ -15,6 +15,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
+import java.util.List;
 
 // @anchor: archiveHandler_class
 // 项目归档处理器：校验项目名与目标存在性后执行目录递归复制
@@ -94,8 +96,9 @@ public class ArchiveHandler implements HttpHandler {
      * 递归复制目录
      */
     private void copyDirectory(Path src, Path dest) throws IOException {
-        Files.walk(src).forEach(source -> {
-            try {
+        try (var stream = Files.walk(src)) {
+            List<Path> all = stream.toList();
+            for (Path source : all) {
                 Path target = dest.resolve(src.relativize(source));
                 if (Files.isDirectory(source)) {
                     if (!Files.exists(target)) {
@@ -104,10 +107,8 @@ public class ArchiveHandler implements HttpHandler {
                 } else {
                     Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
                 }
-            } catch (IOException e) {
-                throw new RuntimeException(e);
             }
-        });
+        }
     }
 
     // @anchor: archiveHandler_deleteDirectory
@@ -116,16 +117,12 @@ public class ArchiveHandler implements HttpHandler {
      * 递归删除目录
      */
     private void deleteDirectory(Path dir) throws IOException {
-        if (Files.exists(dir)) {
-            Files.walk(dir)
-                    .sorted((a, b) -> b.compareTo(a)) // 先删除子文件
-                    .forEach(path -> {
-                        try {
-                            Files.deleteIfExists(path);
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
-                    });
+        if(!Files.exists(dir)) return;
+        try(var stream = Files.walk(dir)) {
+            List<Path> sorted = stream.sorted(Comparator.reverseOrder()).toList();
+            for(Path path : sorted){
+                Files.deleteIfExists(path);
+            }
         }
     }
 

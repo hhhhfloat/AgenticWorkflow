@@ -104,7 +104,12 @@ public class ToolExecutor {
             case "read_file":
                 return fileOp.readFile((String) args.get("filename"));
             case "delete_file":
-                return fileOp.deleteFile((String) args.get("filename"));
+                String deleteFilename = (String) args.get("filename");
+                String deleteResult = fileOp.deleteFile(deleteFilename);
+                if (deleteResult != null && deleteResult.startsWith("✅")) {
+                    anchorMgr.markDirtyByFilename(deleteFilename);
+                }
+                return deleteResult;
             case "search_text":
                 return searcher.searchText(
                         (String) args.get("keyword"),

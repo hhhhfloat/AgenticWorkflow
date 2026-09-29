@@ -138,13 +138,14 @@ public class FileOperator {
             if (!recursive) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("📁 目录 ").append(path).append(" 的内容：\n");
-                Files.list(dirPath)
-                        .filter(p -> !shouldIgnore(p))  // ← 新增过滤
-                        .forEach(p -> {
-                            String name = p.getFileName().toString();
-                            String type = Files.isDirectory(p) ? "📁" : "📄";
-                            sb.append(type).append(" ").append(name).append("\n");
-                        });
+                try(var stream = Files.list(dirPath)){
+                    stream.filter(p -> !shouldIgnore(p))  // ← 新增过滤
+                            .forEach(p -> {
+                                String name = p.getFileName().toString();
+                                String type = Files.isDirectory(p) ? "📁" : "📄";
+                                sb.append(type).append(" ").append(name).append("\n");
+                            });
+                }
                 return sb.toString();
             }
 
@@ -164,17 +165,18 @@ public class FileOperator {
 // 把目录结构渲染为树形文本
     private void buildTree(StringBuilder sb, Path dir, String indent, boolean isLast) {
         try {
-            List<Path> entries = Files.list(dir)
-                    .filter(p -> !shouldIgnore(p))  // ← 新增过滤
-                    .sorted((a, b) -> {
-                        boolean aDir = Files.isDirectory(a);
-                        boolean bDir = Files.isDirectory(b);
-                        if (aDir && !bDir) return -1;
-                        if (!aDir && bDir) return 1;
-                        return a.getFileName().toString().compareToIgnoreCase(b.getFileName().toString());
-                    })
-                    .toList();
-
+            List<Path> entries;
+            try(var stream = Files.list(dir)) {
+                entries = stream.filter(p -> !shouldIgnore(p))  // ← 新增过滤
+                        .sorted((a, b) -> {
+                            boolean aDir = Files.isDirectory(a);
+                            boolean bDir = Files.isDirectory(b);
+                            if (aDir && !bDir) return -1;
+                            if (!aDir && bDir) return 1;
+                            return a.getFileName().toString().compareToIgnoreCase(b.getFileName().toString());
+                        })
+                        .toList();
+            }
             int count = entries.size();
             for (int i = 0; i < count; i++) {
                 Path p = entries.get(i);

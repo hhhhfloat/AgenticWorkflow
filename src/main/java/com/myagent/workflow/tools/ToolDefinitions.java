@@ -69,7 +69,7 @@ public final class ToolDefinitions {
                 "get_file_structure",
                 "获取文件的代码结构信息（类、方法、字段、锚点等），帮助快速了解文件内容，而不需要读取整个文件。",
                 defineParams()
-                        .prop("filename", "string", "文件相对路径，例如 'src/Main.java'")
+                        .prop("filename", "string", "文件相对沙箱根的路径，例如 'project/src/Main.java'")
                         .build(),
                 List.of("filename")
         ));
@@ -78,7 +78,7 @@ public final class ToolDefinitions {
 // 工具：read_file 读取文件内容
         tools.add(defineTool(
                 "read_file",
-                "读取沙箱目录下指定文件的内容（文本格式），返回文件内容。支持 Java、HTML、TXT 等文本文件。读取大小限制为 5000 字符，超过则截断并提示。",
+                "读取沙箱目录下指定文件的内容（文本格式），返回文件内容。支持 Java、HTML、TXT 等文本文件。读取大小限制为 50000 字符，超过则截断并提示。",
                 defineParams()
                         .prop("filename", "string", "文件名（相对路径），例如 'calculator.html' 或 'src/Tool.java'。")
                         .build(),

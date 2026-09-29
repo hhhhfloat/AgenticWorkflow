@@ -86,7 +86,7 @@ public class UsageTracker {
      */
     public double calculateCost(String model, long promptTokens, long cachedTokens, long completionTokens) {
         boolean peak = isPeakHour();
-        long uncached = promptTokens - cachedTokens;
+        long uncached = Math.max(0, promptTokens - cachedTokens);
 
         double inHit = peak ? FLASH_IN_HIT_PEAK : FLASH_IN_HIT_OFF_PEAK;
         double inNotHit = peak ? FLASH_IN_NOT_HIT_PEAK : FLASH_IN_NOT_HIT_OFF_PEAK;

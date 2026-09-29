@@ -9,6 +9,7 @@ import com.myagent.workflow.http.utils.HandlerUtils;
 import java.awt.*;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -31,20 +32,20 @@ public class OpenFolderHandler implements HttpHandler {
         Map<String, String> params = HandlerUtils.parseQuery(query);
         String target = params.getOrDefault("path", "sandbox");
 
-        // 安全白名单：只允许打开这三个目录
-        Set<String> allowed = Set.of("sandbox", "TestProjects", "HistoryOutput");
-        if (!allowed.contains(target)) {
-            HandlerUtils.sendResponse(exchange, 400, "{\"status\":\"error\", \"message\":\"不支持的目录: " + target + "\"}");
+        // 安全白名单：允许打开 sandbox / TestProjects / HistoryOutput 及其任意子目录
+        Path targetPath = Paths.get("./" + target).toAbsolutePath().normalize();
+        boolean allowed = targetPath.startsWith(Paths.get("./sandbox").toAbsolutePath().normalize())
+                || targetPath.startsWith(Paths.get("./TestProjects").toAbsolutePath().normalize())
+                || targetPath.startsWith(Paths.get("./HistoryOutput").toAbsolutePath().normalize());
+        if (!allowed) {
+            HandlerUtils.sendResponse(exchange, 400, "{\"status\":\"error\", \"message\":\"不支持的目录\"}");
             return;
         }
-
-        Path dirPath = Paths.get("./" + target).toAbsolutePath().normalize();
-        File dir = dirPath.toFile();
-
-        if (!dir.exists() || !dir.isDirectory()) {
-            HandlerUtils.sendResponse(exchange, 404, "{\"status\":\"error\", \"message\":\"" + target + " 目录不存在\"}");
+        if (!Files.isDirectory(targetPath)) {
+            HandlerUtils.sendResponse(exchange, 404, "{\"status\":\"error\", \"message\":\"目录不存在\"}");
             return;
         }
+        File dir = targetPath.toFile();
 
         if (!Desktop.isDesktopSupported()) {
             HandlerUtils.sendResponse(exchange, 500, "{\"status\":\"error\", \"message\":\"当前系统不支持 Desktop API\"}");

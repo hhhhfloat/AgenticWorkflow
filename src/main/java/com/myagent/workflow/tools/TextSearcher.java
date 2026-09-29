@@ -9,9 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -48,14 +46,12 @@ public class TextSearcher {
 
             List<String> patterns = SearchFileFilter.parseFilePatterns(filePattern);
 
-            AtomicInteger matchCount = new AtomicInteger(0);
-            AtomicInteger resultCount = new AtomicInteger(0);
-            List<String> results = Collections.synchronizedList(new ArrayList<>());
+            int matchCount = 0;
+            List<String> results = new ArrayList<>();
             final int MAX_RESULTS = 30;
 
             List<Path> files = SearchFileFilter.collectFiles(startPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS, SearchFileFilter.DEFAULT_EXCLUDED_FILES);
             for (Path file : files) {
-                if (resultCount.get() >= MAX_RESULTS) break;
                 try {
                     String fileName = file.getFileName().toString();
                     if (!SearchFileFilter.matchesExtension(fileName, patterns, TEXT_EXTENSIONS)) continue;
@@ -65,13 +61,13 @@ public class TextSearcher {
                     int lineNum = 0;
                     for (String line : lines) {
                         lineNum++;
-                        if (resultCount.get() >= MAX_RESULTS) break;
                         if (pattern.matcher(line).find()) {
-                            String preview = line.trim();
-                            if (preview.length() > 80) preview = preview.substring(0, 80) + "...";
-                            results.add(relPathStr + ":" + lineNum + ":" + preview);
-                            matchCount.incrementAndGet();
-                            resultCount.incrementAndGet();
+                            matchCount++;
+                            if(results.size()<MAX_RESULTS){
+                                String preview = line.trim();
+                                if(preview.length()>100)preview = preview.substring(0,100)+"... 共"+preview.length()+"字符";
+                                results.add(relPathStr + ":" + lineNum + ":" +preview);
+                            }
                         }
                     }
                 } catch (IOException ignored) {}
@@ -82,10 +78,10 @@ public class TextSearcher {
             }
 
             StringBuilder sb = new StringBuilder();
-            int total = matchCount.get();
-            int shown = results.size();
-            sb.append("🔍 找到 ").append(total).append(" 条匹配结果");
-            if (total > shown) sb.append("（仅显示前 ").append(MAX_RESULTS).append(" 条）");
+            sb.append("🔍 找到 ").append(matchCount).append(" 条匹配结果");
+            if (matchCount > results.size()) {
+                sb.append("（仅显示前 ").append(MAX_RESULTS).append(" 条）");
+            }
             sb.append("：\n");
             for (String r : results) sb.append(r).append("\n");
             return sb.toString();
