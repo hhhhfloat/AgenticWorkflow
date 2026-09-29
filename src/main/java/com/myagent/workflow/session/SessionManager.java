@@ -53,18 +53,21 @@ public class SessionManager {
 
     // @anchor: sessionManager_create
     // 创建新会话：加入内存并立即落盘
-    /**
-     * 创建一个新会话，自动落盘并加入内存。
-     */
     public Session create(AgentConfig config) {
-        Session session = new Session(config);
+        return create(config, null);
+    }
+
+    // @anchor: sessionManager_createWithProject
+    // 创建新会话并指定工作项目，加入内存并立即落盘
+    public Session create(AgentConfig config, String workProject) {
+        Session session = new Session(config, workProject);
         activeSessions.put(session.getSessionId(), session);
         try {
             storage.save(session);
         } catch (IOException e) {
             logger.error("创建会话时落盘失败", e);
         }
-        logger.info("📂 新会话已创建: {}", session.getSessionId());
+        logger.info("📂 新会话已创建: {} (项目: {})", session.getSessionId(), (workProject==null)?"不限":workProject);
         return session;
     }
 

@@ -103,7 +103,8 @@ public class Main {
         // ToolExecutor 绑定日志到 Session
         this.toolExecutor = new ToolExecutor(
                 runConfig,
-                objectMapper
+                objectMapper,
+                session.getWorkProject()
         );
         this.toolExecutor.setLogConsumer(session::log);
     }

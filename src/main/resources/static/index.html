@@ -28,10 +28,10 @@
             <button id="viewSessionsBtn">💬 会话</button>
         </div>
 
-        <!-- 工作项目占位（阶段 2 改为下拉） -->
+        <!-- 当前会话绑定的工作项目 -->
         <div id="projectSelector">
             <span class="label">📌 工作项目：</span>
-            <span class="value">未选择</span>
+            <span class="value" id="currentProjectName">未选择</span>
         </div>
 
         <!-- 文件视图 -->
@@ -157,6 +157,24 @@
             </div>
         </div>
 
+        <!-- ===== 新建会话弹窗 ===== -->
+        <!-- @anchor: html_sessionCreateModal -->
+        <!-- 新建会话弹窗：选择工作项目后创建会话 -->
+        <div id="sessionCreateModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span>📌 选择工作项目</span>
+                    <button id="closeSessionCreateBtn" class="close-btn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div id="projectList" class="project-list"></div>
+                    <p class="hint-text" style="margin-top:12px;">
+                        没有想要的项目？请到左侧文件树中 sandbox 节点下创建后再试。
+                    </p>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -187,6 +205,10 @@
 <script src="modules/archive.js"></script>
 <!-- 打开文件夹 -->
 <script src="modules/openFolder.js"></script>
+<!-- 调用后端工具 -->
+<script src="modules/toolApi.js"></script>
+<!-- 新建会话（选择工作项目） -->
+<script src="modules/sessionCreate.js"></script>
 <!-- SSE 流式请求 -->
 <script src="modules/sse.js"></script>
 <!-- 配置管理 -->

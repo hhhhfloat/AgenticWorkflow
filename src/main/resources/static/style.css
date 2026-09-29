@@ -1,10 +1,28 @@
 /* @anchor: style_reset */
 /* 全局基础样式：页面底色、等宽字体与内边距 */
+
+:root {
+    --bg-base: #1e1e1e;
+    --bg-panel: #252526;
+    --bg-elevated: #2d2d2d;
+    --bg-hover: #3d3d3d;
+
+    --fg-primary: #d4d4d4;
+    --fg-secondary: #888;
+    --fg-muted: #666;
+
+    --accent-blue: #9cdcfe;
+    --accent-green: #4ec9b0;
+    --accent-red: #f44747;
+
+    --border-subtle: #333;
+    --border-default: #444;
+}
+
 body {
     font-family: 'Courier New', monospace;
     background: #1e1e1e;
     color: #d4d4d4;
-    padding: 20px;
 }
 
 /* @anchor: style_textarea */
@@ -36,18 +54,6 @@ button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
-
-/* @anchor: style_output */
-/* 日志输出面板：固定高度、纵向滚动 */
-#output {
-    background: #1e1e1e;
-    border: 1px solid #444;
-    padding: 10px;
-    height: 500px;
-    overflow-y: auto;
-    margin-top: 10px;
-}
-
 /* @anchor: style_logEntry */
 /* 日志行：保留换行、长词断行 */
 .log-entry {
@@ -159,13 +165,16 @@ button:disabled {
 /* 侧边栏 + 主工作区 Flex 布局 */
 html, body {
     height: 100%;
+    width: 100%;
     margin: 0;
     padding: 0;
+    overflow: hidden;
 }
 
 #app {
     display: flex;
     height: 100vh;
+    width: 100%;
     overflow: hidden;
 }
 
@@ -282,26 +291,6 @@ html, body {
 }
 .tree-children {
     padding-left: 16px;
-}
-
-/* @anchor: style_main */
-/* 主工作区布局：内容纵向排列、可滚动 */
-/* ===== 主工作区 ===== */
-#main {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-    background: #1e1e1e;
-    display: flex;
-    flex-direction: column;
-}
-#main > * {
-    flex-shrink: 0;
-}
-#output {
-    flex: 1;
-    min-height: 300px;
-    margin-top: 10px;
 }
 
 /* @anchor: style_iterationControl */
@@ -613,7 +602,7 @@ html, body {
 .session-item {
     position: relative;
     padding: 8px 10px;
-    pending-right: 34px;
+    padding-right: 34px;
     border-bottom: 1px solid #2a2a2a;
     cursor: pointer;
     transition: background 0.15s;
@@ -680,7 +669,8 @@ html, body {
 #main {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    flex: 1;
+    min-width: 0;
     padding: 12px;
     box-sizing: border-box;
     overflow: hidden;
@@ -694,10 +684,12 @@ html, body {
 /* ===== 日志区（顶部，占据剩余空间，可滚动） ===== */
 #output {
     flex: 1;
+    min-height: 300px;
     overflow-y: auto;
     background: #1e1e1e;
     border: 1px solid #333;
     padding: 12px;
+    margin-top: 10px;
     margin-bottom: 10px;
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 13px;
@@ -705,7 +697,6 @@ html, body {
     white-space: pre-wrap;
     word-wrap: break-word;
     border-radius: 4px;
-    /* 滚动到底部时，最新内容可见 */
     scroll-behavior: smooth;
 }
 
@@ -850,12 +841,6 @@ html, body {
     text-align: left;
 }
 
-/* ===== 用户消息与 Agent 消息之间的分割线 ===== */
-.msg + .msg::before {
-    content: '';
-    position: absolute;
-    /* 用 border 代替，避免伪元素定位麻烦 */
-}
 /* @anchor: style_usagePanel */
 /* 用量面板：按会话展示 Token 与成本 */
 .usage-panel {
@@ -891,4 +876,43 @@ html, body {
 
 .folder-icon-btn:hover {
     opacity: 0.65;
+}
+
+/* ===== 新建会话弹窗 ===== */
+.project-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.project-item {
+    padding: 10px 14px;
+    text-align: left;
+    background: #2d2d2d;
+    color: #e0e0e0;
+    border: 1px solid #3d3d3d;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.project-item:hover {
+    background: #3d3d3d;
+    border-color: #4ec9b0;
+}
+
+.project-list .empty {
+    padding: 20px;
+    text-align: center;
+    color: #888;
+    font-style: italic;
+}
+
+.session-project {
+    font-size: 12px;
+    color: #4ec9b0;
+    margin-top: 2px;
 }

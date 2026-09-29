@@ -398,6 +398,10 @@ function addActionButtons(label, path, isRoot) {
                             appendLog('[系统] ❌ runner.js 未加载');
                         }
                     }));
+                    label.appendChild(createBtn('🔄', '🔄 重建锚点索引', async (e) => {
+                        e.stopPropagation();
+                        await callTool('build_anchor_index', {project_path: projectName});
+                    }));
                 }
             } catch (err) { /* 静默失败 */ }
         })();

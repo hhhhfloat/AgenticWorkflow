@@ -27,13 +27,19 @@ public class AnchorManager {
     private final AnchorIndex anchorIndex;
     private final AnchorQuery anchorQuery;
     private final AnchorFormatter anchorFormatter;
+    private final String workProject;
 
     // @anchor: anchorManager_constructor
 // 构造：创建内部 AnchorIndex
-    public AnchorManager(ObjectMapper objectMapper) {
+    public AnchorManager(ObjectMapper objectMapper, String workProject) {
         this.anchorIndex = new AnchorIndex(objectMapper);
         this.anchorQuery = new AnchorQuery(objectMapper);
         this.anchorFormatter = new AnchorFormatter(objectMapper);
+        this.workProject = workProject;
+    }
+
+    public AnchorManager(ObjectMapper objectMapper){
+        this(objectMapper,null);
     }
 
     // ===== 转发：索引构建 =====
@@ -60,6 +66,10 @@ public class AnchorManager {
         }
         AnchorLocation loc = resolveAnchor(anchorId,file);
         if (loc == null) return buildResolveError(anchorId, file);
+
+        if (workProject != null && !workProject.equals(loc.projectPath)) {
+            return "❌ 只能修改工作项目 [" + workProject + "]，当前锚点属于: " + loc.projectPath;
+        }
 
         try {
             Path filePath = PathUtils.safeResolve(loc.projectPath, loc.filePath);
@@ -92,6 +102,11 @@ public class AnchorManager {
 
         AnchorLocation startLoc = resolveAnchor(startAnchor, file);
         if (startLoc == null) return buildResolveError(startAnchor, file);
+
+        if (workProject != null && !workProject.equals(startLoc.projectPath)) {
+            return "❌ 只能修改工作项目 [" + workProject + "]，当前锚点属于: " + startLoc.projectPath;
+        }
+
         AnchorLocation endLoc = resolveAnchor(endAnchor, file);
         if (endLoc == null) return buildResolveError(endAnchor, file);
 
@@ -137,7 +152,7 @@ public class AnchorManager {
     }
 
     // @anchor: anchorManager_readBetweenAnchors
-// 读取两锚点之间的代码
+    // 读取两锚点之间的代码
     String readBetweenAnchors(String startAnchor, String endAnchor, String file) {
         if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
         if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";

@@ -1,5 +1,5 @@
 // @anchor: sessionCreateHandler_tot_desc
-// 会话创建处理器：POST /session/create，显式创建一个空会话
+// 会话创建处理器：POST /session/create，显式创建一个空会话并绑定工作项目
 package com.myagent.workflow.http.handlers;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,23 +15,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 // @anchor: sessionCreateHandler_class
-// 会话创建处理器：用全局配置创建会话并返回其 ID/标题/创建时间
-/**
- * POST /session/create
- * <p>
- * 请求体：可为空（使用全局配置）
- * 响应：{ "status":"ok", "sessionId":"xxx", "title":"新会话", "createdAt":"..." }
- * <p>
- * 用途：前端点击"新对话"时调用。
- * 说明：即使不调用此接口，直接 POST /run 也会自动创建新会话。
- *       此接口仅用于"我想先建一个空会话，稍后再用"的场景。
- */
+// 会话创建处理器：必须指定工作项目，创建会话并返回元信息
 public class SessionCreateHandler implements HttpHandler {
 
     private final ObjectMapper mapper = new ObjectMapper();
 
     // @anchor: sessionCreateHandler_handle
-    // 处理创建请求：用全局配置创建会话并回传元信息
+    // 处理创建请求：解析 project 参数、校验合法性后创建会话
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -47,14 +37,41 @@ public class SessionCreateHandler implements HttpHandler {
             return;
         }
 
+        // 解析 body
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        String project = null;
+        if (!body.isBlank()) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> parsed = mapper.readValue(body, Map.class);
+                Object p = parsed.get("project");
+                if (p instanceof String s) project = s.trim();
+            } catch (Exception ignored) { /* 保持 null */ }
+        }
+
+        if (project == null || project.isBlank()) {
+            writeJson(exchange, 400,
+                    "{\"status\":\"error\",\"message\":\"必须指定工作项目\"}");
+            return;
+        }
+
+        // 轻量校验（不做存在性检查，允许新项目在首次写入时创建）
+        if (project.contains("..") || project.startsWith("/")
+                || project.contains("\\") || project.contains(":")) {
+            writeJson(exchange, 400,
+                    "{\"status\":\"error\",\"message\":\"项目名不合法\"}");
+            return;
+        }
+
         Session session = HttpServerMain.getSessionManager()
-                .create(HttpServerMain.getGlobalConfig());
+                .create(HttpServerMain.getGlobalConfig(), project);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("status", "ok");
         response.put("sessionId", session.getSessionId());
         response.put("title", session.getMeta().title());
         response.put("createdAt", session.getMeta().createdAt());
+        response.put("workProject", project);
 
         writeJson(exchange, 200, mapper.writeValueAsString(response));
     }

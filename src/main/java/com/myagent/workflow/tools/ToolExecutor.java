@@ -36,8 +36,14 @@ public class ToolExecutor {
     private Consumer<String> logConsumer;
     // 字段
     private ObjectMapper objectMapper;
-
     private final AgentConfig config;
+    private String workProject;
+
+    // @anchor: toolExecutor_writeTools
+    // 写操作工具集合：这些工具的目标必须落在 workProject 内
+    private static final Set<String> WRITE_TOOLS = Set.of(
+            "write_file", "delete_file", "compile_and_run", "build_anchor_index"
+    );
 
     // 工具名 → 需要做路径检查的参数名
     private static final Map<String, List<String>> PATH_ARG_MAP = Map.ofEntries(
@@ -58,14 +64,19 @@ public class ToolExecutor {
 
     // @anchor: toolExecutor_constructor
     // 构造：注入配置与 ObjectMapper，并装配各工具组件
-    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper) {
+    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper, String workProject) {
         this.config = config;
         this.compiler = new Compiler(config);
         this.fileOp = new FileOperator();
         this.objectMapper = objectMapper;
-        this.anchorMgr = new AnchorManager(objectMapper);
+        this.anchorMgr = new AnchorManager(objectMapper, workProject);
         this.searcher = new CodeSearcher(anchorMgr);
+        this.workProject = workProject;
     }
+    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper) {
+        this(config, objectMapper, null);
+    }
+
 
     // @anchor: toolExecutor_setLogConsumer
     // 设置日志回调，把工具执行输出实时推送给 UI
@@ -170,14 +181,42 @@ public class ToolExecutor {
     // 按工具类型校验其路径参数，违规时返回错误消息
     private String checkAccess(String toolName, Map<String, Object> args) {
         List<String> pathArgs = PATH_ARG_MAP.get(toolName);
-        if (pathArgs == null) return null;
+        if (pathArgs != null) {
+            for (String argName : pathArgs) {
+                Object val = args.get(argName);
+                if (!(val instanceof String path) || path.isBlank()) continue;
+                String err = checkPath(toolName, path);
+                if (err != null) return err;
+            }
+        }
+        return checkWorkProject(toolName, args);
+    }
 
-        for (String argName : pathArgs) {
-            Object val = args.get(argName);
-            if (!(val instanceof String path) || path.isBlank()) continue;
+    // @anchor: toolExecutor_checkWorkProject
+// 写工具的工作项目限定校验：目标路径必须落在 workProject 内
+    private String checkWorkProject(String toolName, Map<String, Object> args) {
+        if (workProject == null) return null;              // 未限定
+        if (!WRITE_TOOLS.contains(toolName)) return null;  // 非写工具放行
 
-            String err = checkPath(toolName, path);
-            if (err != null) return err;
+        // build_anchor_index：project_path 精确等于 workProject
+        if ("build_anchor_index".equals(toolName)) {
+            String pp = (String) args.get("project_path");
+            if (pp == null || !pp.equals(workProject)) {
+                return "❌ 只能操作工作项目 [" + workProject + "]，当前: " + pp;
+            }
+            return null;
+        }
+
+        // 其他写工具：filename 必须落在 workProject 下
+        String filename = (String) args.get("filename");
+        if (filename == null || filename.isBlank()) return null;
+
+        String normalized = filename.replace('\\', '/');
+        if (normalized.startsWith("./")) normalized = normalized.substring(2);
+
+        // 允许 "mygame" 本身（编译整个项目）和 "mygame/xxx"（项目内文件）
+        if (!normalized.equals(workProject) && !normalized.startsWith(workProject + "/")) {
+            return "❌ 只能写入工作项目 [" + workProject + "]，当前路径: " + filename;
         }
         return null;
     }

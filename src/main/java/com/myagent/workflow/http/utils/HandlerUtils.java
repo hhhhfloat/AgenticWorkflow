@@ -2,6 +2,8 @@
 // HTTP handler 公共工具：查询串解析与 JSON 响应封装
 package com.myagent.workflow.http.utils;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -32,6 +34,16 @@ public final class HandlerUtils {
             }
         }
         return params;
+    }
+
+    // @anchor: handlerUtils_parseJsonBody
+    // 解析 POST 请求体 JSON 为 Map（空 body 返回空 Map）
+    public static Map<String, Object> parseJsonBody(HttpExchange exchange) throws IOException {
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        if (body.isBlank()) return Map.of();
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.readValue(body,
+                new TypeReference<Map<String, Object>>() {});
     }
 
     // @anchor: handlerUtils_sendResponse

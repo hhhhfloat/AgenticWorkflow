@@ -65,7 +65,7 @@ public class Session {
         this.state = SessionState.IDLE;
 
         String now = LocalDateTime.now().format(TIME_FMT);
-        this.meta = new SessionMeta(sessionId, "新会话", now, now, 0, SessionState.IDLE);
+        this.meta = new SessionMeta(sessionId, "新会话", now, now, 0, SessionState.IDLE, null);
     }
 
     // @anchor: session_constructorNew
@@ -73,6 +73,17 @@ public class Session {
     /** 创建新会话时使用 */
     public Session(AgentConfig config) {
         this(generateSessionId(), config);
+    }
+
+    // @anchor: session_constructorWithProject
+    // 创建新会话并指定工作项目（相对沙箱的项目名）
+    public Session(AgentConfig config, String workProject) {
+        this.sessionId = generateSessionId();
+        this.config = config;
+        this.state = SessionState.IDLE;
+        String now = LocalDateTime.now().format(TIME_FMT);
+        String title = (workProject != null && !workProject.isBlank()) ? workProject : "新会话";
+        this.meta = new SessionMeta(sessionId, title, now, now, 0, SessionState.IDLE, workProject);
     }
 
     // @anchor: session_generateSessionId
@@ -284,5 +295,9 @@ public class Session {
 
     public boolean hasActiveTask() {
         return runningAgent != null;
+    }
+
+    public String getWorkProject(){
+        return meta.workProject();
     }
 }
