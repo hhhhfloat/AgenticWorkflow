@@ -3,7 +3,6 @@ package com.myagent.workflow.tools;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.AgentConfig;
-import com.myagent.workflow.model.AnchorLocation;
 import com.myagent.workflow.model.MethodDefinition;
 import com.myagent.workflow.parser.StructureParserRegistry;
 import org.slf4j.Logger;
@@ -224,18 +223,7 @@ class AnchorIndex {
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(index));
     }
 
-    // @anchor: anchorIndex_rebuildFile
-    /**
-     * 单文件全刷：先刷新位置，再刷新 desc/symbol。
-     * 索引文件不存在时退化为全量 rebuild。
-     */
-    String rebuildFile(String projectPath, String fileRelPath) {
-        String r1 = refreshAnchorsFile(projectPath, fileRelPath);
-        String r2 = refreshProjectIndexFile(projectPath, fileRelPath);
-        return r1 + " | " + r2;
-    }
-
-// @anchor: anchorIndex_refreshAnchorsFile
+    // @anchor: anchorIndex_refreshAnchorsFile
     /**
      * 只刷新 .anchors.json 里该文件的位置（id + line + preview）。
      * 供编辑操作后立即调用，不跑 AST 解析，快速保证行号准确。
@@ -276,7 +264,7 @@ class AnchorIndex {
         }
     }
 
-// @anchor: anchorIndex_refreshProjectIndexFile
+    // @anchor: anchorIndex_refreshProjectIndexFile
     /**
      * 只刷新 .project_index.json 里该文件的条目（desc + symbol）。
      * 供 flushDirty 一轮结束统一调用，代价是 AST 解析，较慢。

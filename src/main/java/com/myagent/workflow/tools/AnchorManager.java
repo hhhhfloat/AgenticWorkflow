@@ -42,6 +42,7 @@ public class AnchorManager {
     // @anchor: anchorManager_buildIndex
 // 重建锚点索引
     String buildAnchorIndex(String projectPath) {
+        if (projectPath == null || projectPath.isBlank()) return "❌ 缺少参数 project_path";
         return anchorIndex.rebuild(projectPath);
     }
 
@@ -50,6 +51,10 @@ public class AnchorManager {
     // @anchor: anchorManager_insertAtAnchor
 // 在锚点前/后插入代码，并标记文件为脏
     String insertAtAnchor(String anchorId, String content, String position, String file) {
+        if(anchorId == null || anchorId.isBlank()){
+            return "❌ 缺少参数 anchor_id";
+        }
+        if (content == null) return "❌ 缺少参数 content";
         if(!"before".equals(position) && !"after".equals(position)){
             return "❌ position 必须是 'before' 或 'after'，收到: " + position;
         }
@@ -82,6 +87,9 @@ public class AnchorManager {
     // @anchor: anchorManager_deleteBetweenAnchors
 // 删除两锚点之间的内容
     String deleteBetweenAnchors(String startAnchor, String endAnchor, String file) {
+        if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
+        if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";
+
         AnchorLocation startLoc = resolveAnchor(startAnchor, file);
         if (startLoc == null) return buildResolveError(startAnchor, file);
         AnchorLocation endLoc = resolveAnchor(endAnchor, file);
@@ -131,6 +139,9 @@ public class AnchorManager {
     // @anchor: anchorManager_readBetweenAnchors
 // 读取两锚点之间的代码
     String readBetweenAnchors(String startAnchor, String endAnchor, String file) {
+        if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
+        if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";
+
         AnchorLocation startLoc = resolveAnchor(startAnchor, file);
         if (startLoc == null) return buildResolveError(startAnchor, file);
         AnchorLocation endLoc = resolveAnchor(endAnchor, file);
@@ -307,21 +318,17 @@ public class AnchorManager {
     // @anchor: anchorManager_rebuildProjectIndex
 // 重建整个项目的锚点索引文件
     String rebuildProjectIndex(String projectPath) {
+        if (projectPath == null || projectPath.isBlank()) return "❌ 缺少参数 project_path";
         return anchorIndex.rebuildProjectIndex(projectPath);
     }
 
     // @anchor: anchorManager_describeAnchors
 // 返回各锚点及其紧邻描述
     String describeAnchors(String projectPath, String filePath) {
+        if (projectPath == null || projectPath.isBlank()) return "❌ 缺少参数 project_path";
+
         return anchorFormatter.describe(projectPath, filePath);
     }
-
-    // @anchor: anchorManager_rebuildFile
-// 单文件转发：刷新该文件的位置与描述
-    String rebuildFile(String projectPath, String fileRelPath) {
-        return anchorIndex.rebuildFile(projectPath, fileRelPath);
-    }
-
 
     // @anchor: anchorManager_onFileModified
     /**

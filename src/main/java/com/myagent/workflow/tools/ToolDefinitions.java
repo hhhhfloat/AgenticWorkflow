@@ -156,7 +156,7 @@ public final class ToolDefinitions {
                 defineParams()
                         .prop("startAnchor", "string", "起始锚点 ID")
                         .prop("endAnchor", "string", "结束锚点 ID")
-                        .prop("file", "string", "可选。锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
+                        .prop("file", "string", "锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
                         .build(),
                 List.of("startAnchor", "endAnchor")
         ));
