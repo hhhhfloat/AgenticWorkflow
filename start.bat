@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 setlocal EnableDelayedExpansion
-title Agentic Workflow v4.0
+title Agentic Workflow v5.x
 
 :: -r / --reset-config  强制重新探测环境，覆盖 agent-config.properties
 :: -m / --mobile        绑定 Tailscale IP，供手机远程访问
