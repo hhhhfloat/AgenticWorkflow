@@ -944,3 +944,17 @@ html, body {
     border-color: #4a8aff;
     color: #fff;
 }
+
+/* @anchor: style_quickPromptAdd */
+/* 添加话术按钮：虚线边框 + 灰色，与普通 chip 区分 */
+.quick-prompt-add {
+    color: #888;
+    border-style: dashed;
+    font-weight: bold;
+}
+
+.quick-prompt-add:hover {
+    color: #fff;
+    border-style: solid;
+    border-color: #4a8aff;
+}
