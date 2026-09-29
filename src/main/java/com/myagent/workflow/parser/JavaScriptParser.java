@@ -261,65 +261,39 @@ public class JavaScriptParser implements StructureParser {
 
     // ==================== 字符串/注释清理 ====================
     // @anchor: javaScriptParser_stripStringsOnly
-    // 移除单/双引号及模板字符串内容，保留注释与代码
+    // 移除单/双引号及模板字符串内容（含转义），保留注释与代码
     @Override
     public String stripStringsOnly(String rawLine) {
         StringBuilder result = new StringBuilder();
-        boolean inString = false;
-        boolean inTemplate = false;
-        boolean inSingle = false;
-        boolean inDouble = false;
-        char prev = 0;
-        for (int i = 0; i < rawLine.length(); i++) {
+        int i = 0;
+        int len = rawLine.length();
+        while (i < len) {
             char c = rawLine.charAt(i);
-            if (!inString && !inSingle && !inDouble && !inTemplate) {
-                // 检测模板字符串
-                if (c == '`') {
-                    inTemplate = true;
-                    prev = c;
-                    i++;
-                    continue;
-                }
-                if (c == '\'') {
-                    inSingle = true;
-                    prev = c;
-                    i++;
-                    continue;
-                }
-                if (c == '"') {
-                    inDouble = true;
-                    prev = c;
-                    i++;
-                    continue;
-                }
-            }
-            if (inSingle) {
-                if (c == '\'' && prev != '\\') {
-                    inSingle = false;
-                }
-                prev = c;
-                i++;
+            // 转义：跳过下一个字符
+            if (c == '\\' && i + 1 < len) {
+                result.append(c).append(rawLine.charAt(i + 1));
+                i += 2;
                 continue;
             }
-            if (inDouble) {
-                if (c == '"' && prev != '\\') {
-                    inDouble = false;
-                }
-                prev = c;
+            // 字符串起始：整体跳过
+            if (c == '\'' || c == '"' || c == '`') {
+                char quote = c;
                 i++;
+                while (i < len) {
+                    char inner = rawLine.charAt(i);
+                    if (inner == '\\' && i + 1 < len) {
+                        i += 2;
+                        continue;
+                    }
+                    if (inner == quote) {
+                        i++;
+                        break;
+                    }
+                    i++;
+                }
                 continue;
             }
-            if (inTemplate) {
-                if (c == '`' && prev != '\\') {
-                    inTemplate = false;
-                }
-                prev = c;
-                i++;
-                continue;
-            }
-            // 普通字符
             result.append(c);
-            prev = c;
             i++;
         }
         return result.toString();

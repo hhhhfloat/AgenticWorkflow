@@ -47,7 +47,7 @@ class AnchorFormatter {
             for (String raw : filePath.split("[,;]")) {
                 String hint = raw.trim();
                 if (hint.isEmpty()) continue;
-                appendDescribeOne(sb, hint, projectAnchors);
+                appendDescribeOne(sb, hint, projectAnchors, projectDir);
             }
             return sb.toString();
         } catch (IOException e) {
@@ -58,7 +58,9 @@ class AnchorFormatter {
 
     // @anchor: anchorFormatter_appendOne
     private void appendDescribeOne(StringBuilder sb, String hint,
-                                   Map<String, List<Map<String, Object>>> projectAnchors) {
+                                   Map<String, List<Map<String,
+                                   Object>>> projectAnchors,
+                                   Path projectDir) {
         List<String> fileMatches = new ArrayList<>();
         for (String key : projectAnchors.keySet()) {
             if (key.equals(hint) || key.endsWith("/" + hint)) fileMatches.add(key);
@@ -74,9 +76,9 @@ class AnchorFormatter {
             appendFileDetail(sb, fileMatches.get(0), projectAnchors.get(fileMatches.get(0)));
             return;
         }
-
+        // 索引里没匹配 → 走目录概览；概览为空时在 appendDirIntro 内做文件系统诊断
         String dirPrefix = normalizeDirHint(hint);
-        appendDirIntro(sb, dirPrefix, projectAnchors);
+        appendDirIntro(sb, dirPrefix, projectAnchors, projectDir, hint);
     }
 
     private String normalizeDirHint(String hint) {
@@ -92,7 +94,8 @@ class AnchorFormatter {
     }
 
     private void appendDirIntro(StringBuilder sb, String dirPrefix,
-                                Map<String, List<Map<String, Object>>> projectAnchors) {
+                                Map<String, List<Map<String, Object>>> projectAnchors,
+                                Path projectDir, String rawHint) {
         int total = 0, withIntro = 0;
         StringBuilder body = new StringBuilder();
         for (Map.Entry<String, List<Map<String, Object>>> e : projectAnchors.entrySet()) {
@@ -112,7 +115,27 @@ class AnchorFormatter {
 
         String label = dirPrefix.isEmpty() ? "整个项目" : dirPrefix;
         if (total == 0) {
-            sb.append("📌 ").append(label).append(" 下没有锚点记录。\n\n");
+            // 索引里没有匹配 → 去文件系统确认具体原因
+            if (dirPrefix.isEmpty()) {
+                sb.append("📌 ").append(label).append(" 下没有锚点记录。\n\n");
+                return;
+            }
+            try {
+                Path candidate = projectDir.resolve(rawHint.replace('\\', '/')).normalize();
+                if (candidate.startsWith(projectDir)) {
+                    if (Files.isRegularFile(candidate)) {
+                        sb.append("📄 ").append(rawHint).append("\n");
+                        sb.append("   （文件存在，但未标注任何锚点）\n\n");
+                        return;
+                    }
+                    if (Files.isDirectory(candidate)) {
+                        sb.append("📌 ").append(rawHint)
+                              .append(" 目录存在，但目录下没有锚点记录。\n\n");
+                        return;
+                    }
+                }
+            } catch (Exception ignored) {}
+            sb.append("📌 ").append(rawHint).append(" 不存在，或没有锚点记录。\n\n");
             return;
         }
         sb.append("📌 ").append(label).append(" 文件职责概览（")

@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Map;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
@@ -115,6 +116,28 @@ public class Compiler {
     }
 
     // ==================== 单文件 Java 编译运行 ====================
+
+    // @anchor: compiler_resolveClassName
+// 从源文件推导全限定类名：优先读 package 声明，无则用文件名
+    private String resolveClassName(Path filePath) throws IOException {
+        String baseName = filePath.getFileName().toString();
+        if (baseName.endsWith(".java")) {
+            baseName = baseName.substring(0, baseName.length() - ".java".length());
+        }
+
+        List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
+        for (String line : lines) {
+            String t = line.trim();
+            if (t.isEmpty() || t.startsWith("//") || t.startsWith("/*") || t.startsWith("*")) continue;
+            if (t.startsWith("package ")) {
+                String pkg = t.substring("package ".length()).replace(";", "").trim();
+                if (!pkg.isEmpty()) return pkg + "." + baseName;
+            }
+            break;  // 第一行有效代码不是 package 就不用继续找
+        }
+        return baseName;
+    }
+
     // @anchor: compiler_compileJava
 // 编译并运行单个 Java 文件
     public String compileJava(Path filePath, String filename, boolean run) {
@@ -158,7 +181,7 @@ public class Compiler {
             // ============================================================
             // 4. 【替换点】运行：从 classes 目录加载类（旧代码全删，换成下面这个）
             // ============================================================
-            String className = filename.replace(".java", "");
+            String className = resolveClassName(filePath);
             ProcessBuilder runPb = new ProcessBuilder(
                     "java", "-cp", classesDir.toString(), className
             );

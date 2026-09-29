@@ -34,10 +34,8 @@ class AnchorIndex {
     private final ObjectMapper objectMapper;
     private boolean migrationAttempted = false;
     private static final String PROJECT_INDEX_NAME = ".project_index.json";
-    private static final Pattern END_ANCHOR_PATTERN = Pattern.compile("_end(\\d+)?$");
 
-    private static final Set<String> EXCLUDED_DIRS = Set.of(
-            "target", "node_modules", ".git", "classes", "build", "dist", "out");
+
 
     // @anchor: anchorIndex_constructor
 // 构造：注入 ObjectMapper
@@ -144,8 +142,7 @@ class AnchorIndex {
 
                         try {
                             Path relPath = projectDir.relativize(file);
-                            if (relPath.getNameCount() > 0 && EXCLUDED_DIRS.contains(relPath.getName(0).toString())) return;
-
+                            if (SearchFileFilter.isExcludedDir(relPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS)) return;
                             String rel = projectDir.relativize(file).toString().replace('\\', '/');
                             List<Map<String, Object>> anchors = AnchorScanner.scan(file);
                             if (!anchors.isEmpty()) projectAnchors.put(rel, anchors);
@@ -187,7 +184,6 @@ class AnchorIndex {
         List<Map<String, Object>> list = new ArrayList<>();
         for (Map<String, Object> a : anchors) {
             String id = (String) a.get("id");
-            if (id != null && END_ANCHOR_PATTERN.matcher(id).find()) continue;
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", id);
             m.put("line", a.get("line"));
