@@ -45,9 +45,21 @@ public class ScanFilesHandler implements HttpHandler {
             return;
         }
 
+        // 归一化：剥离 sandbox/ 前缀，与 PathUtils.safeResolve 的基准对齐
+        String normalized = projectPath.replace('\\', '/');
+        if (normalized.startsWith("sandbox/")) {
+            normalized = normalized.substring("sandbox/".length());
+        }
+
+        if (normalized.isBlank()) {
+            HandlerUtils.sendResponse(exchange, 400,
+                    "{\"status\":\"error\",\"message\":\"path 参数无效\"}");
+            return;
+        }
+
         Path projectDir;
         try {
-            projectDir = PathUtils.safeResolve(projectPath);
+            projectDir = PathUtils.safeResolve(normalized);
         } catch (IOException e) {
             HandlerUtils.sendResponse(exchange, 400,
                     "{\"status\":\"error\",\"message\":\"路径不合法\"}");
@@ -97,7 +109,8 @@ public class ScanFilesHandler implements HttpHandler {
                     entry.put("lines", lines);
                     entry.put("approximate", approximate);
                     files.add(entry);
-                } catch (IOException ignored) {}
+                } catch (IOException ignored) {
+                }
             });
         }
 
