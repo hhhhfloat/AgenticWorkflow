@@ -183,7 +183,7 @@ public class Main {
         String finalContent = null;
         try {
             // 1. 准备用户消息（内部处理首轮/后续分支，并同步 meta）
-            session.prepareUserMessage(userRequest, SystemPrompt.get());
+            session.prepareUserMessage(userRequest, SystemPrompt.get(session.getWorkProject()));
 
             // 2. 工具定义
             List<Map<String, Object>> tools = ToolDefinitions.build();

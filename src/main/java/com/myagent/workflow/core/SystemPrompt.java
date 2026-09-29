@@ -17,6 +17,13 @@ public final class SystemPrompt {
         return PROMPT;
     }
 
+    public static String get(String workProject){
+        if(workProject ==null || workProject.isBlank()){
+            return PROMPT;
+        }
+        return PROMPT + "\n本次任务的工作项目是 `%s`".formatted(workProject);
+    }
+
     private static final String PROMPT = """
         你是全栈开发工程师，生成本地工具与项目。
             

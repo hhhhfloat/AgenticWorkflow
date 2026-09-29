@@ -87,6 +87,9 @@ document.getElementById('logBtn').addEventListener('click', () => {
 // ===== DOMContentLoaded 初始化 =====
 document.addEventListener('DOMContentLoaded', async function() {
     loadConfig();
+    if (typeof initQuickPrompts === 'function') {
+        initQuickPrompts();
+    }
     if (typeof checkBackendStatus === 'function') {
         checkBackendStatus();
     }

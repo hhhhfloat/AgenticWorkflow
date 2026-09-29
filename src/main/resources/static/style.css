@@ -916,3 +916,31 @@ html, body {
     color: #4ec9b0;
     margin-top: 2px;
 }
+
+/* @anchor: style_quickPromptBar */
+/* 常用话术 chips 行 */
+#quickPromptBar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+
+.quick-prompt-chip {
+    padding: 2px 10px;
+    background: #2a2a2a;
+    color: #9cdcfe;
+    border: 1px solid #3a3a3a;
+    border-radius: 12px;
+    font-size: 12px;
+    line-height: 1.6;
+    cursor: pointer;
+    font-family: inherit;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.quick-prompt-chip:hover {
+    background: #3a4a5a;
+    border-color: #4a8aff;
+    color: #fff;
+}

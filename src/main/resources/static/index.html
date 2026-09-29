@@ -66,6 +66,7 @@
         <!-- 输入区：提示词、历史、迭代次数与运行/停止/清空/日志/配置按钮 -->
         <div id="inputArea">
             <textarea id="prompt" placeholder="输入你的需求，例如：写一个 HTML 计算器，支持加减乘除">写一个 HTML 计算器，支持加减乘除</textarea>
+            <div id="quickPromptBar"></div>
             <div id="historyContainer"></div>
 
             <div class="iteration-control">
@@ -194,6 +195,8 @@
 <script src="modules/log.js"></script>
 <!-- 历史记录 -->
 <script src="modules/history.js"></script>
+<!-- 常用话术 -->
+<script src="modules/quickPrompts.js"></script>
 <script src="modules/sessionState.js"></script>
 <script src="modules/usageStore.js"></script>
 <script src="modules/sessionList.js"></script>
