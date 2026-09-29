@@ -13,7 +13,7 @@ public class PathUtils {
     private static final String sandboxDir = AgentConfig.getSandboxDir();
     // @anchor: pathUtils_safeResolve
 // 将相对路径解析并限制在沙箱根内，拒绝越界
-    static Path safeResolve(String... parts) throws IOException {
+    public static Path safeResolve(String... parts) throws IOException {
         // 1. 获取沙箱根目录的绝对规范化路径
         Path root = Paths.get(sandboxDir).toAbsolutePath().normalize();
 

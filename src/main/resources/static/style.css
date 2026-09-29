@@ -281,11 +281,7 @@ html, body {
     white-space: nowrap;
     min-width: 0;            /* 关键：防止文本撑开父容器 */
 }
-/* 操作按钮：不收缩 */
-.tree-action-btn {
-    flex-shrink: 0;          /* 不收缩 */
-    /* 保留原有样式 */
-}
+
 .tree-item:hover {
     background: #2d2d2d;
 }
@@ -341,50 +337,6 @@ html, body {
     background: #777;
 }
 
-/* @anchor: style_archiveBtn */
-/* 归档按钮：悬停文件项时显示 */
-.archive-btn {
-    display: none;
-    background: transparent;
-    border: none;
-    color: #4ec9b0;
-    font-size: 13px;
-    cursor: pointer;
-    padding: 0 4px;
-    margin-left: auto;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-}
-.tree-item:hover .archive-btn {
-    display: inline-block;
-}
-.archive-btn:hover {
-    opacity: 1;
-    color: #fff;
-}
-
-/* @anchor: style_treeActions */
-/* 文件树操作按钮：悬停时显示 */
-.tree-action-btn {
-    display: none;
-    background: transparent;
-    border: none;
-    color: #9cdcfe;
-    font-size: 13px;
-    cursor: pointer;
-    padding: 0 4px;
-    margin-left: 2px;
-    opacity: 0.6;
-    transition: opacity 0.2s;
-}
-.tree-item:hover .tree-action-btn {
-    display: inline-block;
-}
-.tree-action-btn:hover {
-    opacity: 1;
-    color: #fff;
-}
-
 .log-btn {
     background: #444;
 }
@@ -436,6 +388,65 @@ html, body {
 }
 .close-btn:hover {
     color: #fff;
+}
+
+/* @anchor: style_treeMoreBtn */
+/* 文件树节点右侧的 ⋯ 菜单按钮 */
+.tree-more-btn {
+    display: none;
+    background: transparent;
+    border: none;
+    color: #9cdcfe;
+    font-size: 18px;
+    font-weight: bold;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 6px;
+    opacity: 0.6;
+    transition: opacity 0.15s;
+}
+
+.tree-item:hover .tree-more-btn {
+    display: inline-block;
+}
+
+.tree-more-btn:hover {
+    opacity: 1;
+    color: #fff;
+}
+
+/* @anchor: style_treeMoreMenu */
+/* 弹出菜单：绝对定位浮层 */
+.tree-more-menu {
+    position: fixed;
+    z-index: 2000;
+    background: #2d2d2d;
+    border: 1px solid #444;
+    border-radius: 6px;
+    padding: 4px 0;
+    min-width: 180px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+    font-size: 13px;
+    user-select: none;
+}
+
+.tree-more-item {
+    padding: 6px 14px;
+    color: #d4d4d4;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.1s, color 0.1s;
+}
+
+.tree-more-item:hover {
+    background: #3a4a5a;
+    color: #fff;
+}
+
+.tree-more-sep {
+    height: 1px;
+    background: #444;
+    margin: 4px 0;
 }
 .modal-body {
     padding: 16px;

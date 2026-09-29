@@ -16,11 +16,11 @@ import java.util.regex.Pattern;
 
 // @anchor: anchorScanner_class
 // 锚点扫描器：从单个文件提取锚点、紧邻描述与所属符号（无状态）
-final class AnchorScanner {
+public final class AnchorScanner {
 
     private AnchorScanner() {}
 
-    static final List<String> TEXT_EXTENSIONS = List.of(
+    public static final List<String> TEXT_EXTENSIONS = List.of(
             ".java", ".html", ".htm", ".css", ".js", ".jsx", ".ts", ".tsx",
             ".txt", ".xml", ".json", ".md", ".properties", ".yml", ".yaml",
             ".sh", ".bat", ".gradle", ".sql",

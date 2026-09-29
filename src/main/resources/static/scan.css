@@ -1,0 +1,116 @@
+/* @anchor: scan_css */
+/* 大文件扫描页面样式 */
+
+#scanApp {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 24px;
+    font-family: 'Courier New', monospace;
+}
+
+#scanHeader h2 {
+    margin: 0 0 8px 0;
+    color: #9cdcfe;
+}
+
+#scanSummary {
+    color: #888;
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+
+#scanTabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.scan-tab {
+    padding: 4px 12px;
+    background: #2a2a2a;
+    color: #aaa;
+    border: 1px solid #3a3a3a;
+    border-radius: 12px;
+    font-size: 12px;
+    cursor: pointer;
+}
+.scan-tab:hover { background: #3a3a3a; }
+.scan-tab.active {
+    background: #3a5a8a;
+    color: #fff;
+    border-color: #4a6a9a;
+}
+
+#scanToolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-top: 1px solid #333;
+    border-bottom: 1px solid #333;
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 12px;
+}
+#scanToolbar label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+}
+#scanToolbar button {
+    padding: 4px 10px;
+    font-size: 12px;
+    background: #2a4a2a;
+    color: #afa;
+    border: 1px solid #3a5a3a;
+    border-radius: 3px;
+    cursor: pointer;
+}
+#scanToolbar button:hover { background: #3a5a3a; }
+#selectedInfo { color: #4ec9b0; }
+
+#scanTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+#scanTable th {
+    text-align: left;
+    padding: 8px;
+    background: #252526;
+    color: #9cdcfe;
+    border-bottom: 1px solid #444;
+    font-weight: normal;
+}
+#scanTable td {
+    padding: 6px 8px;
+    border-bottom: 1px solid #2a2a2a;
+    color: #d4d4d4;
+}
+#scanTable tr:hover td { background: #252525; }
+.scan-path {
+    font-family: 'Consolas', 'Monaco', monospace;
+    color: #ce9178;
+}
+
+.scan-bucket {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+}
+.b-normal    { background: #2a4a2a; color: #afa; }
+.b-large     { background: #2a4a3a; color: #9cf; }
+.b-attention { background: #4a4a2a; color: #ffa; }
+.b-warn      { background: #4a3a2a; color: #fc9; }
+.b-hot       { background: #5a2a2a; color: #f99; }
+.b-danger    { background: #6a1a1a; color: #fff; }
+
+.scan-empty {
+    text-align: center;
+    padding: 40px;
+    color: #666;
+    font-style: italic;
+}
