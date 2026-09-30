@@ -85,7 +85,7 @@ public final class SystemPrompt {
         - 所有操作限制在沙箱内
         - 修改标识符前先 search_text 查引用判断影响范围
         - 图集数据文件等“素材”类用户提供的内容不得随意修改
-mv
+
         ## 安全编码规则（强制）
         - 禁止使用系统命令（os.system, Runtime.exec, ProcessBuilder, subprocess）
         - 禁止路径中使用 ".." 或盘符（如 C:）
