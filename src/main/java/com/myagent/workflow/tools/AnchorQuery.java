@@ -40,7 +40,8 @@ class AnchorQuery {
 
             String content = Files.readString(indexFile);
             Map<String, List<Map<String, Object>>> projectAnchors =
-                    objectMapper.readValue(content, new TypeReference<>() {});
+                    objectMapper.readValue(content, new TypeReference<>() {
+                    });
 
             for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
                 String filePath = fileEntry.getKey();
@@ -93,7 +94,8 @@ class AnchorQuery {
 
             String content = Files.readString(indexFile);
             Map<String, List<Map<String, Object>>> projectAnchors =
-                    objectMapper.readValue(content, new TypeReference<>() {});
+                    objectMapper.readValue(content, new TypeReference<>() {
+                    });
 
             for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
                 String filePath = fileEntry.getKey();
@@ -117,7 +119,7 @@ class AnchorQuery {
     }
 
     // @anchor: anchorQuery_findAllGlobally
-    List<AnchorLocation> findAllGlobally(String anchorId) {
+    List<AnchorLocation> findAllGlobally(String anchorId, String workProject) {
         List<AnchorLocation> results = new ArrayList<>();
         try {
             Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
@@ -126,6 +128,7 @@ class AnchorQuery {
                     if (!Files.isDirectory(projectDir)) continue;
                     String projectName = projectDir.getFileName().toString();
                     if (projectName.startsWith(".")) continue;
+                    if (workProject != null && !workProject.equals(projectName)) continue;
                     results.addAll(findAllInProject(projectName, anchorId));
                 }
             }
@@ -136,11 +139,10 @@ class AnchorQuery {
     }
 
     // @anchor: anchorQuery_findInFile
-    AnchorLocation findInFile(String anchorId, String fileHint) {
+    AnchorLocation findInFile(String anchorId, String fileHint, String workProject) {
         try {
             Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
-            AnchorLocation found = null;
-            int matchCount = 0;
+            List<AnchorLocation> matches = new ArrayList<>();
 
             try (var stream = Files.list(sandboxRoot)) {
                 for (Path projectDir : (Iterable<Path>) stream::iterator) {
@@ -148,38 +150,49 @@ class AnchorQuery {
                     String projectName = projectDir.getFileName().toString();
                     if (projectName.startsWith(".")) continue;
 
+                    // 有 workProject 时，只查该项目；否则查所有项目
+                    if (workProject != null && !workProject.equals(projectName)) continue;
+
                     Path indexFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
                     if (!Files.exists(indexFile)) continue;
+                    try {
+                        String content = Files.readString(indexFile);
+                        Map<String, List<Map<String, Object>>> projectAnchors =
+                                objectMapper.readValue(content, new TypeReference<>() {
+                                });
 
-                    String content = Files.readString(indexFile);
-                    Map<String, List<Map<String, Object>>> projectAnchors =
-                            objectMapper.readValue(content, new TypeReference<>() {});
+                        for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
+                            String filePath = fileEntry.getKey();
+                            String fullRel = projectName + "/" + filePath;
+                            boolean fileMatches = fullRel.equals(fileHint)
+                                    || filePath.equals(fileHint)
+                                    || fullRel.endsWith("/" + fileHint);
+                            if (!fileMatches) continue;
 
-                    for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
-                        String filePath = fileEntry.getKey();
-                        String fullRel = projectName + "/" + filePath;
-                        boolean matches = fullRel.equals(fileHint)
-                                || filePath.equals(fileHint)
-                                || fullRel.endsWith("/" + fileHint);
-                        if (!matches) continue;
+                            for (Map<String, Object> anchor : fileEntry.getValue()) {
+                                String id = (String) anchor.get("id");
+                                if (anchorId.equals(id)) {
+                                    AnchorLocation loc = new AnchorLocation();
+                                    loc.projectPath = projectName;
+                                    loc.filePath = filePath;
+                                    loc.line = (int) anchor.get("line");
+                                    loc.id = id;
+                                    loc.preview = (String) anchor.get("preview");
+                                    matches.add(loc);
+                                }
 
-                        for (Map<String, Object> anchor : fileEntry.getValue()) {
-                            String id = (String) anchor.get("id");
-                            if (anchorId.equals(id)) {
-                                AnchorLocation loc = new AnchorLocation();
-                                loc.projectPath = projectName;
-                                loc.filePath = filePath;
-                                loc.line = (int) anchor.get("line");
-                                loc.id = id;
-                                loc.preview = (String) anchor.get("preview");
-                                found = loc;
-                                matchCount++;
                             }
                         }
+                    } catch (IOException e) {
+                        logger.warn("读取 {} 的索引失败，跳过: {}", projectName, e.getMessage());
                     }
                 }
             }
-            return matchCount == 1 ? found : null;
+            if (matches.size() > 1) {
+                logger.warn("锚点 {} 在 fileHint={} 下匹配到 {} 个位置，需更精确的路径",
+                        anchorId, fileHint, matches.size());
+            }
+            return matches.size() == 1 ? matches.get(0) : null;
         } catch (IOException e) {
             logger.error("按文件查找锚点失败", e);
             return null;

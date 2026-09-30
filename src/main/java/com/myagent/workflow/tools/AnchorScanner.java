@@ -45,7 +45,25 @@ public final class AnchorScanner {
         List<Map<String, Object>> anchors = new ArrayList<>();
         Set<String> localSeen = new HashSet<>();
         for (int i = 0; i < lines.size(); i++) {
-            Matcher matcher = ANCHOR_PATTERN.matcher(lines.get(i));
+
+            String line = lines.get(i);
+            String candidate = line;
+
+            // 兼容跨行 XML 注释：`<!--` 开头但当前行没有 `-->`
+            if (line.contains("<!--") && !line.contains("-->")) {
+                StringBuilder buf = new StringBuilder(line);
+                int j = i + 1;
+                while (j < lines.size() && !lines.get(j).contains("-->")) {
+                    buf.append(' ').append(lines.get(j).trim());
+                    j++;
+                }
+                if (j < lines.size()) {
+                    buf.append(' ').append(lines.get(j).trim());
+                    candidate = buf.toString();
+                }
+            }
+
+            Matcher matcher = ANCHOR_PATTERN.matcher(candidate);
             if (!matcher.find()) continue;
             String id = null;
             for (int j = 1; j <= matcher.groupCount(); j++) {
@@ -71,6 +89,33 @@ public final class AnchorScanner {
     // @anchor: anchorScanner_extractDesc
     // 从锚点下一行紧邻注释提取描述
     static String extractDesc(List<String> lines, int anchorLineIdx) {
+
+        String anchorLine = lines.get(anchorLineIdx);
+
+        // 跨行 XML 注释：锚点行有 `<!--` 但没有 `-->`
+        if (anchorLine.contains("<!--") && !anchorLine.contains("-->")) {
+            // 先看锚点行 `@anchor: xxx` 之后的尾部（可能有简短描述）
+            int tagEnd = anchorLine.indexOf("@anchor:");
+            if (tagEnd >= 0) {
+                int idEnd = anchorLine.indexOf(' ', tagEnd + 8);
+                if (idEnd < 0) idEnd = anchorLine.length();
+                String tail = anchorLine.substring(idEnd).trim();
+                if (!tail.isEmpty()) return tail;
+            }
+            // 再往下拼描述，直到 `-->`
+            StringBuilder sb = new StringBuilder();
+            for (int j = anchorLineIdx + 1; j < lines.size(); j++) {
+                String l = lines.get(j).trim();
+                boolean hasClose = l.contains("-->");
+                if (hasClose) l = l.replace("-->", "").trim();
+                if (!l.isEmpty()) {
+                    if (!sb.isEmpty()) sb.append(' ');
+                    sb.append(l);
+                }
+                if (hasClose) break;
+            }
+            return sb.toString();
+        }
         int next = anchorLineIdx + 1;
         if (next >= lines.size()) return "";
 

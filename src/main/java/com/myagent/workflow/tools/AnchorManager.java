@@ -289,10 +289,10 @@ public class AnchorManager {
      */
     private AnchorLocation resolveAnchor(String anchorId, String fileHint) {
         if (fileHint == null || fileHint.isBlank()) {
-            List<AnchorLocation> all = anchorQuery.findAllGlobally(anchorId);
+            List<AnchorLocation> all = anchorQuery.findAllGlobally(anchorId, workProject);
             return all.size() == 1 ? all.get(0) : null;
         }
-        return anchorQuery.findInFile(anchorId, fileHint);
+        return anchorQuery.findInFile(anchorId, fileHint, workProject);
     }
 
 // @anchor: anchorManager_buildResolveError
@@ -303,7 +303,7 @@ public class AnchorManager {
         if (fileHint != null && !fileHint.isBlank()) {
             return "❌ 在文件 " + fileHint + " 中未找到唯一锚点: " + anchorId;
         }
-        List<AnchorLocation> all = anchorQuery.findAllGlobally(anchorId);
+        List<AnchorLocation> all = anchorQuery.findAllGlobally(anchorId, workProject);
         if (all.isEmpty()) return "❌ 锚点不存在: " + anchorId;
 
         StringBuilder sb = new StringBuilder();
