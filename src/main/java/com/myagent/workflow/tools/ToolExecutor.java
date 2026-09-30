@@ -45,6 +45,10 @@ public class ToolExecutor {
             "write_file", "delete_file", "compile_and_run", "build_anchor_index"
     );
 
+    // @anchor: toolExecutor_extraWritePaths
+    // 工作项目之外仍然允许写入的公共路径（相对沙箱）
+    private static final Set<String> EXTRA_WRITE_PATHS = Set.of("tmp");
+
     // 工具名 → 需要做路径检查的参数名
     private static final Map<String, List<String>> PATH_ARG_MAP = Map.ofEntries(
             Map.entry("read_file",          List.of("filename")),
@@ -193,7 +197,7 @@ public class ToolExecutor {
     }
 
     // @anchor: toolExecutor_checkWorkProject
-// 写工具的工作项目限定校验：目标路径必须落在 workProject 内
+    // 写工具的工作项目限定校验：目标路径必须落在 workProject 内
     private String checkWorkProject(String toolName, Map<String, Object> args) {
         if (workProject == null) return null;              // 未限定
         if (!WRITE_TOOLS.contains(toolName)) return null;  // 非写工具放行
@@ -214,11 +218,17 @@ public class ToolExecutor {
         String normalized = filename.replace('\\', '/');
         if (normalized.startsWith("./")) normalized = normalized.substring(2);
 
-        // 允许 "mygame" 本身（编译整个项目）和 "mygame/xxx"（项目内文件）
-        if (!normalized.equals(workProject) && !normalized.startsWith(workProject + "/")) {
-            return "❌ 只能写入工作项目 [" + workProject + "]，当前路径: " + filename;
+        // 主工作项目
+        if (normalized.equals(workProject) || normalized.startsWith(workProject + "/")) {
+            return null;
         }
-        return null;
+        // 公共临时区（跨项目可写）
+        for (String extra : EXTRA_WRITE_PATHS) {
+            if (normalized.equals(extra) || normalized.startsWith(extra + "/")) {
+                return null;
+            }
+        }
+        return "❌ 只能写入工作项目 [" + workProject + "] 或临时目录，当前路径: " + filename;
     }
 
     // @anchor: toolExecutor_checkPath
