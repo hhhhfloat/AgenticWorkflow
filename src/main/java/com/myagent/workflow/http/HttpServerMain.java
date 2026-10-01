@@ -45,20 +45,12 @@ public class HttpServerMain {
     private static volatile boolean apiKeyClearedByUser = false;
     private static volatile boolean heartbeatMonitorRunning = false;
 
-    // @anchor: httpServerMain_mobileLock
-    /**
-     * 手机独占锁：一旦手机发起请求即置位，服务重启才清除
-     */
-    private static volatile boolean mobileLocked = false;
+    // @anchor: httpServerMain_activeController
+    /** 当前控制端：MOBILE / DESKTOP / null（首次访问者自动获取） */
+    private static volatile String activeController = null;
 
-    public static void lockForMobile() {
-        mobileLocked = true;
-    }
-
-    public static boolean isMobileLocked() {
-        return mobileLocked;
-    }
-
+    public static String getActiveController() { return activeController; }
+    public static void setActiveController(String c) { activeController = c; }
     // @anchor: httpServerMain_reg
 
     /**
@@ -233,7 +225,7 @@ public class HttpServerMain {
         // ── 心跳 / 状态（放行） ──
         reg(server, "/heartbeat", new HeartbeatHandler(), false);
         reg(server, "/status", new StatusHandler(), false);
-        reg(server, "/lock-status", new LockStatusHandler(), false);   // 新增
+        reg(server, "/control",     new ControlHandler(), false);
 
         // ── 项目操作 ──
         reg(server, "/runProject", new RunProjectHandler(), true);
@@ -244,7 +236,6 @@ public class HttpServerMain {
         reg(server, "/shutdown",      new ShutdownHandler(), true);
         reg(server, "/clear-api-key", new ClearApiKeyHandler(), true);
         reg(server, "/config", new ConfigHandler(), true);
-        reg(server, "/switch-to-local", new SwitchToLocalHandler(), false);
 
         // ── 项目/文件管理（保护） ──
         reg(server, "/projects", new ProjectsHandler(), false);

@@ -17,7 +17,6 @@ const sessionTitleEl = document.getElementById('sessionTitle');
 const projectTag = document.getElementById('projectTag');
 const usageBar = document.getElementById('usageBar');
 const maxIterEl = document.getElementById('maxIterations');
-const switchLocalBtn = document.getElementById('switchLocalBtn');
 
 const menuBtn = document.getElementById('menuBtn');
 const closeDrawerBtn = document.getElementById('closeDrawerBtn');

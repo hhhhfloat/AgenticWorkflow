@@ -5,7 +5,10 @@ runBtn.addEventListener('click', () => {
     if (isRunning) stopAgent();
     else runAgent();
 });
-switchLocalBtn.addEventListener('click', switchToLocal);
+const switchControllerBtn = document.getElementById('switchControllerBtn');
+if (switchControllerBtn) {
+    switchControllerBtn.addEventListener('click', switchController);
+}
 menuBtn.addEventListener('click', openDrawer);
 closeDrawerBtn.addEventListener('click', closeDrawer);
 newSessionBtn.addEventListener('click', openCreateModal);
@@ -34,6 +37,7 @@ async function initMobileApp() {
         outputEl.innerHTML = '<div class="hint">等待输入…</div>';
     }
     await loadSessionList();
+    await refreshController();
     startHeartbeat();
 }
 

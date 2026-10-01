@@ -115,6 +115,7 @@ async function heartbeat() {
             disconnectedLogged = false;
         }
         if (data.refresh) appendLog('[系统] 检测到沙箱目录变化');
+        if (typeof refreshController === 'function') refreshController();
     } catch (e) {
         heartbeatFailCount++;
         if (heartbeatFailCount >= 3 && !disconnectedLogged) {
@@ -131,15 +132,7 @@ function startHeartbeat() {
     });
 }
 
-// ===== 切回本地 =====
-async function switchToLocal() {
-    if (!confirm('服务将重启并切回本地模式。\n重启后请在电脑端打开 http://127.0.0.1:8080')) return;
-    try { await fetch('/switch-to-local', { method: 'POST' }); } catch (e) {}
-    document.body.innerHTML =
-    '<div style="padding:40px;text-align:center;color:#8b949e">' +
-    '<h2 style="color:#e6edf3">🔄 服务正在重启</h2>' +
-    '<p>即将切回本地模式</p></div>';
-}
+
 
 // 退出主服务（不关 launcher）
 async function shutdownMainService() {

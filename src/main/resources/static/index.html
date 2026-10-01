@@ -10,7 +10,8 @@
 </head>
 <body>
 <div id="mobileLockBanner" style="display:none;">
-    📱 手机正在使用中，本设备操作已暂停（本机模式重启服务可释放）
+    <span id="lockBannerText">另一端正在控制中</span>
+    <button id="lockBannerSwitchBtn">夺回控制权</button>
 </div>
 <div id="app">
     <!-- ===== 侧边栏 ===== -->
@@ -55,7 +56,10 @@
     <!-- @anchor: html_main -->
     <!-- 主工作区：标题、日志输出、用量面板与输入区 -->
     <div id="main">
-        <h2>Agentic 工作台</h2>
+        <div id="mainHeader">
+            <h2>Agentic 工作台</h2>
+            <button id="switchControllerBtn" class="switch-controller-btn">⇄ 切到手机端</button>
+        </div>
 
         <!-- 日志区（顶部，占据剩余空间） -->
         <div id="output">等待输入...</div>
@@ -216,6 +220,8 @@
 <script src="modules/sse.js"></script>
 <!-- 配置管理 -->
 <script src="modules/settings.js"></script>  <!-- ✅ 新增 -->
+<!-- 控制权切换 -->
+<script src="modules/control.js"></script>
 <!-- 侧边栏切换 -->
 <script src="modules/sidebar.js"></script>
 <!-- 运行模块 -->

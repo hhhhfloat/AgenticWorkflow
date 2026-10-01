@@ -27,15 +27,27 @@ public class GuardedHandler implements HttpHandler {
     public void handle(HttpExchange exchange) throws IOException {
         boolean isMobile = isMobile(exchange);
 
-        // 任何手机请求 → 抢占锁
-        if (isMobile && !HttpServerMain.isMobileLocked()) {
-            HttpServerMain.lockForMobile();
-            System.out.println("📱 手机已接管控制权（重启服务可释放）");
+        String caller = isMobile ? "MOBILE" : "DESKTOP";
+        String path = exchange.getRequestURI().getPath();
+
+        // /control/* 永久放行，任何一端都能查询和切换控制权
+        if (path.startsWith("/control/")) {
+            delegate.handle(exchange);
+            return;
         }
 
-        // 锁定时，桌面端受保护请求被拒
-        if (protect && !isMobile && HttpServerMain.isMobileLocked()) {
-            byte[] body = "{\"status\":\"error\",\"code\":\"mobile-locked\",\"message\":\"手机正在使用中，本设备操作已暂停\"}"
+        // 首次访问者自动成为控制端
+        String controller = HttpServerMain.getActiveController();
+        if (controller == null) {
+            HttpServerMain.setActiveController(caller);
+            controller = caller;
+        }
+
+        // 非控制端访问受保护路由 → 403
+        if (protect && !caller.equals(controller)) {
+            byte[] body = ("{\"status\":\"error\",\"code\":\"device-locked\","
+                    + "\"controller\":\"" + controller + "\","
+                    + "\"message\":\"另一端正在控制中\"}")
                     .getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
             exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");

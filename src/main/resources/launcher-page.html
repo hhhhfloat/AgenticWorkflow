@@ -37,6 +37,29 @@
             white-space: pre-wrap; word-break: break-all;
             min-height: 40px;
         }
+        .open-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            max-width: 320px;
+        }
+        .open-link {
+            flex: 1;
+            text-align: center;
+            padding: 12px;
+            background: #1f6feb;
+            color: #fff;
+            text-decoration: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .open-link.disabled {
+            background: #21262d;
+            color: #6e7681;
+            pointer-events: none;
+            opacity: .6;
+        }
     </style>
 </head>
 <body>
@@ -46,6 +69,12 @@
     <button id="startBtn">▶ 启动主服务</button>
     <button id="stopBtn">⏹ 停止主服务</button>
 </div>
+
+<div class="open-row">
+    <a id="openDesktop" class="open-link" href="#">💻 打开电脑端</a>
+    <a id="openMobile" class="open-link" href="#">📱 打开手机端</a>
+</div>
+
 <pre id="out"></pre>
 <script>
     async function refresh() {
@@ -56,6 +85,12 @@
             s.running ? (s.ready ? '● 主服务运行中' : '◐ 主服务启动中…') : '○ 主服务未运行';
             document.getElementById('startBtn').disabled = s.running;
             document.getElementById('stopBtn').disabled = !s.running;
+            const host = location.hostname + ':8080';
+            const disabled = !s.ready;
+            ['openDesktop', 'openMobile'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.toggle('disabled', disabled);
+            });
         } catch (e) {
             document.getElementById('status').textContent = '无法连接 launcher';
         }
@@ -69,6 +104,8 @@
         } catch (e) {
             document.getElementById('out').textContent = '请求失败: ' + e.message;
         }
+        document.getElementById('openDesktop').href = 'http://' + location.hostname + ':8080/';
+        document.getElementById('openMobile').href  = 'http://' + location.hostname + ':8080/mobile/';
         refresh();
     }
     document.getElementById('startBtn').onclick = () => act('start');

@@ -866,19 +866,7 @@ html, body {
     white-space: nowrap;
 }
 
-#mobileLockBanner {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 9999;
-    background: #b8860b;
-    color: #fff;
-    padding: 10px 16px;
-    text-align: center;
-    font-size: 13px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
+
 
 .folder-icon-btn {
     cursor: pointer;
@@ -968,4 +956,45 @@ html, body {
     color: #fff;
     border-style: solid;
     border-color: #4a8aff;
+}
+
+/* 主区标题行 */
+#mainHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.switch-controller-btn {
+    padding: 6px 14px;
+    background: transparent;
+    color: #8b949e;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.switch-controller-btn:hover { background: #161b22; color: #c9d1d9; }
+
+/* 桌面端锁提示条 */
+#mobileLockBanner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: #f8514922;
+    color: #f85149;
+    border-bottom: 1px solid #f8514955;
+    font-size: 14px;
+}
+#mobileLockBanner button {
+    padding: 4px 12px;
+    background: #da3633;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
 }
