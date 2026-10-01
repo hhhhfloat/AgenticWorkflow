@@ -275,8 +275,10 @@ public class LauncherMain {
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(2))
                     .build();
+            // 主服务绑 Tailscale IP，探测地址必须跟随 launcher 的绑定地址
+            String host = (launcherBindAddress != null && !launcherBindAddress.isBlank()) ? launcherBindAddress : "127.0.0.1";
             HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create("http://127.0.0.1:" + MAIN_PORT + "/status"))
+                    .uri(URI.create("http://" + host + ":" + MAIN_PORT + "/status"))
                     .timeout(Duration.ofSeconds(2))
                     .GET()
                     .build();

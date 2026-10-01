@@ -52,6 +52,10 @@ echo  主服务: %AGENT_BIND%:8080
 echo ========================================
 echo.
 
+REM 延迟 2 秒后自动打开 launcher 按钮页（后台异步，不阻塞下面的 java）
+start "" cmd /c "timeout /t 2 /nobreak >nul && start http://%AGENT_BIND%:8081/"
+
+
 java --add-modules jdk.compiler ^
      --add-exports jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED ^
      --add-exports jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED ^

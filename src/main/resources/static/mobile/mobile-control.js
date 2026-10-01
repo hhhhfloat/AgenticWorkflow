@@ -1,5 +1,3 @@
-// 手机端控制权：查询当前控制端、切换到本端
-
 async function refreshController() {
     try {
         const res = await fetch(BASE_URL + '/control/status');
@@ -7,14 +5,21 @@ async function refreshController() {
         const btn = document.getElementById('switchControllerBtn');
         if (!btn) return;
 
-        const isMe = data.controller === 'MOBILE';
-        // 当前是手机端占用 → 按钮提示"切到电脑端"
-        // 当前是电脑端占用 → 按钮提示"切到手机端"
-        btn.textContent = isMe ? '⇄ 切到电脑端' : '⇄ 切到手机端';
-        btn.dataset.target = isMe ? 'DESKTOP' : 'MOBILE';
-    } catch (e) {
-        // 忽略，下轮重试
-    }
+        const controller = data.controller;
+        const isMe = controller === 'MOBILE';
+
+        if (isMe) {
+            btn.textContent = '📱';
+            btn.disabled = true;
+            btn.title = '手机端控制中';
+            btn.classList.add('active');
+        } else {
+            btn.textContent = '⇄';
+            btn.disabled = false;
+            btn.title = '点击接管到手机端';
+            btn.classList.remove('active');
+        }
+    } catch (e) { /* 静默 */ }
 }
 
 async function switchController() {
@@ -23,11 +28,9 @@ async function switchController() {
         const data = await res.json();
         await refreshController();
         if (data.controller === 'MOBILE') {
-            appendLog('[系统] 📱 已切到手机端，本端恢复操作');
-        } else {
-            appendLog('[系统] 💻 已切到电脑端，本端操作已暂停');
+            appendLog('[系统] 📱 已拉取控制权到手机端');
         }
     } catch (e) {
-        appendLog('[系统] ❌ 切换失败: ' + e.message);
+        appendLog('[系统] ❌ 拉取失败: ' + e.message);
     }
 }

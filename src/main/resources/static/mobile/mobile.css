@@ -540,3 +540,9 @@ body {
     cursor: pointer;
 }
 .shutdown-btn:active { background: #f8514922; }
+
+#switchControllerBtn:disabled,
+#switchControllerBtn.active {
+    color: #6e7681;
+    opacity: .55;
+}

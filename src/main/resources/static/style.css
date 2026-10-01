@@ -998,3 +998,9 @@ html, body {
     font-size: 13px;
     cursor: pointer;
 }
+.switch-controller-btn.active,
+.switch-controller-btn:disabled {
+    color: #6e7681;
+    border-color: #21262d;
+    cursor: default;
+}
