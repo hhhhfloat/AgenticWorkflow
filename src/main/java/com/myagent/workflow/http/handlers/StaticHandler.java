@@ -18,7 +18,7 @@ public class StaticHandler implements HttpHandler {
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         String path = exchange.getRequestURI().getPath();
-        if ("/".equals(path)) path = "/index.html";
+        if ("/".equals(path) || path.endsWith("/")) path += "index.html";
 
         InputStream is = HttpServerMain.class.getResourceAsStream("/static" + path);
         if (is == null) {

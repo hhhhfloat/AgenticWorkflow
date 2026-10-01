@@ -11,10 +11,11 @@ import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
-import java.net.InetSocketAddress;
+import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Enumeration;
 import java.util.concurrent.Executors;
 
 // @anchor: httpServerMain_class
@@ -45,13 +46,21 @@ public class HttpServerMain {
     private static volatile boolean heartbeatMonitorRunning = false;
 
     // @anchor: httpServerMain_mobileLock
-    /** 手机独占锁：一旦手机发起请求即置位，服务重启才清除 */
+    /**
+     * 手机独占锁：一旦手机发起请求即置位，服务重启才清除
+     */
     private static volatile boolean mobileLocked = false;
 
-    public static void lockForMobile() { mobileLocked = true; }
-    public static boolean isMobileLocked() { return mobileLocked; }
+    public static void lockForMobile() {
+        mobileLocked = true;
+    }
+
+    public static boolean isMobileLocked() {
+        return mobileLocked;
+    }
 
     // @anchor: httpServerMain_reg
+
     /**
      * 注册路由并包装设备保护。
      * protect=true：手机锁定期间，来自桌面端的请求返回 403。
@@ -60,9 +69,13 @@ public class HttpServerMain {
         server.createContext(path, new GuardedHandler(handler, protect));
     }
 
-    /** 默认绑定：仅本机可访问 */
+    /**
+     * 默认绑定：仅本机可访问
+     */
     public static final String DEFAULT_BIND = "127.0.0.1";
-    /** 环境变量 key：设置后覆盖默认绑定地址（例如 Tailscale IP） */
+    /**
+     * 环境变量 key：设置后覆盖默认绑定地址（例如 Tailscale IP）
+     */
     public static final String BIND_ENV_KEY = "AGENT_BIND";
 
     public static SessionManager getSessionManager() {
@@ -82,6 +95,7 @@ public class HttpServerMain {
     }
 
     // @anchor: httpServerMain_resolveBindAddress
+
     /**
      * 解析 HTTP 服务绑定地址：
      * - 环境变量 AGENT_BIND 优先（如 Tailscale 的 100.x.x.x）
@@ -89,8 +103,45 @@ public class HttpServerMain {
      */
     private static String resolveBindAddress() {
         String v = System.getenv(BIND_ENV_KEY);
-        if (v == null || v.isBlank()) return DEFAULT_BIND;
-        return v.trim();
+        if (v != null && !v.isBlank()) return v.trim();
+
+        String ts = detectTailscaleIp();
+        if (ts != null) {
+            System.out.println("📱 自动检测到 Tailscale IP: " + ts);
+            return ts;
+        }
+
+        System.out.println("⚠️ 未检测到 Tailscale IP，回退到 127.0.0.1（仅本机可访问）");
+        return "127.0.0.1";
+    }
+
+    // @anchor: launcherMain_detectTailscaleIp
+    // 遍历网卡，找 100.64.0.0/10 段（Tailscale CGNAT）的 IPv4 地址
+    private static String detectTailscaleIp() {
+        try {
+            Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
+            while (ifaces.hasMoreElements()) {
+                NetworkInterface ni = ifaces.nextElement();
+                if (!ni.isUp() || ni.isLoopback()) continue;
+                for (InterfaceAddress ia : ni.getInterfaceAddresses()) {
+                    InetAddress ip = ia.getAddress();
+                    if (ip instanceof Inet4Address && isTailscaleCgnat(ip)) {
+                        return ip.getHostAddress();
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
+    }
+
+    // @anchor: launcherMain_isTailscaleCgnat
+    // 判断是否落在 100.64.0.0/10 网段
+    private static boolean isTailscaleCgnat(InetAddress ip) {
+        byte[] b = ip.getAddress();
+        int first = b[0] & 0xFF;
+        int second = b[1] & 0xFF;
+        return first == 100 && second >= 64 && second <= 127;
     }
 
     // ==================== 入口 ====================
@@ -139,7 +190,20 @@ public class HttpServerMain {
             openBrowser(bindAddr);
             System.out.println("🚀 Agent 服务已启动（按 Enter 停止...）");
             startHeartbeatMonitor();
-            System.in.read();
+
+            boolean daemonMode = args.length > 0 && java.util.Arrays.asList(args).contains("--daemon");
+            if (daemonMode) {
+                // 父进程（launcher）退出或被强杀时，OS 关闭 stdin pipe，
+                // read() 返回 -1，主服务随之退出，避免孤儿进程
+                try {
+                    while (System.in.read() != -1) { /* 忽略输入 */ }
+                } catch (java.io.IOException ignored) {
+                }
+                System.out.println("父进程已断开，主服务退出");
+            } else {
+                System.in.read();
+            }
+
             server.stop(0);
             System.out.println("服务已停止。");
         } catch (Exception e) {
@@ -155,43 +219,45 @@ public class HttpServerMain {
     private static void registerRoutes(HttpServer server) {
         // ── 会话管理（写：保护） ──
         reg(server, "/session/create", new SessionCreateHandler(), true);
-        reg(server, "/session/close",  new SessionCloseHandler(), true);
+        reg(server, "/session/close", new SessionCloseHandler(), true);
         reg(server, "/session/rename", new SessionRenameHandler(), true);
         // ── 会话管理（读：放行） ──
-        reg(server, "/session/list",    new SessionListHandler(), false);
+        reg(server, "/session/list", new SessionListHandler(), false);
         reg(server, "/session/history", new SessionHistoryHandler(), false);
-        reg(server, "/session/usage",   new SessionUsageHandler(), false);
+        reg(server, "/session/usage", new SessionUsageHandler(), false);
 
         // ── 任务执行 ──
-        reg(server, "/run",  new RunHandler(), true);
+        reg(server, "/run", new RunHandler(), true);
         reg(server, "/stop", new StopHandler(), true);
 
         // ── 心跳 / 状态（放行） ──
         reg(server, "/heartbeat", new HeartbeatHandler(), false);
-        reg(server, "/status",    new StatusHandler(), false);
+        reg(server, "/status", new StatusHandler(), false);
         reg(server, "/lock-status", new LockStatusHandler(), false);   // 新增
 
         // ── 项目操作 ──
-        reg(server, "/runProject",   new RunProjectHandler(), true);
+        reg(server, "/runProject", new RunProjectHandler(), true);
         reg(server, "/project-meta", new ProjectMetaHandler(), false);
 
         // ── 系统操作（保护） ──
-        reg(server, "/restart",       new RestartHandler(), true);
+        reg(server, "/restart", new RestartHandler(), true);
+        reg(server, "/shutdown",      new ShutdownHandler(), true);
         reg(server, "/clear-api-key", new ClearApiKeyHandler(), true);
-        reg(server, "/config",        new ConfigHandler(), true);
+        reg(server, "/config", new ConfigHandler(), true);
         reg(server, "/switch-to-local", new SwitchToLocalHandler(), false);
 
         // ── 项目/文件管理（保护） ──
-        reg(server, "/projects",      new ProjectsHandler(), false);
-        reg(server, "/browse",        new BrowseHandler(), false);
-        reg(server, "/archive",       new ArchiveHandler(), true);
-        reg(server, "/upload",        new UploadHandler(), true);
+        reg(server, "/projects", new ProjectsHandler(), false);
+        reg(server, "/browse", new BrowseHandler(), false);
+        reg(server, "/archive", new ArchiveHandler(), true);
+        reg(server, "/upload", new UploadHandler(), true);
         reg(server, "/createProject", new CreateProjectHandler(), true);
-        reg(server, "/openFolder",    new OpenFolderHandler(), true);
-        reg(server, "/scan-files",    new ScanFilesHandler(), false);
-        reg(server, "/tool",          new ToolHandler(), true);
+        reg(server, "/openFolder", new OpenFolderHandler(), true);
+        reg(server, "/scan-files", new ScanFilesHandler(), false);
+        reg(server, "/tool", new ToolHandler(), true);
 
         // ── 静态资源（放行） ──
+        reg(server, "/mobile", new StaticHandler(), false);
         reg(server, "/", new StaticHandler(), false);
         reg(server, "/TestProjects",
                 new ExternalFileHandler(Paths.get("./TestProjects"), "/TestProjects"), false);

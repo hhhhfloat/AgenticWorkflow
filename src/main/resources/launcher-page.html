@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agentic Launcher</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+            background: #0d1117; color: #e6edf3;
+            min-height: 100dvh;
+            display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 24px; gap: 16px;
+        }
+        h2 { font-size: 20px; font-weight: 600; }
+        .status { color: #8b949e; font-size: 13px; text-align: center; min-height: 20px; }
+        .btns { display: flex; flex-direction: column; gap: 12px; width: 100%; max-width: 320px; }
+        button {
+            padding: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            color: #fff;
+        }
+        #startBtn { background: #238636; }
+        #stopBtn  { background: #da3633; }
+        button:disabled { background: #21262d; color: #6e7681; }
+        pre {
+            width: 100%; max-width: 320px;
+            background: #161b22; border: 1px solid #30363d;
+            border-radius: 8px; padding: 10px;
+            color: #8b949e; font-size: 12px;
+            white-space: pre-wrap; word-break: break-all;
+            min-height: 40px;
+        }
+    </style>
+</head>
+<body>
+<h2>Agentic Launcher</h2>
+<div class="status" id="status">加载中…</div>
+<div class="btns">
+    <button id="startBtn">▶ 启动主服务</button>
+    <button id="stopBtn">⏹ 停止主服务</button>
+</div>
+<pre id="out"></pre>
+<script>
+    async function refresh() {
+        try {
+            const r = await fetch('/status');
+            const s = await r.json();
+            document.getElementById('status').textContent =
+            s.running ? (s.ready ? '● 主服务运行中' : '◐ 主服务启动中…') : '○ 主服务未运行';
+            document.getElementById('startBtn').disabled = s.running;
+            document.getElementById('stopBtn').disabled = !s.running;
+        } catch (e) {
+            document.getElementById('status').textContent = '无法连接 launcher';
+        }
+    }
+    async function act(cmd) {
+        document.getElementById('out').textContent = '正在执行 ' + cmd + ' …';
+        try {
+            const r = await fetch('/' + cmd, { method: 'POST' });
+            const t = await r.text();
+            document.getElementById('out').textContent = t;
+        } catch (e) {
+            document.getElementById('out').textContent = '请求失败: ' + e.message;
+        }
+        refresh();
+    }
+    document.getElementById('startBtn').onclick = () => act('start');
+    document.getElementById('stopBtn').onclick  = () => act('stop');
+    refresh();
+    setInterval(refresh, 3000);
+</script>
+</body>
+</html>

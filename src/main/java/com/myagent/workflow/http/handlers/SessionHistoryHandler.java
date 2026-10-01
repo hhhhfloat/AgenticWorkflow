@@ -85,6 +85,7 @@ public class SessionHistoryHandler implements HttpHandler {
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("sessionId", session.getSessionId());
         response.put("title", session.getMeta().title());
+        response.put("workProject", session.getMeta().workProject());
         response.put("state", session.getState().name());
         response.put("messageCount", session.getMeta().messageCount());
         response.put("messages", messages);

@@ -55,6 +55,7 @@ public class SessionListHandler implements HttpHandler {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("sessionId", meta.sessionId());
             item.put("title", meta.title());
+            item.put("workProject", meta.workProject());
             item.put("createdAt", meta.createdAt());
             item.put("lastActiveAt", meta.lastActiveAt());
             item.put("messageCount", meta.messageCount());
