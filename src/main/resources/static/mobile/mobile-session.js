@@ -50,6 +50,7 @@ async function loadSessionHistory(sessionId) {
         setProject(data.workProject);
         renderHistoryMessages(data.messages || []);
         loadSessionUsage(sessionId);
+        await renderRunLogs(sessionId);
     } catch (e) {
         appendMessage('error', '加载历史失败: ' + e.message);
     }
@@ -136,6 +137,7 @@ function formatRelativeTime(t) {
 
 async function switchToSession(sessionId) {
     if (sessionId === currentSessionId) { closeDrawer(); return; }
+    if (typeof abortRun === 'function') abortRun();
     if (typeof closeStream === 'function') closeStream();
     currentSessionId = sessionId;
     setStoredSessionId(sessionId);

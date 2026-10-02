@@ -48,9 +48,8 @@ async function switchToWorkSession() {
         output.scrollTop = 0;
         return;
     }
+    if (typeof abortRun === 'function') abortRun();
     if (typeof closeStream === 'function') closeStream();
-    currentRunLog = [];
-    runDetailShown = false;
     setCurrentSessionId(sid);
     await loadSessionHistory(sid);
     highlightCurrentSession();
@@ -65,13 +64,16 @@ async function pollStatus() {
     if (!data) return;
 
     const wasRunning = globalStatus.running;
+    const prevSessionId = globalStatus.sessionId;
     globalStatus = data;
 
     applyStatusToUI(data);
 
     if (wasRunning && !data.running) {
-        // 任务结束：折叠本轮日志 + 刷新会话列表
-        if (typeof finishRun === 'function') finishRun(true);
+        // 任务结束：刷新 UI（仅在查看该会话时重载视图）
+        if (typeof onTaskFinished === 'function') {
+            await onTaskFinished(prevSessionId);
+        }
     }
 }
 
@@ -92,6 +94,7 @@ async function checkBackendStatus() {
     if (data.running && data.sessionId) {
         appendLog('[系统] 🟢 检测到正在运行的任务，正在重连…');
         if (data.sessionId !== getCurrentSessionId()) {
+            if (typeof abortRun === 'function') abortRun();
             setCurrentSessionId(data.sessionId);
             await loadSessionHistory(data.sessionId);
             highlightCurrentSession();

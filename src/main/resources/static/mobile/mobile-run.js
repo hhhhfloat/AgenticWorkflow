@@ -1,5 +1,6 @@
-// 手机端运行：SSE 流、停止、心跳、usage、切回本地
+// 手机端运行：SSE 流、停止、心跳、usage、日志拉取
 
+// ===== SSE 事件处理 =====
 function handleEvent(data) {
     if (data === '[结束]') return;
 
@@ -20,6 +21,9 @@ function handleEvent(data) {
     appendLog(data);
 }
 
+// ===== 运行入口 =====
+let mobileRunAbort = null;
+
 async function runAgent() {
     const prompt = promptEl.value.trim();
     if (!prompt || isRunning) return;
@@ -32,15 +36,19 @@ async function runAgent() {
 
     const maxIterations = Number(maxIterEl.value) || 100;
 
+    mobileRunAbort = new AbortController();
     let res;
     try {
         res = await fetch(BASE_URL + '/run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, sessionId: currentSessionId, maxIterations })
+            body: JSON.stringify({ prompt, sessionId: currentSessionId, maxIterations }),
+            signal: mobileRunAbort.signal
         });
     } catch (e) {
+        if (e.name === 'AbortError') { mobileRunAbort = null; return; }
         appendMessage('error', '[连接错误] ' + e.message);
+        mobileRunAbort = null;
         if (typeof pollStatus === 'function') pollStatus();
         return;
     }
@@ -48,6 +56,7 @@ async function runAgent() {
     if (!res.ok) {
         const text = await res.text();
         appendMessage('error', `HTTP ${res.status}: ${text}`);
+        mobileRunAbort = null;
         if (typeof pollStatus === 'function') pollStatus();
         return;
     }
@@ -70,14 +79,68 @@ async function runAgent() {
             }
         }
     } catch (e) {
-        appendMessage('error', '[流中断] ' + e.message);
+        if (e.name !== 'AbortError') {
+            appendMessage('error', '[流中断] ' + e.message);
+        }
     } finally {
-        // 不直接复位按钮，交给 pollStatus 判定任务是否真的结束
+        mobileRunAbort = null;
         if (currentSessionId) await loadSessionList();
         if (typeof pollStatus === 'function') pollStatus();
     }
 }
 
+// @anchor: mobile_abortRun
+// 主动断开 /run 的 SSE（不停止后端任务）；切会话时避免日志串台
+function abortRun() {
+    if (mobileRunAbort) {
+        mobileRunAbort.abort();
+        mobileRunAbort = null;
+    }
+}
+
+// @anchor: mobile_renderRunLogs
+// 从 /session/logs 拉取会话最近一轮日志，追加为折叠块
+async function renderRunLogs(sessionId) {
+    if (!sessionId) return;
+    try {
+        const res = await fetch(BASE_URL + '/session/logs?sessionId=' +
+        encodeURIComponent(sessionId) + '&tail=500');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.lines || data.lines.length === 0) return;
+
+        const details = document.createElement('details');
+        details.className = 'run-detail';
+
+        const summary = document.createElement('summary');
+        const total = data.total || 0;
+        const shown = data.lines.length;
+        summary.textContent = total > shown
+            ? `▸ 最近一轮运行详情（已截断，共 ${total} 行，显示最后 ${shown} 行）`
+            : `▸ 最近一轮运行详情（共 ${shown} 行）`;
+        details.appendChild(summary);
+
+        const pre = document.createElement('pre');
+        pre.textContent = data.lines.join('\n');
+        details.appendChild(pre);
+
+        outputEl.appendChild(details);
+        outputEl.scrollTop = outputEl.scrollHeight;
+    } catch (e) {
+        // 静默
+    }
+}
+
+// @anchor: mobile_onTaskFinished
+// 由 pollStatus 调用：任务结束时刷新 UI
+async function onTaskFinished(finishedSessionId) {
+    await loadSessionList();
+    if (finishedSessionId && finishedSessionId === currentSessionId) {
+        await loadSessionHistory(finishedSessionId);
+    }
+}
+
+// ===== 停止 =====
 async function stopAgent() {
     const sid = (globalStatus && globalStatus.sessionId) || currentSessionId;
     if (!sid) return;
@@ -91,7 +154,7 @@ async function stopAgent() {
         });
         const data = await res.json();
         appendLog('[系统] ' + (data.message || data.status));
-        // 不主动复位按钮，交给 pollStatus 判定任务是否真结束
+        // 不主动复位，交给 pollStatus
     } catch (e) {
         appendMessage('error', '[停止失败] ' + e.message);
         runBtn.disabled = false;
@@ -133,9 +196,7 @@ function startHeartbeat() {
     });
 }
 
-
-
-// 退出主服务（不关 launcher）
+// ===== 退出主服务 =====
 async function shutdownMainService() {
     if (isRunning) {
         alert('任务正在运行，请先停止再退出');
@@ -153,7 +214,6 @@ async function shutdownMainService() {
 }
 
 // ===== 只读日志流 =====
-
 let streamAbort = null;
 
 async function openStream(sessionId) {

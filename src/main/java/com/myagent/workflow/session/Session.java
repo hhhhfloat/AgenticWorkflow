@@ -25,7 +25,7 @@ import java.util.function.Consumer;
  * 1. 持有会话的上下文管理器（ContextManager）
  * 2. 记录会话的元数据和状态
  * 3. 管理当前运行的任务（Main 实例 + 线程）
- * 4. 处理日志转发（供 HTTP 层的 SSE 使用）
+ * 4. 将日志多播给所有订阅者（/run 与 /stream）
  * <p>
  * 注意：
  * - ContextManager 采用"延迟注入"模式：Session 构造时不创建它，
@@ -54,9 +54,6 @@ public class Session {
 
     // 支持多个消费者（运行端 + 拉取端同时订阅）
     private final List<Consumer<String>> logConsumers = new CopyOnWriteArrayList<>();
-    // 环形缓冲：最近 N 条日志，供 /stream 新订阅者补发历史
-    private final ArrayDeque<String> recentLogs = new ArrayDeque<>();
-    private static final int RECENT_LOG_LIMIT = 2000;
 
     // ===== 当前运行的任务（临时，任务结束后清空） =====
     private volatile Object runningAgent;             // 用 Object 避免循环依赖 core.Main
@@ -182,10 +179,6 @@ public class Session {
      * 标记任务开始运行。
      */
     public synchronized void markRunning(Object agent) {
-        // 任务开始时清空上次任务的日志缓冲，让缓冲只代表当前任务
-        synchronized (recentLogs) {
-            recentLogs.clear();
-        }
         this.runningAgent = agent;
         this.runningThread = Thread.currentThread();
         this.runningStartedAt = System.currentTimeMillis();
@@ -256,15 +249,6 @@ public class Session {
         }
     }
 
-    // @anchor: session_subscribeAndReplay
-    // 原子地"加入消费者 + 返回快照"，避免补发与订阅之间丢日志
-    public List<String> subscribeAndReplay(Consumer<String> consumer) {
-        synchronized (recentLogs) {
-            logConsumers.add(consumer);
-            return new ArrayList<>(recentLogs);
-        }
-    }
-
     // ==================== 心跳 ====================
 
     // @anchor: session_heartbeat
@@ -295,27 +279,12 @@ public class Session {
         logConsumers.remove(consumer);
     }
 
-    // @anchor: session_getRecentLogs
-    // 返回最近日志的快照，供 /stream 补发历史
-    public List<String> getRecentLogs() {
-        synchronized (recentLogs) {
-            return new ArrayList<>(recentLogs);
-        }
-    }
-
     // @anchor: session_log
     // 内部日志入口：有消费者则转发给 SSE，否则回退到本地日志
     /**
      * 内部日志入口，供 ContextManager 和 Main 调用。
      */
     public void log(String message) {
-        // 追加到环形缓冲
-        synchronized (recentLogs) {
-            recentLogs.addLast(message);
-            if (recentLogs.size() > RECENT_LOG_LIMIT) {
-                recentLogs.removeFirst();
-            }
-        }
         // 服务端日志始终记录，便于排障
         logger.info(message);
         // 分发给所有消费者

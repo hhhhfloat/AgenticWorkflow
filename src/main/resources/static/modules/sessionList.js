@@ -176,9 +176,8 @@ function formatRelativeTime(timeStr) {
 async function switchToSession(sessionId, workProject) {
     if (sessionId === getCurrentSessionId()) return;
 
+    if (typeof abortRun === 'function') abortRun();
     if (typeof closeStream === 'function') closeStream();
-    currentRunLog = [];
-    if (typeof runDetailShown !== 'undefined') runDetailShown = false;
     setCurrentSessionId(sessionId);
     await loadSessionHistory(sessionId);
     highlightCurrentSession();
@@ -218,6 +217,7 @@ async function loadSessionHistory(sessionId) {
         }
         const data = await res.json();
         renderHistoryMessages(data.messages || []);
+        await renderRunLogs(sessionId);
     } catch (err) {
         console.error('加载会话历史失败', err);
     }

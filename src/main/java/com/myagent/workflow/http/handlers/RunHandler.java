@@ -154,15 +154,17 @@ public class RunHandler implements HttpHandler {
         final Object outLock = new Object();
 
         final Consumer<String> logConsumer = msg -> {
-            try {
-                synchronized (outLock) {
+            synchronized (outLock) {
+                try {
                     sendEvent(out, msg);
+                } catch (IOException ignored) {
                 }
                 if (finalLogWriter != null) {
-                    finalLogWriter.write(msg);
+                    try {
+                        finalLogWriter.write(msg);
+                    } catch (IOException ignored) {
+                    }
                 }
-            } catch (Exception e) {
-                // SSE 客户端可能已断开，静默
             }
         };
 

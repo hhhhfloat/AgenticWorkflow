@@ -546,3 +546,35 @@ body {
     color: #6e7681;
     opacity: .55;
 }
+.run-detail {
+    margin: 12px 0;
+    background: #161b22;
+    border: 1px solid #21262d;
+    border-radius: 8px;
+    font-size: 13px;
+}
+.run-detail > summary {
+    padding: 10px 14px;
+    color: #8b949e;
+    cursor: pointer;
+    font-size: 13px;
+    list-style: none;
+}
+.run-detail > summary::marker { content: ''; }
+.run-detail > summary::-webkit-details-marker { display: none; }
+.run-detail[open] > summary {
+    border-bottom: 1px solid #21262d;
+    color: #c9d1d9;
+}
+.run-detail > pre {
+    margin: 0;
+    padding: 10px 14px;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #8b949e;
+    max-height: 50vh;
+    overflow-y: auto;
+}

@@ -30,6 +30,7 @@ async function switchToWorkSession() {
         outputEl.scrollTop = 0;
         return;
     }
+    if (typeof abortRun === 'function') abortRun();
     if (typeof closeStream === 'function') closeStream();
     currentSessionId = sid;
     setStoredSessionId(sid);
@@ -44,6 +45,7 @@ async function pollStatus() {
 
     const wasRunning = lastKnownRunning;
     const nowRunning = !!data.running;
+    const prevSessionId = globalStatus.sessionId;
     lastKnownRunning = nowRunning;
     globalStatus = data;
 
@@ -52,9 +54,8 @@ async function pollStatus() {
 
     // 任务刚结束：刷新会话列表 + 重载历史拿最新摘要
     if (wasRunning && !nowRunning) {
-        if (currentSessionId) {
-            await loadSessionList();
-            await loadSessionHistory(currentSessionId);
+        if (typeof onTaskFinished === 'function') {
+            await onTaskFinished(prevSessionId);
         }
     }
 }
@@ -80,6 +81,7 @@ async function initMobileStatus() {
 
     if (data.running && data.sessionId) {
         if (data.sessionId !== currentSessionId) {
+            if (typeof abortRun === 'function') abortRun();
             currentSessionId = data.sessionId;
             setStoredSessionId(data.sessionId);
             await loadSessionHistory(data.sessionId);

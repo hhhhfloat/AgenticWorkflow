@@ -16,14 +16,14 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 // @anchor: streamHandler_class
-// 日志流处理器：补发历史缓冲 + 订阅新日志，任务结束后自动关闭
+// 日志流处理器：订阅会话实时日志，任务结束后自动关闭
 public class StreamHandler implements HttpHandler {
 
     private static final long PING_INTERVAL_MS = 15_000;
     private static final long CHECK_INTERVAL_MS = 2_000;
 
     // @anchor: streamHandler_handle
-    // 处理订阅请求：建立 SSE，补发历史，转发实时日志，任务结束后关闭
+    // 处理订阅请求：建立 SSE，转发实时日志，任务结束后关闭
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -75,12 +75,8 @@ public class StreamHandler implements HttpHandler {
         };
 
         try {
-            // 原子：加入消费者 + 取快照
-            java.util.List<String> replay = session.subscribeAndReplay(consumer);
-            for (String msg : replay) {
-                consumer.accept(msg);
-            }
-
+            // 历史补发由前端通过 /session/logs 拉取，这里只订阅新日志
+            session.addLogConsumer(consumer);
             // 保活 + 结束检测
             // 初始等待：避免"订阅时任务尚未 markRunning"导致的秒退
             if (!session.isRunning()) {
