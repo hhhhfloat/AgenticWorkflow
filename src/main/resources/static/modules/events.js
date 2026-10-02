@@ -26,8 +26,15 @@ function switchSidebarView(view) {
 
 document.getElementById('viewFilesBtn').addEventListener('click', () => switchSidebarView('files'));
 document.getElementById('viewSessionsBtn').addEventListener('click', () => switchSidebarView('sessions'));
-document.getElementById('newSessionBtn').addEventListener('click', createNewSession);
-// ⭐ 新增：页面卸载标志，防止误报断联日志
+document.getElementById('newSessionBtn').addEventListener('click', () => {
+    const btn = document.getElementById('newSessionBtn');
+    if (btn.dataset.mode === 'switch') {
+            switchToWorkSession();
+        } else {
+        createNewSession();
+    }
+});
+// 页面卸载标志，防止误报断联日志
 window._isPageUnloading = false;
 
 // 清空按钮
@@ -56,12 +63,11 @@ runBtn.addEventListener('click', () => {
 stopBtn.addEventListener('click', stopAgent);
 
 
-// ⭐ 关键修改：页面卸载时只标记，不杀 Agent，也不触发断联日志
+// 页面卸载时只标记，不杀 Agent，也不触发断联日志
 window.addEventListener('beforeunload', () => {
     window._isPageUnloading = true;  // 标记正在卸载
     if (isRunning) {
         stopHeartbeat();  // 停止发送心跳
-        // ⭐ 不发送 /stop，让后端自己超时清理
     }
 });
 
@@ -138,4 +144,5 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
     startHeartbeat();
+    startStatusPolling();
 });

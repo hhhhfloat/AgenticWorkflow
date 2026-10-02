@@ -43,7 +43,7 @@ function sendHeartbeat() {
         // 连续失败 3 次（约 9 秒）判定为断联
         if (heartbeatFailCount >= 3 && !isDisconnectedLogged) {
             isDisconnectedLogged = true;
-            appendLog('[系统] 🔴 与服务器断联（心跳连续失败），后端任务将在 120 秒后超时清理');
+            appendLog('[系统] 🔴 与服务器断联（连续心跳失败），任务仍在后台运行');
         }
     });
 }

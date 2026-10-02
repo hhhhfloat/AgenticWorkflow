@@ -136,11 +136,7 @@ function formatRelativeTime(t) {
 
 async function switchToSession(sessionId) {
     if (sessionId === currentSessionId) { closeDrawer(); return; }
-    if (isRunning) {
-        if (!confirm('当前任务正在运行，是否停止并切换？')) return;
-        await stopAgent();
-        await new Promise(r => setTimeout(r, 300));
-    }
+    if (typeof closeStream === 'function') closeStream();
     currentSessionId = sessionId;
     setStoredSessionId(sessionId);
     await loadSessionHistory(sessionId);

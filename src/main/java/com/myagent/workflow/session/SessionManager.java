@@ -102,43 +102,6 @@ public class SessionManager {
         return activeSessions.get(sessionId);
     }
 
-    // ==================== 切换 ====================
-
-    // @anchor: sessionManager_switchTo
-    // 切换会话：存在运行中任务时抛出异常，否则确保目标会话在内存并返回
-    /**
-     * 切换会话。
-     * <p>
-     * 语义：
-     * - 从 fromId 的会话如果没有运行任务，直接离开（不落盘，因为它随时在内存里）
-     * - 要进入的 toId 会话如果不在内存，从磁盘加载
-     * <p>
-     * 返回目标会话。
-     */
-    public Session switchTo(String sessionId, AgentConfig config) throws IOException {
-        // 检查当前是否有任务在跑
-        Session running = findRunningSession();
-        if (running != null && !running.getSessionId().equals(sessionId)) {
-            throw new IOException(
-                    "另一个会话正在运行（" + running.getSessionId() + "），请先停止后再切换。");
-        }
-
-        Session target = get(sessionId, config);
-        if (target == null) {
-            throw new IOException("会话不存在: " + sessionId);
-        }
-        return target;
-    }
-
-    // @anchor: sessionManager_findRunningSession
-    // 查找当前处于运行状态的会话
-    private Session findRunningSession() {
-        for (Session s : activeSessions.values()) {
-            if (s.isRunning()) return s;
-        }
-        return null;
-    }
-
     // ==================== 关闭 ====================
 
     // @anchor: sessionManager_save
@@ -189,6 +152,10 @@ public class SessionManager {
             // 等待任务自然退出（最多 5 秒）
             waitForIdle(session, 5000);
         }
+
+        // 落盘前强制归一化为 IDLE：磁盘状态不应是 RUNNING
+        // 若 waitForIdle 超时，任务线程可能仍在跑，但会话即将从内存移除
+        session.markIdle();
 
         try {
             storage.save(session);
@@ -276,6 +243,8 @@ public class SessionManager {
                 }
                 waitForIdle(session, 5000);
             }
+            // 落盘前强制归一化为 IDLE
+            session.markIdle();
             try {
                 storage.save(session);
             } catch (IOException e) {

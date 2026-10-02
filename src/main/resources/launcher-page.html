@@ -95,6 +95,18 @@
             document.getElementById('status').textContent = '无法连接 launcher';
         }
     }
+
+
+    // 本机模式：hostname 是 127.0.0.1 / localhost 时，手机端入口禁用
+    const isLocalMode = (location.hostname === '127.0.0.1' || location.hostname === 'localhost');
+    if (isLocalMode) {
+        const mobileLink = document.getElementById('openMobile');
+        if (mobileLink) {
+            mobileLink.classList.add('disabled');
+            mobileLink.textContent = '📱 手机端（需 Tailscale）';
+            mobileLink.removeAttribute('href');
+        }
+    }
     async function act(cmd) {
         document.getElementById('out').textContent = '正在执行 ' + cmd + ' …';
         try {

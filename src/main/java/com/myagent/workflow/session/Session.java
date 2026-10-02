@@ -9,7 +9,11 @@ import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 // @anchor: session_class
@@ -47,12 +51,18 @@ public class Session {
     // ===== 运行时状态 =====
     private volatile SessionState state;
     private volatile ContextManager contextManager;   // 延迟注入
-    private volatile Consumer<String> logConsumer;    // 由 SSE 连接建立后设置
+
+    // 支持多个消费者（运行端 + 拉取端同时订阅）
+    private final List<Consumer<String>> logConsumers = new CopyOnWriteArrayList<>();
+    // 环形缓冲：最近 N 条日志，供 /stream 新订阅者补发历史
+    private final ArrayDeque<String> recentLogs = new ArrayDeque<>();
+    private static final int RECENT_LOG_LIMIT = 2000;
 
     // ===== 当前运行的任务（临时，任务结束后清空） =====
     private volatile Object runningAgent;             // 用 Object 避免循环依赖 core.Main
     private volatile Thread runningThread;
     private volatile long lastHeartbeatTime;
+    private volatile long runningStartedAt;           // 任务开始时间（硬超时用）
 
     // ==================== 构造 ====================
 
@@ -172,8 +182,13 @@ public class Session {
      * 标记任务开始运行。
      */
     public synchronized void markRunning(Object agent) {
+        // 任务开始时清空上次任务的日志缓冲，让缓冲只代表当前任务
+        synchronized (recentLogs) {
+            recentLogs.clear();
+        }
         this.runningAgent = agent;
         this.runningThread = Thread.currentThread();
+        this.runningStartedAt = System.currentTimeMillis();
         this.lastHeartbeatTime = System.currentTimeMillis();
         this.state = SessionState.RUNNING;
         this.meta = meta.withState(SessionState.RUNNING);
@@ -185,6 +200,30 @@ public class Session {
      * 标记任务结束（成功或失败）。
      */
     public synchronized void markIdle() {
+        this.runningAgent = null;
+        this.runningThread = null;
+        this.runningStartedAt = 0;
+        this.state = SessionState.IDLE;
+        this.meta = meta.withState(SessionState.IDLE);
+        touch();
+    }
+    // @anchor: session_getRunningStartedAt
+    // 返回当前任务的开始时间戳（毫秒）；未运行时为 0
+    public long getRunningStartedAt() {
+        return runningStartedAt;
+    }
+
+    // @anchor: session_forceIdle
+    // 强制将会话置为 IDLE，不依赖 runningAgent 是否存在；用于清理卡死会话
+    public synchronized void forceIdle() {
+        if (runningAgent != null) {
+            try {
+                runningAgent.getClass().getMethod("stop").invoke(runningAgent);
+            } catch (Exception ignored) {}
+        }
+        if (runningThread != null && runningThread != Thread.currentThread()) {
+            runningThread.interrupt();
+        }
         this.runningAgent = null;
         this.runningThread = null;
         this.state = SessionState.IDLE;
@@ -200,6 +239,10 @@ public class Session {
      */
     public synchronized void stopTask() {
         if (runningAgent == null) {
+            // 僵尸状态：state 是 RUNNING 但 agent 已消失，直接归一化
+            if (state == SessionState.RUNNING) {
+                forceIdle();
+            }
             return;
         }
         // 用反射/接口方式调用 stop，避免直接依赖 core.Main
@@ -210,6 +253,15 @@ public class Session {
         }
         if (runningThread != null && runningThread != Thread.currentThread()) {
             runningThread.interrupt();
+        }
+    }
+
+    // @anchor: session_subscribeAndReplay
+    // 原子地"加入消费者 + 返回快照"，避免补发与订阅之间丢日志
+    public List<String> subscribeAndReplay(Consumer<String> consumer) {
+        synchronized (recentLogs) {
+            logConsumers.add(consumer);
+            return new ArrayList<>(recentLogs);
         }
     }
 
@@ -229,14 +281,25 @@ public class Session {
 
     // ==================== 日志转发 ====================
 
-    // @anchor: session_setLogConsumer
-    // 设置日志消费者（SSE 建立后），并同步注入到上下文管理器
-    public void setLogConsumer(Consumer<String> consumer) {
-        this.logConsumer = consumer;
-        // 同步给 ContextManager（如果已注入）
-        if (contextManager != null) {
-            // 注意：ContextManager 需要提供 setLogConsumer 方法，Step 2 会改造
-            contextManager.setLogConsumer(consumer);
+    // @anchor: session_addLogConsumer
+    // 追加一个日志消费者，供 /stream 与 /run 同时订阅
+    public void addLogConsumer(Consumer<String> consumer) {
+        if (consumer != null && !logConsumers.contains(consumer)) {
+            logConsumers.add(consumer);
+        }
+    }
+
+    // @anchor: session_removeLogConsumer
+    // 移除指定日志消费者，SSE 断开时调用
+    public void removeLogConsumer(Consumer<String> consumer) {
+        logConsumers.remove(consumer);
+    }
+
+    // @anchor: session_getRecentLogs
+    // 返回最近日志的快照，供 /stream 补发历史
+    public List<String> getRecentLogs() {
+        synchronized (recentLogs) {
+            return new ArrayList<>(recentLogs);
         }
     }
 
@@ -246,11 +309,22 @@ public class Session {
      * 内部日志入口，供 ContextManager 和 Main 调用。
      */
     public void log(String message) {
-        Consumer<String> consumer = this.logConsumer;
-        if (consumer != null) {
-            consumer.accept(message);
-        } else {
-            logger.info(message);
+        // 追加到环形缓冲
+        synchronized (recentLogs) {
+            recentLogs.addLast(message);
+            if (recentLogs.size() > RECENT_LOG_LIMIT) {
+                recentLogs.removeFirst();
+            }
+        }
+        // 服务端日志始终记录，便于排障
+        logger.info(message);
+        // 分发给所有消费者
+        for (Consumer<String> c : logConsumers) {
+            try {
+                c.accept(message);
+            } catch (Exception ignored) {
+                // 单个消费者异常不影响其他消费者
+            }
         }
     }
 
@@ -261,6 +335,11 @@ public class Session {
      * 仅在 SessionStorage.load() 中调用。
      */
     public void restoreMeta(SessionMeta meta) {
+        // 磁盘上的 RUNNING 不代表运行时真相：进程已退出，任务不可能还在跑
+        // 归一化为 IDLE，避免恢复后 isRunning() 恒真导致永久 409
+        if (meta.state() == SessionState.RUNNING) {
+            meta = meta.withState(SessionState.IDLE);
+        }
         this.meta = meta;
         this.state = meta.state();
     }
@@ -301,3 +380,4 @@ public class Session {
         return meta.workProject();
     }
 }
+

@@ -176,14 +176,9 @@ function formatRelativeTime(timeStr) {
 async function switchToSession(sessionId, workProject) {
     if (sessionId === getCurrentSessionId()) return;
 
-    if (isRunning) {
-        if (!confirm('当前任务正在运行，是否停止并切换？')) return;
-        stopAgent();
-        await new Promise(r => setTimeout(r, 400));
-    }
-
-    currentRunLog = [];   // ← 新增：切会话清空缓冲
-
+    if (typeof closeStream === 'function') closeStream();
+    currentRunLog = [];
+    if (typeof runDetailShown !== 'undefined') runDetailShown = false;
     setCurrentSessionId(sessionId);
     await loadSessionHistory(sessionId);
     highlightCurrentSession();
@@ -205,11 +200,6 @@ function highlightCurrentSession() {
  * "新对话"按钮 —— 弹出项目选择框，选完后再创建会话。
  */
 async function createNewSession() {
-    if (isRunning) {
-        if (!confirm('当前任务正在运行，是否停止并开启新对话？')) return;
-        stopAgent();
-        await new Promise(r => setTimeout(r, 400));
-    }
     openSessionCreateModal();
 }
 

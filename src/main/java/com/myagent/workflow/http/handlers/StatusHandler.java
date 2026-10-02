@@ -46,6 +46,10 @@ public class StatusHandler implements HttpHandler {
         if (running != null) {
             response.put("sessionId", running.getSessionId());
             response.put("title", running.getMeta().title());
+            long now = System.currentTimeMillis();
+            long noHeartbeat = now - running.getLastHeartbeatTime();
+            response.put("heartbeatStale",
+                    noHeartbeat > HttpServerMain.HEARTBEAT_TIMEOUT_MS);
         }
 
         writeJson(exchange, 200, mapper.writeValueAsString(response));

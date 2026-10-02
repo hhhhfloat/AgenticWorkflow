@@ -11,7 +11,13 @@ if (switchControllerBtn) {
 }
 menuBtn.addEventListener('click', openDrawer);
 closeDrawerBtn.addEventListener('click', closeDrawer);
-newSessionBtn.addEventListener('click', openCreateModal);
+newSessionBtn.addEventListener('click', () => {
+    if (newSessionBtn.dataset.mode === 'switch') {
+            switchToWorkSession();
+        } else {
+        openCreateModal();
+    }
+});
 closeCreateBtn.addEventListener('click', closeCreateModal);
 cancelCreateBtn.addEventListener('click', closeCreateModal);
 confirmCreateBtn.addEventListener('click', createSession);
@@ -30,15 +36,10 @@ promptEl.addEventListener('input', () => {
 // ===== 初始化 =====
 async function initMobileApp() {
     currentSessionId = getStoredSessionId();
-    if (currentSessionId) {
-        await loadSessionHistory(currentSessionId);
-    } else {
-        setProject(null);
-        outputEl.innerHTML = '<div class="hint">等待输入…</div>';
-    }
+    await initMobileStatus();
     await loadSessionList();
-    await refreshController();
     startHeartbeat();
+    startStatusPolling();
 }
 
 initMobileApp().catch(e => {

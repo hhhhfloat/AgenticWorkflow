@@ -171,17 +171,24 @@ public class Main {
      */
     public String run(String userRequest, int maxIterations) throws IOException {
         this.runningThread = Thread.currentThread();
-        session.markRunning(this);
-        session.touch();
 
-        long startPrompt = contextManager.getTotalPromptTokens();
-        long startCached = contextManager.getTotalCachedTokens();
-        long startCompletion = contextManager.getTotalCompletionTokens();
-        int startCalls = contextManager.getApiCallCount();
-        double startPrice = contextManager.getTotalPrice();
+        long startPrompt = 0, startCached = 0, startCompletion = 0;
+        int startCalls = 0;
+        double startPrice = 0;
 
         String finalContent = null;
         try {
+
+            // 移进 try：保证与 finally 里的 markIdle 严格配对
+            session.markRunning(this);
+            session.touch();
+
+            startPrompt = contextManager.getTotalPromptTokens();
+            startCached = contextManager.getTotalCachedTokens();
+            startCompletion = contextManager.getTotalCompletionTokens();
+            startCalls = contextManager.getApiCallCount();
+            startPrice = contextManager.getTotalPrice();
+
             // 1. 准备用户消息（内部处理首轮/后续分支，并同步 meta）
             session.prepareUserMessage(userRequest, SystemPrompt.get(session.getWorkProject()));
 

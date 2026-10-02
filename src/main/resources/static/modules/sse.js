@@ -5,9 +5,11 @@
 
 // ===== 本轮运行日志缓冲（用于结束后折叠展示） =====
 let currentRunLog = [];
+let runDetailShown = false;
 
 async function runAgent(prompt, maxIterations) {
-    currentRunLog = [];   // ← 新增：清空上一轮缓冲
+    currentRunLog = [];
+    runDetailShown = false;
 
     if (!isDraftSession()) {
         await loadSessionHistory(getCurrentSessionId());
@@ -23,8 +25,6 @@ async function runAgent(prompt, maxIterations) {
     runBtn.disabled = true;
     stopBtn.disabled = false;
 
-    const settings = getEffectiveSettings ? getEffectiveSettings() : {};
-    const config = buildRunConfig(settings);
     const sessionId = getCurrentSessionId(); // 可能为 null，后端会自动创建
 
     fetch(BASE_URL + '/run', {
@@ -33,8 +33,7 @@ async function runAgent(prompt, maxIterations) {
         body: JSON.stringify({
             prompt: prompt,
             maxIterations: maxIterations,
-            sessionId: sessionId,
-            config: config
+            sessionId: sessionId
         })
     })
         .then(response => {
@@ -50,7 +49,6 @@ async function runAgent(prompt, maxIterations) {
         function readChunk() {
             reader.read().then(({ done, value }) => {
                 if (done) {
-                    finishRun(true);
                     return;
                 }
                 buffer += decoder.decode(value, { stream: true });
@@ -69,7 +67,6 @@ async function runAgent(prompt, maxIterations) {
                 if (!window._isPageUnloading) {
                     appendLog('[错误] ' + err.message);
                 }
-                finishRun();
             });
         }
         readChunk();
@@ -78,7 +75,6 @@ async function runAgent(prompt, maxIterations) {
         if (!window._isPageUnloading) {
             appendLog('[连接错误] ' + err.message + '\n请确保 HTTP 服务已启动（运行 start.bat）');
         }
-        finishRun();
     });
 }
 
@@ -126,12 +122,10 @@ function handleSpecialEvent(data) {
 
 // ===== 运行结束清理 =====
 function finishRun(normal = false) {
-    if (!normal && !window._isPageUnloading && isRunning) {
-        appendLog('[系统] ⚠️ 任务意外终止，请检查后端服务状态');
-    }
     runBtn.disabled = false;
     stopBtn.disabled = true;
     isRunning = false;
+    lastAppliedRunning = false;
     refreshSandbox();
 
     if (!isDraftSession()) {
@@ -152,6 +146,8 @@ function finishRun(normal = false) {
  */
 function appendRunDetail() {
     if (currentRunLog.length === 0) return;
+    if (runDetailShown) return;
+    runDetailShown = true;
 
     const details = document.createElement('details');
     details.className = 'run-detail';
@@ -177,7 +173,8 @@ function stopAgent() {
     stopBtn.disabled = true;
     appendLog('[系统] 正在停止任务...');
 
-    const sessionId = getCurrentSessionId();
+    // 用全局状态里的 sessionId（正在跑的会话），而不是当前浏览的会话
+    const sessionId = globalStatus.sessionId || getCurrentSessionId();
     fetch(BASE_URL + '/stop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -186,10 +183,7 @@ function stopAgent() {
         .then(response => response.json())
         .then(data => {
         appendLog('[系统] ' + data.message);
-        stopBtn.disabled = true;
-        runBtn.disabled = false;
-        isRunning = false;
-        finishRun(true);
+        // 不主动复位按钮，等 pollStatus 检测到 running=false
     })
         .catch(err => {
         if (!window._isPageUnloading) {
@@ -197,4 +191,55 @@ function stopAgent() {
         }
         stopBtn.disabled = false;
     });
+}
+
+// @anchor: modules_desktop_stream
+// 桌面端只读日志流：订阅 /stream 观看其他设备正在运行的任务日志
+
+let desktopStreamAbort = null;
+
+async function openStream(sessionId) {
+    closeStream();
+    if (!sessionId) return;
+    desktopStreamAbort = new AbortController();
+    try {
+        const res = await fetch(BASE_URL + '/stream?sessionId=' + encodeURIComponent(sessionId), {
+            signal: desktopStreamAbort.signal
+        });
+        if (!res.ok) {
+            appendLog('[系统] 日志流订阅失败: HTTP ' + res.status);
+            return;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop();
+            for (const ev of events) {
+                if (!ev.startsWith('data: ')) continue;
+                const data = ev.substring(6).trim().replace(/\\n/g, '\n');
+                if (data === '[stream-end]' || data === '[stream-timeout]') {
+                    appendLog('[系统] 日志流已结束');
+                    closeStream();
+                    return;
+                }
+                appendLog(data);
+            }
+        }
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            appendLog('[系统] 日志流中断: ' + e.message);
+        }
+    }
+}
+
+function closeStream() {
+    if (desktopStreamAbort) {
+        desktopStreamAbort.abort();
+        desktopStreamAbort = null;
+    }
 }

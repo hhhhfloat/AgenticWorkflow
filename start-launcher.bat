@@ -35,14 +35,8 @@ if %errorlevel%==0 (
     )
 
     if not defined AGENT_BIND (
-        echo.
-        echo ⚠️  launcher 已在运行，但无法获取 Tailscale IP
-        echo.
-        echo 请确认 Tailscale 已启动并登录，然后重试。
-        echo 或者手动访问: http://<你的 Tailscale IP>:8081/
-        echo.
-        pause >nul
-        exit /b 1
+        set "AGENT_BIND=127.0.0.1"
+        echo ⚠️  未检测到 Tailscale，按本机模式打开页面
     )
 
     netstat -ano | findstr ":8080" | findstr "LISTENING" >nul
@@ -165,25 +159,14 @@ for /f "delims=" %%i in ('""!TS_EXE!" ip -4" 2^>nul') do (
 
 if not defined AGENT_BIND (
     echo.
-    echo ========================================
-    echo  ❌ 未能获取 Tailscale IP
-    echo ========================================
+    echo ⚠️  未检测到 Tailscale IP，降级为本机模式（127.0.0.1）
     echo.
-    echo 本启动器依赖 Tailscale 进行远程访问，无法继续。
+    echo    电脑端可正常使用，手机端将无法访问。
+    echo    需要手机访问请先启动 Tailscale，再重跑本脚本。
+    echo    下载: https://tailscale.com/download
     echo.
-    echo 请确认：
-    echo   1. 已安装 Tailscale 客户端
-    echo      https://tailscale.com/download
-    echo   2. Tailscale 已启动并登录账号
-    echo   3. 命令行执行 "tailscale ip -4" 能看到 100.x.x.x
-    echo.
-    echo 或者手动指定绑定地址后重试：
-    echo   set AGENT_BIND=100.x.x.x
-    echo   start-launcher.bat
-    echo.
-    echo 按任意键退出 ...
-    pause >nul
-    exit /b 1
+    set "AGENT_BIND=127.0.0.1"
+    timeout /t 3 /nobreak >nul
 )
 
 echo ✅ Tailscale IP: %AGENT_BIND%

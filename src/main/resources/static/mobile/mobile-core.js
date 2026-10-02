@@ -1,11 +1,30 @@
 // 手机端核心：常量、DOM 引用、全局状态、通用渲染工具
 
+// @anchor: mobile_core_patchFetch
+// 给所有 mobile 端请求自动加设备标识，服务端据此优先判定身份
+(function patchFetchForDevice() {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = function(input, init) {
+        init = init || {};
+        const headers = new Headers(init.headers || {});
+        if (!headers.has('X-Client-Device')) {
+            headers.set('X-Client-Device', 'mobile');
+        }
+        init.headers = headers;
+        return originalFetch(input, init);
+    };
+})();
+
 const BASE_URL = '';
 const HEARTBEAT_MS = 30000;
 const SESSION_KEY = 'mobileCurrentSessionId';
 
 let currentSessionId = null;
 let isRunning = false;
+
+// 全局状态（由 mobile-status.js 轮询维护）
+let globalStatus = { running: false, sessionId: null, title: null, heartbeatStale: false };
+let lastKnownRunning = false;
 
 // ===== DOM 引用 =====
 const outputEl = document.getElementById('output');

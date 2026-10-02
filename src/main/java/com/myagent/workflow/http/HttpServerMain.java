@@ -25,7 +25,10 @@ public class HttpServerMain {
     // ==================== 端口与超时 ====================
 
     public static final int PORT = 8080;
+    // 心跳超时不再停任务，仅用于前端 UI 提示
     public static final long HEARTBEAT_TIMEOUT_MS = 120_000;
+    // 任务硬超时：超过后强制停止，兜住"用户彻底忘了"的极端情况
+    public static final long TASK_HARD_TIMEOUT_MS = 30 * 60 * 1000L;
     public static final long HEARTBEAT_CHECK_INTERVAL_MS = 5_000;
     public static final int MAX_ITERATIONS = 100;
 
@@ -213,14 +216,17 @@ public class HttpServerMain {
         reg(server, "/session/create", new SessionCreateHandler(), true);
         reg(server, "/session/close", new SessionCloseHandler(), true);
         reg(server, "/session/rename", new SessionRenameHandler(), true);
+        reg(server, "/session/reset",  new SessionResetHandler(), true);
         // ── 会话管理（读：放行） ──
         reg(server, "/session/list", new SessionListHandler(), false);
         reg(server, "/session/history", new SessionHistoryHandler(), false);
         reg(server, "/session/usage", new SessionUsageHandler(), false);
+        reg(server, "/session/logs",    new SessionLogsHandler(), false);
 
         // ── 任务执行 ──
         reg(server, "/run", new RunHandler(), true);
         reg(server, "/stop", new StopHandler(), true);
+        reg(server, "/stream", new StreamHandler(), false);
 
         // ── 心跳 / 状态（放行） ──
         reg(server, "/heartbeat", new HeartbeatHandler(), false);
@@ -235,7 +241,8 @@ public class HttpServerMain {
         reg(server, "/restart", new RestartHandler(), true);
         reg(server, "/shutdown",      new ShutdownHandler(), true);
         reg(server, "/clear-api-key", new ClearApiKeyHandler(), true);
-        reg(server, "/config", new ConfigHandler(), true);
+        // /config 是只读（返回 maxIterations），非控制端也应能读
+        reg(server, "/config",        new ConfigHandler(), false);
 
         // ── 项目/文件管理（保护） ──
         reg(server, "/projects", new ProjectsHandler(), false);
@@ -286,11 +293,24 @@ public class HttpServerMain {
                     long now = System.currentTimeMillis();
                     for (var session : sessionManager.listActive()) {
                         if (!session.isRunning()) continue;
-                        long elapsed = now - session.getLastHeartbeatTime();
-                        if (elapsed > HEARTBEAT_TIMEOUT_MS) {
+
+                        // 硬超时：兜底清理
+                        long runningTime = now - session.getRunningStartedAt();
+                        if (runningTime > TASK_HARD_TIMEOUT_MS) {
                             System.out.println("⚠️ 会话 " + session.getSessionId()
-                                    + " 心跳超时，停止任务");
+                                    + " 超过硬超时 " + (TASK_HARD_TIMEOUT_MS / 60000)
+                                    + " 分钟，强制停止任务");
+                            session.log("[系统] ⏱️ 任务超过 " + (TASK_HARD_TIMEOUT_MS / 60000));
                             session.stopTask();
+                            continue;
+                        }
+
+                        // 心跳超时：仅记录，不再停任务（前端会根据这个状态显示提示）
+                        long noHeartbeat = now - session.getLastHeartbeatTime();
+                        if (noHeartbeat > HEARTBEAT_TIMEOUT_MS) {
+                            // 只打日志，不停任务
+                            // System.out.println("💤 会话 " + session.getSessionId()
+                            //     + " 客户端心跳失联 " + (noHeartbeat / 1000) + " 秒，任务继续");
                         }
                     }
                 } catch (InterruptedException e) {

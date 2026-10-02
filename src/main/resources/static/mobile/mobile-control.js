@@ -29,6 +29,16 @@ async function switchController() {
         await refreshController();
         if (data.controller === 'MOBILE') {
             appendLog('[系统] 📱 已拉取控制权到手机端');
+            // 若对方正在跑任务，跳过去并订阅日志
+            if (data.runningSessionId) {
+                currentSessionId = data.runningSessionId;
+                setStoredSessionId(data.runningSessionId);
+                await loadSessionHistory(data.runningSessionId);
+                await loadSessionList();
+                if (typeof openStream === 'function') {
+                    openStream(data.runningSessionId);
+                }
+            }
         }
     } catch (e) {
         appendLog('[系统] ❌ 拉取失败: ' + e.message);

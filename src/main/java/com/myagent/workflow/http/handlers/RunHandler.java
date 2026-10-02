@@ -24,6 +24,7 @@ import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
 // @anchor: runHandler_class
 // 运行处理器：解析请求、获取/创建会话、并发控制并以 SSE 推送执行日志
@@ -139,7 +140,7 @@ public class RunHandler implements HttpHandler {
         // ===== 6. 准备日志文件 =====
         LogFileWriter logWriter = null;
         try {
-            logWriter = new LogFileWriter(userRequest);
+            logWriter = new LogFileWriter(session.getSessionId(), userRequest);
         } catch (IOException e) {
             System.err.println("⚠️ 无法创建日志文件: " + e.getMessage());
         }
@@ -149,94 +150,131 @@ public class RunHandler implements HttpHandler {
 
         final LogFileWriter finalLogWriter = logWriter;
 
+        // 共享锁：ping 线程与日志消费者都通过它串行化对 out 的写入
+        final Object outLock = new Object();
+
+        final Consumer<String> logConsumer = msg -> {
+            try {
+                synchronized (outLock) {
+                    sendEvent(out, msg);
+                }
+                if (finalLogWriter != null) {
+                    finalLogWriter.write(msg);
+                }
+            } catch (Exception e) {
+                // SSE 客户端可能已断开，静默
+            }
+        };
+
+        // SSE 空闲保活：每 15 秒发一行注释，避免任务静默期被中间层切断
+        final OutputStream pingOut = out;
+        Thread pingThread = new Thread(() -> {
+            try {
+                while (!Thread.currentThread().isInterrupted()) {
+                    Thread.sleep(15_000);
+                    synchronized (outLock) {
+                        pingOut.write(": ping\n\n".getBytes(StandardCharsets.UTF_8));
+                        pingOut.flush();
+                    }
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (IOException ignored) {
+                // 连接已断，静默退出
+            }
+        }, "RunPing-" + session.getSessionId());
+        pingThread.setDaemon(true);
+
         try {
             // ===== 8. 首条事件：告知前端 sessionId =====
             sendEvent(out, "{\"type\":\"session\",\"sessionId\":\"" + session.getSessionId()
                     + "\",\"isNew\":" + isNewSession + "}");
 
             // ===== 9. 绑定日志消费者 =====
-            session.setLogConsumer(msg -> {
-                try {
-                    sendEvent(out, msg);
-                    if (finalLogWriter != null) {
-                        finalLogWriter.write(msg);
-                    }
-                } catch (Exception e) {
-                    // SSE 客户端可能已断开，静默
-                }
-            });
+            session.addLogConsumer(logConsumer);
 
             // ===== 10. 创建 Agent 并启动线程 =====
             Main agent = new Main(session);
             final int finalMaxIterations = maxIterations;
 
+            pingThread.start();
+
             new Thread(() -> {
                 String result = null;
-                Exception error = null;
-
+                Throwable error = null;
                 try {
                     result = agent.run(userRequest, finalMaxIterations);
-                } catch (Exception e) {
-                    error = e;
+                } catch (Throwable t) {
+                    // Throwable：防止 Error（如 OOM / StackOverflow）泄漏全局 Semaphore
+                    error = t;
                 }
 
-                // ===== 无论成败，都写 usage =====
-                Main.TaskUsage usage = agent.getLastTaskUsage();
-                if (usage != null) {
-                    try {
-                        SessionUsage delta = new SessionUsage(
-                                usage.promptTokens(), usage.cachedTokens(), usage.completionTokens(),
-                                usage.apiCalls(), usage.cost());
-                        SessionUsage total = sessionManager.appendUsage(session.getSessionId(), delta);
-
-                        String usageJson = String.format(
-                                "{\"type\":\"usage\",\"sessionId\":\"%s\",\"promptTokens\":%d,\"cachedTokens\":%d," +
-                                        "\"completionTokens\":%d,\"apiCalls\":%d,\"cost\":%.6f}",
-                                session.getSessionId(),
-                                total.promptTokens(), total.cachedTokens(), total.completionTokens(),
-                                total.apiCalls(), total.cost()
-                        );
-                        sendEvent(out, usageJson);
-                    } catch (Exception ignored) {
-                        // usage 写失败不应影响任务结束流程
-                    }
-                }
-
-                // ===== 发结束事件 =====
                 try {
-                    if (error != null) {
-                        sendEvent(out, "[错误] " + error.getMessage());
-                    } else {
-                        sendEvent(out, "[完成] " + result);
+                    // ===== 无论成败，都写 usage =====
+                    Main.TaskUsage usage = agent.getLastTaskUsage();
+                    if (usage != null) {
+                        try {
+                            SessionUsage delta = new SessionUsage(
+                                    usage.promptTokens(), usage.cachedTokens(), usage.completionTokens(),
+                                    usage.apiCalls(), usage.cost());
+                            SessionUsage total = sessionManager.appendUsage(session.getSessionId(), delta);
+
+                            String usageJson = String.format(
+                                    "{\"type\":\"usage\",\"sessionId\":\"%s\",\"promptTokens\":%d,\"cachedTokens\":%d," +
+                                            "\"completionTokens\":%d,\"apiCalls\":%d,\"cost\":%.6f}",
+                                    session.getSessionId(),
+                                    total.promptTokens(), total.cachedTokens(), total.completionTokens(),
+                                    total.apiCalls(), total.cost()
+                            );
+                            synchronized (outLock) {
+                                sendEvent(out, usageJson);
+                            }
+                        } catch (Exception ignored) {
+                            // usage 写失败不应影响任务结束流程
+                        }
                     }
-                    sendEvent(out, "[结束]");
-                } catch (IOException ignored) {}
 
-                // ===== 清理 =====
-                session.setLogConsumer(null);
-                sessionManager.releaseRunningPermit();
-                sessionManager.save(session);
+                    // ===== 发结束事件 =====
+                    try {
+                        synchronized (outLock) {
+                            if (error != null) {
+                                String msg = error.getMessage() != null
+                                        ? error.getMessage()
+                                        : error.getClass().getSimpleName();
+                                sendEvent(out, "[错误] " + msg);
+                            } else {
+                                sendEvent(out, "[完成] " + result);
+                            }
+                            sendEvent(out, "[结束]");
+                        }
+                    } catch (IOException ignored) {}
+                } finally {
+                    // ===== 清理：无论成功失败都必须执行 =====
+                    pingThread.interrupt();
+                    session.removeLogConsumer(logConsumer);
+                    sessionManager.releaseRunningPermit();
+                    sessionManager.save(session);
 
-                if (finalLogWriter != null) {
-                    try { finalLogWriter.close(); } catch (IOException ignored) {}
+                    if (finalLogWriter != null) {
+                        try { finalLogWriter.close(); } catch (IOException ignored) {}
+                    }
+                    try { out.close(); } catch (IOException ignored) {}
                 }
-                try { out.close(); } catch (IOException ignored) {}
             }, "AgentRunner-" + session.getSessionId()).start();
 
         } catch (Exception e) {
             // 建立 SSE 过程中出错，回滚
-            session.setLogConsumer(null);
+            pingThread.interrupt();
+            session.removeLogConsumer(logConsumer);
             sessionManager.releaseRunningPermit();
             try {
-                sendEvent(out, "[错误] " + e.getMessage());
+                synchronized (outLock) {
+                    sendEvent(out, "[错误] " + e.getMessage());
+                }
             } catch (IOException ignored) {}
-            try {
-                out.close();
-            } catch (IOException ignored) {}
+            try { out.close(); } catch (IOException ignored) {}
             if (finalLogWriter != null) {
-                try {
-                    finalLogWriter.close();
-                } catch (IOException ignored) {}
+                try { finalLogWriter.close(); } catch (IOException ignored) {}
             }
         }
     }

@@ -45,9 +45,32 @@ async function refreshController() {
 
 async function switchController() {
     try {
-        await fetch('/control/switch', { method: 'POST' });
-    } catch (e) {}
-    location.reload();
+        const res = await fetch('/control/switch', { method: 'POST' });
+        const data = await res.json();
+        await refreshController();
+
+        if (data.controller !== 'DESKTOP') return;
+
+        appendLog('[系统] 💻 已拉取控制权到电脑端');
+
+        // 若另一端正在跑任务，跳过去并订阅实时日志
+        if (data.runningSessionId) {
+            if (data.runningSessionId !== getCurrentSessionId()) {
+                setCurrentSessionId(data.runningSessionId);
+                await loadSessionHistory(data.runningSessionId);
+                highlightCurrentSession();
+                renderUsagePanel();
+                await loadSessionList();
+            }
+            if (typeof openStream === 'function') {
+                if(typeof isRunning !== 'undefined' && !isRunning){
+                    openStream(data.runningSessionId);
+                }
+            }
+        }
+    } catch (e) {
+        appendLog('[系统] ❌ 拉取失败: ' + e.message);
+    }
 }
 
 function initControl() {

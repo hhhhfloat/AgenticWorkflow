@@ -41,14 +41,14 @@ async function runAgent() {
         });
     } catch (e) {
         appendMessage('error', '[连接错误] ' + e.message);
-        setStatus(false);
+        if (typeof pollStatus === 'function') pollStatus();
         return;
     }
 
     if (!res.ok) {
         const text = await res.text();
         appendMessage('error', `HTTP ${res.status}: ${text}`);
-        setStatus(false);
+        if (typeof pollStatus === 'function') pollStatus();
         return;
     }
 
@@ -72,25 +72,26 @@ async function runAgent() {
     } catch (e) {
         appendMessage('error', '[流中断] ' + e.message);
     } finally {
-        setStatus(false);
-        if (currentSessionId) {
-            await loadSessionList();
-        }
+        // 不直接复位按钮，交给 pollStatus 判定任务是否真的结束
+        if (currentSessionId) await loadSessionList();
+        if (typeof pollStatus === 'function') pollStatus();
     }
 }
 
 async function stopAgent() {
-    if (!currentSessionId) return;
+    const sid = (globalStatus && globalStatus.sessionId) || currentSessionId;
+    if (!sid) return;
     runBtn.disabled = true;
     appendLog('[系统] 正在停止…');
     try {
         const res = await fetch(BASE_URL + '/stop', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: currentSessionId })
+            body: JSON.stringify({ sessionId: sid })
         });
         const data = await res.json();
         appendLog('[系统] ' + (data.message || data.status));
+        // 不主动复位按钮，交给 pollStatus 判定任务是否真结束
     } catch (e) {
         appendMessage('error', '[停止失败] ' + e.message);
         runBtn.disabled = false;
@@ -120,7 +121,7 @@ async function heartbeat() {
         heartbeatFailCount++;
         if (heartbeatFailCount >= 3 && !disconnectedLogged) {
             disconnectedLogged = true;
-            appendLog('[系统] 🔴 与服务器断联（连续心跳失败），任务可能在 120 秒后被超时停止');
+            appendLog('[系统] 🔴 与服务器断联（连续心跳失败），任务仍在后台运行');
         }
     }
 }
@@ -149,4 +150,54 @@ async function shutdownMainService() {
     '<p style="margin-top:20px"><a href="http://' + location.hostname + ':8081/" ' +
     'style="color:#58a6ff">重新启动</a></p>' +
     '</div>';
+}
+
+// ===== 只读日志流 =====
+
+let streamAbort = null;
+
+async function openStream(sessionId) {
+    closeStream();
+    if (!sessionId) return;
+    streamAbort = new AbortController();
+    try {
+        const res = await fetch(BASE_URL + '/stream?sessionId=' + encodeURIComponent(sessionId), {
+            signal: streamAbort.signal
+        });
+        if (!res.ok) {
+            appendLog('[系统] 日志流订阅失败: HTTP ' + res.status);
+            return;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop();
+            for (const ev of events) {
+                if (!ev.startsWith('data: ')) continue;
+                const data = ev.substring(6).trim().replace(/\\n/g, '\n');
+                if (data === '[stream-end]' || data === '[stream-timeout]') {
+                    appendLog('[系统] 日志流已结束');
+                    closeStream();
+                    return;
+                }
+                handleEvent(data);
+            }
+        }
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            appendLog('[系统] 日志流中断: ' + e.message);
+        }
+    }
+}
+
+function closeStream() {
+    if (streamAbort) {
+        streamAbort.abort();
+        streamAbort = null;
+    }
 }
