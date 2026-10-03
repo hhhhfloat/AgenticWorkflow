@@ -61,8 +61,6 @@ runBtn.addEventListener('click', () => {
 
 // 停止按钮
 stopBtn.addEventListener('click', stopAgent);
-
-
 // 页面卸载时只标记，不杀 Agent，也不触发断联日志
 window.addEventListener('beforeunload', () => {
     window._isPageUnloading = true;  // 标记正在卸载
@@ -143,6 +141,27 @@ document.addEventListener('DOMContentLoaded', async function() {
             this.value = val;
         });
     }
+    const scrollBottomBtn = document.getElementById('scrollBottomBtn');
+    if (scrollBottomBtn) {
+        scrollBottomBtn.addEventListener('click', () => {
+            output.scrollTop = output.scrollHeight;
+            updateScrollBottomBtn();
+        });
+    }
+    output.addEventListener('scroll', updateScrollBottomBtn);
+
     startHeartbeat();
     startStatusPolling();
 });
+
+// ===== 回到底部按钮 =====
+(function initScrollBottomBtn() {
+        const btn = document.getElementById('scrollBottomBtn');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                output.scrollTop = output.scrollHeight;
+                updateScrollBottomBtn();
+            });
+    }
+    output.addEventListener('scroll', updateScrollBottomBtn);
+})();

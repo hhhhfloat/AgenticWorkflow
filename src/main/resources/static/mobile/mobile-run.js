@@ -36,19 +36,23 @@ async function runAgent() {
 
     const maxIterations = Number(maxIterEl.value) || 100;
 
-    mobileRunAbort = new AbortController();
+    const myAbort = new AbortController();
+    mobileRunAbort = myAbort;
     let res;
     try {
         res = await fetch(BASE_URL + '/run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ prompt, sessionId: currentSessionId, maxIterations }),
-            signal: mobileRunAbort.signal
+            signal: myAbort.signal
         });
     } catch (e) {
-        if (e.name === 'AbortError') { mobileRunAbort = null; return; }
+        if (e.name === 'AbortError') {
+            if (myAbort === mobileRunAbort) mobileRunAbort = null;
+            return;
+        }
         appendMessage('error', '[连接错误] ' + e.message);
-        mobileRunAbort = null;
+        if(myAbort == mobileRunAbort) mobileRunAbort = null;
         if (typeof pollStatus === 'function') pollStatus();
         return;
     }
@@ -56,7 +60,7 @@ async function runAgent() {
     if (!res.ok) {
         const text = await res.text();
         appendMessage('error', `HTTP ${res.status}: ${text}`);
-        mobileRunAbort = null;
+        if(myAbort == mobileRunAbort) mobileRunAbort = null;
         if (typeof pollStatus === 'function') pollStatus();
         return;
     }
@@ -74,6 +78,7 @@ async function runAgent() {
             buffer = events.pop();
             for (const ev of events) {
                 if (!ev.startsWith('data: ')) continue;
+                if (mobileRunAbort !== myAbort) return;
                 const data = ev.substring(6).trim().replace(/\\n/g, '\n');
                 handleEvent(data);
             }
@@ -83,7 +88,7 @@ async function runAgent() {
             appendMessage('error', '[流中断] ' + e.message);
         }
     } finally {
-        mobileRunAbort = null;
+        if(myAbort == mobileRunAbort) mobileRunAbort = null;
         if (currentSessionId) await loadSessionList();
         if (typeof pollStatus === 'function') pollStatus();
     }
@@ -125,7 +130,8 @@ async function renderRunLogs(sessionId) {
         details.appendChild(pre);
 
         outputEl.appendChild(details);
-        outputEl.scrollTop = outputEl.scrollHeight;
+        if (isScrolledToBottom(outputEl)) outputEl.scrollTop = outputEl.scrollHeight;
+        updateScrollBottomBtn();
     } catch (e) {
         // 静默
     }
@@ -219,10 +225,11 @@ let streamAbort = null;
 async function openStream(sessionId) {
     closeStream();
     if (!sessionId) return;
-    streamAbort = new AbortController();
+    const myAbort = new AbortController();
+    streamAbort = myAbort;
     try {
         const res = await fetch(BASE_URL + '/stream?sessionId=' + encodeURIComponent(sessionId), {
-            signal: streamAbort.signal
+            signal: myAbort.signal
         });
         if (!res.ok) {
             appendLog('[系统] 日志流订阅失败: HTTP ' + res.status);
@@ -239,6 +246,7 @@ async function openStream(sessionId) {
             buffer = events.pop();
             for (const ev of events) {
                 if (!ev.startsWith('data: ')) continue;
+                if (streamAbort !== myAbort) return;
                 const data = ev.substring(6).trim().replace(/\\n/g, '\n');
                 if (data === '[stream-end]' || data === '[stream-timeout]') {
                     appendLog('[系统] 日志流已结束');

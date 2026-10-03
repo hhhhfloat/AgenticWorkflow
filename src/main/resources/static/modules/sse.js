@@ -19,60 +19,63 @@ async function runAgent(prompt, maxIterations) {
     stopBtn.disabled = false;
 
     const sessionId = getCurrentSessionId();
+    const myAbort = new AbortController();
+    desktopRunAbort = myAbort;
 
-    desktopRunAbort = new AbortController();
-    fetch(BASE_URL + '/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            prompt: prompt,
-            maxIterations: maxIterations,
-            sessionId: sessionId
-        }),
-        signal: desktopRunAbort.signal
-    })
-        .then(response => {
-        if (!response.ok) {
-            return response.text().then(text => {
-                throw new Error(`HTTP ${response.status}: ${text}`);
-            });
-        }
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
-
-        function readChunk() {
-            reader.read().then(({ done, value }) => {
-                if (done) return;
-                buffer += decoder.decode(value, { stream: true });
-                const events = buffer.split('\n\n');
-                buffer = events.pop();
-                for (const event of events) {
-                    if (event.startsWith('data: ')) {
-                        const data = event.substring(6).trim().replace(/\\n/g, '\n');
-                        if (handleSpecialEvent(data)) continue;
-                        appendLog(data);
-                    }
-                }
-                readChunk();
-            }).catch(err => {
-                if (err.name === 'AbortError') return;
-                if (!window._isPageUnloading) {
-                    appendLog('[错误] ' + err.message);
-                }
-            });
-        }
-        readChunk();
-    })
-        .catch(err => {
-        if (err.name === 'AbortError') return;
-        if (!window._isPageUnloading) {
+    let response;
+    try {
+        response = await fetch(BASE_URL + '/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: prompt,
+                maxIterations: maxIterations,
+                sessionId: sessionId
+            }),
+            signal: myAbort.signal
+        });
+    } catch (err) {
+        if (err.name !== 'AbortError' && !window._isPageUnloading) {
             appendLog('[连接错误] ' + err.message + '\n请确保 HTTP 服务已启动');
         }
-    })
-        .finally(() => {
-        desktopRunAbort = null;
-    });
+        if (desktopRunAbort === myAbort) desktopRunAbort = null;
+        return;
+    }
+
+    if (!response.ok) {
+        const text = await response.text();
+        appendLog('HTTP ' + response.status + ': ' + text);
+        if (desktopRunAbort === myAbort) desktopRunAbort = null;
+        return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop();
+            for (const event of events) {
+                if (!event.startsWith('data: ')) continue;
+                // abort 后立即停止输出，避免最后一批 buffer 写进别人的视图
+                if (desktopRunAbort !== myAbort) return;
+                const data = event.substring(6).trim().replace(/\\n/g, '\n');
+                if (handleSpecialEvent(data)) continue;
+                appendLog(data);
+            }
+        }
+    } catch (err) {
+        if (err.name !== 'AbortError' && !window._isPageUnloading) {
+            appendLog('[错误] ' + err.message);
+        }
+    } finally {
+        if (desktopRunAbort === myAbort) desktopRunAbort = null;
+    }
 }
 
 // @anchor: modules_abortRun
@@ -143,7 +146,8 @@ async function renderRunLogs(sessionId) {
         details.appendChild(pre);
 
         output.appendChild(details);
-        output.scrollTop = output.scrollHeight;
+        if (isScrolledToBottom(output)) output.scrollTop = output.scrollHeight;
+        updateScrollBottomBtn();
     } catch (e) {
         // 静默
     }
@@ -192,10 +196,11 @@ let desktopStreamAbort = null;
 async function openStream(sessionId) {
     closeStream();
     if (!sessionId) return;
-    desktopStreamAbort = new AbortController();
+    const myAbort = new AbortController();
+    desktopStreamAbort = myAbort;
     try {
         const res = await fetch(BASE_URL + '/stream?sessionId=' + encodeURIComponent(sessionId), {
-            signal: desktopStreamAbort.signal
+            signal: myAbort.signal
         });
         if (!res.ok) {
             appendLog('[系统] 日志流订阅失败: HTTP ' + res.status);
@@ -212,6 +217,7 @@ async function openStream(sessionId) {
             buffer = events.pop();
             for (const ev of events) {
                 if (!ev.startsWith('data: ')) continue;
+                if (desktopStreamAbort !== myAbort) return;
                 const data = ev.substring(6).trim().replace(/\\n/g, '\n');
                 if (data === '[stream-end]' || data === '[stream-timeout]') {
                     appendLog('[系统] 日志流已结束');

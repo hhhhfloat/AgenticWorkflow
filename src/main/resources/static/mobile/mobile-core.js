@@ -67,12 +67,24 @@ window.addEventListener('error', e => {
 // ===== 渲染工具 =====
 function clearOutput() { outputEl.innerHTML = ''; }
 
+function isScrolledToBottom(el) {
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+}
+
+function updateScrollBottomBtn() {
+    const btn = document.getElementById('scrollBottomBtn');
+    if (!btn) return;
+    btn.hidden = isScrolledToBottom(outputEl);
+}
+
 function appendMessage(role, text) {
+    const stick = isScrolledToBottom(outputEl);
     const div = document.createElement('div');
     div.className = 'msg ' + role;
     div.textContent = text;
     outputEl.appendChild(div);
-    outputEl.scrollTop = outputEl.scrollHeight;
+    if (stick) outputEl.scrollTop = outputEl.scrollHeight;
+    updateScrollBottomBtn();
 }
 
 function appendLog(text) { appendMessage('log', text); }

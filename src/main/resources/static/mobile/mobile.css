@@ -578,3 +578,24 @@ body {
     max-height: 50vh;
     overflow-y: auto;
 }
+.scroll-bottom-btn {
+    position: fixed;
+    right: 16px;
+    bottom: 80px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #1f6feb;
+    color: #fff;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    z-index: 50;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.scroll-bottom-btn:active { filter: brightness(1.15); }
+.scroll-bottom-btn[hidden] { display: none; }

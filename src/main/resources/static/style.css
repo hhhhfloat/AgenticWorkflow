@@ -685,6 +685,7 @@ html, body {
     padding: 12px;
     box-sizing: border-box;
     overflow: hidden;
+    position: relative;
 }
 
 #main h2 {
@@ -1004,3 +1005,25 @@ html, body {
     border-color: #21262d;
     cursor: default;
 }
+
+.scroll-bottom-btn {
+    position: absolute;
+    right: 24px;
+    bottom: 180px;         /* 避开输入区，按实际高度调 */
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #1f6feb;
+    color: #fff;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    z-index: 50;
+    opacity: 0.9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.scroll-bottom-btn:hover { opacity: 1; }
+.scroll-bottom-btn[hidden] { display: none; }

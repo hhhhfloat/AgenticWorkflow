@@ -18,6 +18,15 @@ newSessionBtn.addEventListener('click', () => {
         openCreateModal();
     }
 });
+// ===== 回到底部按钮 =====
+const scrollBottomBtnEl = document.getElementById('scrollBottomBtn');
+if (scrollBottomBtnEl) {
+    scrollBottomBtnEl.addEventListener('click', () => {
+        outputEl.scrollTop = outputEl.scrollHeight;
+        updateScrollBottomBtn();
+    });
+}
+outputEl.addEventListener('scroll', updateScrollBottomBtn);
 closeCreateBtn.addEventListener('click', closeCreateModal);
 cancelCreateBtn.addEventListener('click', closeCreateModal);
 confirmCreateBtn.addEventListener('click', createSession);
