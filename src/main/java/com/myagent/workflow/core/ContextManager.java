@@ -122,6 +122,17 @@ public class ContextManager {
         volatileWorking.addAll(round);
     }
 
+    // @anchor: contextManager_clearVolatileWorking
+    // 清空工作区（任务被中断时调用），不合并任何摘要
+    public void clearVolatileWorking() {
+        int before = volatileWorking.size();
+        volatileWorking.clear();
+        if (before > 0) {
+            log("📌 [系统] 任务被中断，工作区已清空（原 " + before + " 条消息）");
+        }
+    }
+
+
     // ==================== 构建 ====================
 
     // @anchor: contextManager_buildMessages

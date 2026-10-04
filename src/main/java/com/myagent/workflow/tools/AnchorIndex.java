@@ -95,7 +95,7 @@ class AnchorIndex {
                     return;
                 }
                 String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(projectAnchors);
-                Files.writeString(newIndex, json);
+                FileOperator.writeAtomic(newIndex, json);
 
                 int anchorCount = projectAnchors.values().stream().mapToInt(List::size).sum();
                 migratedProjects++;
@@ -158,7 +158,8 @@ class AnchorIndex {
                 return "❌ 项目路径无效: " + projectPath;
             }
 
-            Files.writeString(indexFile, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(AnchorScanner.leanize(projectAnchors)));
+            FileOperator.writeAtomic(indexFile,
+                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(AnchorScanner.leanize(projectAnchors)));
 
             // 写 .project_index.json（精简版：id + line + desc）
             writeProjectIndex(projectPath, projectAnchors);
@@ -180,7 +181,7 @@ class AnchorIndex {
 
 
     // @anchor: anchorIndex_buildIndexEntries
-// 把锚点列表转为项目索引条目（id/line/desc/symbol），跳过 _end 锚点
+    // 把锚点列表转为项目索引条目（id/line/desc/symbol），包含全部锚点
     private List<Map<String, Object>> buildIndexEntries(Path file, List<Map<String, Object>> anchors) {
         StructureParserRegistry registry = StructureParserRegistry.getInstance();
         List<MethodDefinition> methods = AnchorScanner.parseMethods(file, registry);
@@ -218,7 +219,7 @@ class AnchorIndex {
         }
 
         Path indexFile = projectDir.resolve(PROJECT_INDEX_NAME);
-        Files.writeString(indexFile,
+        FileOperator.writeAtomic(indexFile,
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(index));
     }
 
@@ -260,7 +261,8 @@ class AnchorIndex {
             } else {
                 projectAnchors.put(fileRelPath, anchors);
             }
-            Files.writeString(anchorsFile, objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(AnchorScanner.leanize(projectAnchors)));
+            FileOperator.writeAtomic(anchorsFile,
+                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(AnchorScanner.leanize(projectAnchors)));
             return "✅ 已刷新位置 " + fileRelPath + "（" + anchors.size() + " 个锚点）";
 
         } catch (IOException e) {
@@ -282,8 +284,14 @@ class AnchorIndex {
             List<Map<String, Object>> anchors;
             if(!Files.exists(file) || !Files.isRegularFile(file)){
                 anchors = List.of();
-            } else{
-                anchors = AnchorScanner.scan(file);
+            } else {
+                // 与 refreshAnchorsFile / rebuild 保持同一排除口径
+                Path rel = projectDir.relativize(file);
+                if (SearchFileFilter.isExcludedDir(rel, SearchFileFilter.DEFAULT_EXCLUDED_DIRS)) {
+                    anchors = List.of();
+                } else {
+                    anchors = AnchorScanner.scan(file);
+                }
             }
             updateProjectIndexForFile(projectDir, fileRelPath, anchors);
 
@@ -314,7 +322,7 @@ class AnchorIndex {
             else index.put(fileRelPath, entries);
         }
 
-        Files.writeString(indexFile,
+        FileOperator.writeAtomic(indexFile,
                 objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(index));
     }
 

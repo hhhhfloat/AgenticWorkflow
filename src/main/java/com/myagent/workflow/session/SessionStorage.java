@@ -136,11 +136,7 @@ public class SessionStorage {
         List<Map<String, Object>> base = readJsonl(sessionDir.resolve(BASE_FILE));
         cm.restoreImmutableBase(base);
 
-        Path workingFile = sessionDir.resolve(WORKING_FILE);
-        if (Files.exists(workingFile)) {
-            List<Map<String, Object>> working = readJsonl(workingFile);
-            cm.restoreVolatileWorking(working);
-        }
+        // 工作区是易失的：磁盘上的残留只可能来自被中断的任务，不应恢复。volatile_working.jsonl 应为空文件。
 
         return session;
     }

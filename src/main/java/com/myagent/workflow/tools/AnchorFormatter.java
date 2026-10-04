@@ -47,7 +47,7 @@ class AnchorFormatter {
             for (String raw : filePath.split("[,;]")) {
                 String hint = raw.trim();
                 if (hint.isEmpty()) continue;
-                appendDescribeOne(sb, hint, projectAnchors, projectDir);
+                appendDescribeOne(sb, normalizeHint(hint, projectPath), projectAnchors, projectDir);
             }
             return sb.toString();
         } catch (IOException e) {
@@ -79,6 +79,28 @@ class AnchorFormatter {
         // 索引里没匹配 → 走目录概览；概览为空时在 appendDirIntro 内做文件系统诊断
         String dirPrefix = normalizeDirHint(hint);
         appendDirIntro(sb, dirPrefix, projectAnchors, projectDir, hint);
+    }
+
+    // @anchor: anchorFormatter_normalizeHint
+    // 把 file 提示归一化为“相对项目根”的路径：
+    // - 反斜杠统一为 "/"
+    // - 去掉 "./" 前缀
+    // - 剥离 projectPath 前缀（若存在）
+    // - 传项目名本身等价于传 "."（返回空串）
+    private String normalizeHint(String hint, String projectPath) {
+        if (hint == null) return "";
+        String h = hint.trim().replace('\\', '/');
+        if (h.startsWith("./")) h = h.substring(2);
+
+        if (projectPath != null && !projectPath.isBlank()) {
+            String pp = projectPath.trim().replace('\\', '/');
+            if (pp.startsWith("./")) pp = pp.substring(2);
+            while (pp.endsWith("/")) pp = pp.substring(0, pp.length() - 1);
+
+            if (h.equals(pp)) return "";
+            if (h.startsWith(pp + "/")) h = h.substring(pp.length() + 1);
+        }
+        return h;
     }
 
     private String normalizeDirHint(String hint) {

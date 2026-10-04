@@ -205,7 +205,7 @@ public final class ToolDefinitions {
 // 工具：describe_anchors 列出锚点及其职责描述
         tools.add(defineTool(
                 "describe_anchors",
-                "返回锚点信息。file 支持逗号分隔多个片段。每个片段：先按文件匹配（精确或后缀），命中则列出该文件的全部功能锚点（id / 行号 / symbol / 描述）；未命中则按目录匹配，列出该目录下所有文件的 _intro 锚点描述（文件职责概览）；传 '.' 表示整个项目。不返回 _end 锚点。",
+                "返回锚点信息。file 支持逗号分隔多个片段。每个片段：先按文件匹配（精确或后缀），命中则列出该文件的全部锚点（含 _end，按行号升序）；未命中则按目录匹配，列出该目录下所有文件的 _intro 锚点描述（文件职责概览）；传 '.' 表示整个项目。",
                 defineParams()
                         .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
                         .prop("file", "string", "必填。文件相对路径（逗号分隔多个文件）或目录路径（如 'src/main/java/game'）。传 '.' 表示整个项目。")

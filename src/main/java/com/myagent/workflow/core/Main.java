@@ -290,9 +290,12 @@ public class Main {
             try {
                 if (finalContent != null) {
                     contextManager.mergeSummaryToBase(buildTaskSummary(finalContent));
+                } else {
+                    // 任务被用户停止或异常中断：清空残留工作区，避免污染下一次任务
+                    contextManager.clearVolatileWorking();
                 }
             } catch (Exception e) {
-                logger.warn("合并任务摘要失败", e);
+                logger.warn("清理任务上下文失败", e);
             }
 
             try {
