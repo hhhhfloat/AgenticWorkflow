@@ -1,4 +1,4 @@
-// @anchor: sessionListHandler_tot_desc
+// @anchor: sessionListHandler_intro
 // 会话列表处理器：GET /session/list，返回全部会话元数据（按最近活跃排序）
 package com.myagent.workflow.http.handlers.session;
 

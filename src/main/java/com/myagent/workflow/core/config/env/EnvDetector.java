@@ -1,4 +1,4 @@
-// @anchor: envDetector_tot_desc
+// @anchor: envDetector_intro
 // 本机开发环境探测器门面：遍历 Probe 收集工具链路径并生成配置文件
 package com.myagent.workflow.core.config.env;
 

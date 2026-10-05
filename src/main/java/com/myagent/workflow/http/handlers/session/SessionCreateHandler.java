@@ -1,4 +1,4 @@
-// @anchor: sessionCreateHandler_tot_desc
+// @anchor: sessionCreateHandler_intro
 // 会话创建处理器：POST /session/create，显式创建一个空会话并绑定工作项目
 package com.myagent.workflow.http.handlers.session;
 

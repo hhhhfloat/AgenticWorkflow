@@ -1,3 +1,5 @@
+// @anchor: mobileControl_intro
+// 手机端控制权：拉取控制权到手机端并刷新切换按钮
 async function refreshController() {
     try {
         const res = await fetch(BASE_URL + '/control/status');

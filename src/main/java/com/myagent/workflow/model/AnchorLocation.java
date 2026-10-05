@@ -1,3 +1,5 @@
+// @anchor: anchorLocation_intro
+// 锚点定位数据载体：项目路径、文件、行号与预览
 package com.myagent.workflow.model;
 
 // @anchor: anchorLocation_class

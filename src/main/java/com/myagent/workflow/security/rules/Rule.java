@@ -1,4 +1,4 @@
-// @anchor: securityRule_tot_desc
+// @anchor: securityRule_intro
 // 安全规则接口：定义危险代码模式的 ID、匹配正则、级别与修复建议
 package com.myagent.workflow.security.rules;
 

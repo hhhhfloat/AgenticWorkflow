@@ -1,7 +1,7 @@
-// @anchor: modules_tree_state
+// @anchor: treeState_intro
 // 文件树状态层：展开路径收集、逐级展开、缓存预加载
 
-// @anchor: modules_clearCache
+// @anchor: treeState_clearCache
 // 递归清除文件树各级节点的加载缓存标记
 function clearCacheRecursively(container) {
     const nodes = container.querySelectorAll('.tree-node');
@@ -14,7 +14,7 @@ function clearCacheRecursively(container) {
     });
 }
 
-// @anchor: modules_tree_getExpandedPaths
+// @anchor: treeState_getExpandedPaths
 // 收集所有"自身展开且所有祖先都展开"的目录路径
 function getExpandedPaths(container) {
     const paths = [];
@@ -45,7 +45,7 @@ function getExpandedPaths(container) {
     return paths;
 }
 
-// @anchor: modules_tree_expandPath
+// @anchor: treeState_expandPath
 // 逐级点击展开到目标路径
 async function expandPath(path, container) {
     const parts = path.split('/');
@@ -75,7 +75,7 @@ async function expandPath(path, container) {
     return true;
 }
 
-// @anchor: modules_tree_preloadPaths
+// @anchor: treeState_preloadPaths
 // 递归预加载 targetPaths 及其祖先链，返回缓存 Map
 async function preloadPaths(path, targetPaths, cache) {
     if (cache.has(path)) return cache;

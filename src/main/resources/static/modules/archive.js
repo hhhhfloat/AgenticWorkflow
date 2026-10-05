@@ -1,4 +1,4 @@
-// @anchor: modules_archive
+// @anchor: archive_intro
 // 把沙箱项目归档到 TestProjects（含覆盖确认）并刷新目录树
 
 // ===== 归档功能 =====
@@ -46,7 +46,7 @@ async function archiveProject(projectName) {
     }
 }
 
-// @anchor: modules_refreshRoot
+// @anchor: archive_refreshRoot
 // 保持展开状态刷新指定根目录的子树
 
 // ===== 归档功能 =====
@@ -104,21 +104,28 @@ async function refreshRoot(rootPath) {
         childrenContainer.innerHTML = '';
         childrenContainer.dataset.loaded = '';
 
-        // ⭐ 关键修复 2：如果之前是展开的，或者有展开的子节点，设置为 block
         if (wasExpanded || expandedPaths.length > 0) {
             childrenContainer.style.display = 'block';
-            childrenContainer.dataset.loaded = 'true';
 
-            // 从缓存渲染根节点下的内容（直接子节点）
-            const data = cache.get(rootPath);
-            if (data && data.entries) {
-                if(data.entries.length === 0){
-                    showEmptyMessage(childrenContainer);
+            try {
+                const data = cache.get(rootPath);
+                if (data && data.entries) {
+                    if (data.entries.length === 0) {
+                        showEmptyMessage(childrenContainer);
+                    } else {
+                        renderEntries(childrenContainer, rootPath, data.entries, cache, targetPaths, true);
+                    }
                 } else {
-                    renderAndExpand(childrenContainer, rootPath, data.entries, cache, targetPaths);
+                    showEmptyMessage(childrenContainer);
                 }
-            } else {
-                showEmptyMessage(childrenContainer);
+                // 只有渲染成功才标 loaded
+                childrenContainer.dataset.loaded = 'true';
+            } catch (err) {
+                // 渲染失败：保持未加载状态，让用户下次点击能重试
+                console.error('refreshRoot 渲染失败:', err);
+                childrenContainer.dataset.loaded = '';
+                childrenContainer.innerHTML = '';
+                showErrorMessage(childrenContainer, err.message);
             }
         } else {
             childrenContainer.style.display = 'none';
@@ -144,7 +151,7 @@ async function refreshSidebar() {
     await refreshRoot('TestProjects');
 }
 
-// @anchor: modules_createProject
+// @anchor: archive_createProject
 // 在 sandbox 下创建新项目文件夹并刷新目录树
 
 // ===== 创建项目 =====
@@ -173,7 +180,7 @@ async function createProject(projectName) {
     }
 }
 
-// @anchor: modules_upload
+// @anchor: archive_upload
 // 向指定项目上传文件（含重名覆盖确认）并刷新目录树
 
 // ===== 文件上传 =====

@@ -1,4 +1,4 @@
-// @anchor: processRegistry_tot_desc
+// @anchor: processRegistry_intro
 // 全局子进程登记：所有 Compiler 启动的顶层进程在此登记，JVM 退出时统一回收
 package com.myagent.workflow.core;
 

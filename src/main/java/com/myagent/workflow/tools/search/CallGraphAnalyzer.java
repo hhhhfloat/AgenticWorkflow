@@ -1,3 +1,5 @@
+// @anchor: callGraphAnalyzer_intro
+// 调用图分析：递归解析函数调用关系（find_callees）
 package com.myagent.workflow.tools.search;
 
 import com.myagent.workflow.core.config.AgentConfig;

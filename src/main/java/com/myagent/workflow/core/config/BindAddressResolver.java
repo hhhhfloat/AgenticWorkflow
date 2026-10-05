@@ -1,4 +1,4 @@
-// @anchor: bindAddressResolver_tot_desc
+// @anchor: bindAddressResolver_intro
 // 绑定地址解析：AGENT_BIND 优先，否则探测 Tailscale，最后回退 127.0.0.1
 package com.myagent.workflow.core.config;
 

@@ -1,4 +1,4 @@
-// @anchor: modules_quote
+// @anchor: quote_intro
 // 从文案库中随机抽取一条迭代提示语
 
 // ===== 随机文案抽取 =====

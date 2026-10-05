@@ -1,7 +1,7 @@
-// @anchor: scan_js
+// @anchor: scan_intro
 // 大文件扫描页面：加载、分档筛选、勾选、导出
 
-// @anchor: scan_js_buckets
+// @anchor: scan_buckets
 // 档位定义：每档含 min（含）、max（不含）、label、className
 const SCAN_BUCKETS = [
     { key: 'all',   min: 0,     max: Infinity, label: '全部',       cls: '' },
@@ -18,7 +18,7 @@ let allFiles = [];
 let currentBucket = 'all';
 let selectedPaths = new Set();
 
-// @anchor: scan_js_bucketOf
+// @anchor: scan_bucketOf
 // 返回文件所属档位对象
 function bucketOf(chars) {
     if (chars < 0) return SCAN_BUCKETS[SCAN_BUCKETS.length - 1];  // 超大标记为最高档
@@ -29,7 +29,7 @@ function bucketOf(chars) {
     return SCAN_BUCKETS[1];
 }
 
-// @anchor: scan_js_init
+// @anchor: scan_init
 // 页面初始化：读取路径参数、拉数据、渲染
 async function initScan() {
     const params = new URLSearchParams(location.search);
@@ -54,7 +54,7 @@ async function initScan() {
     }
 }
 
-// @anchor: scan_js_summary
+// @anchor: scan_summary
 // 顶部汇总：总文件数 + 各档计数
 function renderSummary(data) {
     const counts = {};
@@ -71,7 +71,7 @@ function renderSummary(data) {
     document.getElementById('scanSummary').textContent = parts.join(' · ');
 }
 
-// @anchor: scan_js_tabs
+// @anchor: scan_tabs
 // 渲染档位 tab
 function renderTabs() {
     const tabs = document.getElementById('scanTabs');
@@ -92,7 +92,7 @@ function renderTabs() {
     });
 }
 
-// @anchor: scan_js_table
+// @anchor: scan_table
 // 渲染表格
 function renderTable() {
     const tbody = document.getElementById('scanTbody');
@@ -150,14 +150,14 @@ function renderTable() {
     updateSelectedInfo();
 }
 
-// @anchor: scan_js_selectedInfo
+// @anchor: scan_selectedInfo
 // 更新"已选 N 个"显示
 function updateSelectedInfo() {
     document.getElementById('selectedInfo').textContent =
     '已选 ' + selectedPaths.size + ' 个';
 }
 
-// @anchor: scan_js_export
+// @anchor: scan_export
 // 导出选中路径为 txt（每行一个）
 function exportSelected() {
     if (selectedPaths.size === 0) {
@@ -167,7 +167,7 @@ function exportSelected() {
     downloadTxt(Array.from(selectedPaths), 'selected-files.txt');
 }
 
-// @anchor: scan_js_copy
+// @anchor: scan_copy
 // 复制选中路径到剪贴板
 async function copySelected() {
     if (selectedPaths.size === 0) {
@@ -182,7 +182,7 @@ async function copySelected() {
     }
 }
 
-// @anchor: scan_js_exportFiltered
+// @anchor: scan_exportFiltered
 // 导出当前筛选列表
 function exportFiltered() {
     const filtered = currentBucket === 'all'
@@ -195,7 +195,7 @@ function exportFiltered() {
     downloadTxt(filtered.map(f => f.path), 'filtered-' + currentBucket + '.txt');
 }
 
-// @anchor: scan_js_download
+// @anchor: scan_download
 // 触发浏览器下载 txt 文件
 function downloadTxt(lines, filename) {
     const blob = new Blob([lines.join('\n')], {type: 'text/plain;charset=utf-8'});
@@ -207,7 +207,7 @@ function downloadTxt(lines, filename) {
     URL.revokeObjectURL(url);
 }
 
-// @anchor: scan_js_bind
+// @anchor: scan_bind
 // 绑定工具栏按钮
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('selectAll').addEventListener('change', (e) => {

@@ -1,4 +1,4 @@
-// @anchor: sessionResetHandler_tot_desc
+// @anchor: sessionResetHandler_intro
 // 会话重置处理器：POST /session/reset，强制将会话状态归一化为 IDLE
 package com.myagent.workflow.http.handlers.session;
 

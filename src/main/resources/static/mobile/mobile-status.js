@@ -1,3 +1,4 @@
+// @anchor: mobileStatus_intro
 // 手机端状态轮询：驱动按钮、检测任务结束、切回工作会话
 
 async function fetchStatus() {

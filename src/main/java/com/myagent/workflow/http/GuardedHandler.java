@@ -1,4 +1,4 @@
-// @anchor: guardedHandler_tot_desc
+// @anchor: guardedHandler_intro
 // 设备保护包装器：手机锁定期间，桌面端的受保护请求返回 403
 package com.myagent.workflow.http;
 

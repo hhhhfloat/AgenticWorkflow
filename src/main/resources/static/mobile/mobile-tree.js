@@ -1,3 +1,4 @@
+// @anchor: mobileTree_intro
 // 手机端文件树：浏览 sandbox / TestProjects，支持目录展开、文件预览、运行项目
 
 const TREE_ROOTS = ['sandbox', 'TestProjects'];

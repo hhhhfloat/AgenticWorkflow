@@ -1,4 +1,4 @@
-// @anchor: restartHandler_tot_desc
+// @anchor: restartHandler_intro
 // 重启处理器：POST /restart，回复后退出进程（退出码 43）等待外部拉起
 package com.myagent.workflow.http.handlers.system;
 

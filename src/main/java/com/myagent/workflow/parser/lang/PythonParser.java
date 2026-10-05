@@ -1,4 +1,4 @@
-// @anchor: pythonParser_tot_desc
+// @anchor: pythonParser_intro
 // Python 结构解析器：基于缩进识别锚点、导入、类、方法与类变量
 package com.myagent.workflow.parser.lang;
 

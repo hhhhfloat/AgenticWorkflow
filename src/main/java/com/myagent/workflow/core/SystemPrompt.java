@@ -1,4 +1,4 @@
-// @anchor: systemPrompt_tot_desc
+// @anchor: systemPrompt_intro
 // 系统提示词仓库：集中存放交给 Agent 的行为规范与工作流程说明
 package com.myagent.workflow.core;
 

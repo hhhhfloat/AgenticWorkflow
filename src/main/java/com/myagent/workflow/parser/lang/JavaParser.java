@@ -1,4 +1,4 @@
-// @anchor: javaParser_tot_desc
+// @anchor: javaParser_intro
 // Java 结构解析器：优先用 javac AST 提取类/方法/字段，失败时回退正则
 package com.myagent.workflow.parser.lang;
 

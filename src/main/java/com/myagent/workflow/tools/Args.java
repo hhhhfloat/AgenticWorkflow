@@ -1,4 +1,4 @@
-// @anchor: args_tot_desc
+// @anchor: args_intro
 // 工具参数包装：对模型传入的 JSON 参数做类型宽容提取，避免强转崩溃
 package com.myagent.workflow.tools;
 

@@ -1,4 +1,4 @@
-// @anchor: controlHandler_tot_desc
+// @anchor: controlHandler_intro
 // 控制权处理器：GET /control/status 查询，POST /control/switch 切换控制端
 package com.myagent.workflow.http.handlers.system;
 

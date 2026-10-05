@@ -1,4 +1,4 @@
-// @anchor: sessionRenameHandler_tot_desc
+// @anchor: sessionRenameHandler_intro
 // 会话重命名处理器：POST /session/rename，更新会话标题并落盘
 package com.myagent.workflow.http.handlers.session;
 

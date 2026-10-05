@@ -1,4 +1,4 @@
-// @anchor: toolLogFormatter_tot_desc
+// @anchor: toolLogFormatter_intro
 // 工具日志格式化器：只服务于“人类调试日志”，不参与 API 回灌与 rawfile 落盘
 package com.myagent.workflow.core;
 

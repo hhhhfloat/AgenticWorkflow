@@ -1,3 +1,5 @@
+// @anchor: methodDefinition_intro
+// 方法定义结构：签名、修饰符、行范围与所属锚点
 package com.myagent.workflow.model;
 
 import java.util.List;

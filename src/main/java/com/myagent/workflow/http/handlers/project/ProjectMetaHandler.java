@@ -1,4 +1,4 @@
-// @anchor: projectMetaHandler_tot_desc
+// @anchor: projectMetaHandler_intro
 // 项目元信息处理器：GET /project-meta，读取项目入口注册表 .agent_entry.json
 package com.myagent.workflow.http.handlers.project;
 

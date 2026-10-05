@@ -1,4 +1,4 @@
-// @anchor: javaHomeProbe_tot_desc
+// @anchor: javaHomeProbe_intro
 // JDK 根目录探测：环境变量 → 常见发行版安装位置 → 由 java.exe 反推
 package com.myagent.workflow.core.config.env;
 

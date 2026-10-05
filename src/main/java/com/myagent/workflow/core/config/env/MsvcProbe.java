@@ -1,4 +1,4 @@
-// @anchor: msvcProbe_tot_desc
+// @anchor: msvcProbe_intro
 // MSVC 探测：vswhere 或常见安装目录 → cl.exe + include + lib
 package com.myagent.workflow.core.config.env;
 

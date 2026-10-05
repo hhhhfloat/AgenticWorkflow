@@ -1,4 +1,4 @@
-// @anchor: historyRecorder_tot_desc
+// @anchor: historyRecorder_intro
 // 会话历史落盘器：原始 API 日志周期缓存后刷盘，run 结束压缩归档为 .gz
 package com.myagent.workflow.core;
 

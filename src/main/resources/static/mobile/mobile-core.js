@@ -1,6 +1,7 @@
+// @anchor: mobileCore_intro
 // 手机端核心：常量、DOM 引用、全局状态、通用渲染工具
 
-// @anchor: mobile_core_patchFetch
+// @anchor: mobileCore_patchFetch
 // 给所有 mobile 端请求自动加设备标识，服务端据此优先判定身份
 (function patchFetchForDevice() {
     const originalFetch = window.fetch.bind(window);

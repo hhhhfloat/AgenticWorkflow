@@ -1,7 +1,7 @@
-// @anchor: modules_quickPrompts
+// @anchor: quickPrompts_intro
 // 常用话术快捷入口：支持自定义、持久化到 localStorage
 
-// @anchor: modules_quickPrompts_defaults
+// @anchor: quickPrompts_defaults
 // 默认话术：首次使用时写入 localStorage，之后以本地数据为准
 const DEFAULT_QUICK_PROMPTS = [
     { label: '继续',   text: '继续完成 NEXT_STEP 中的任务' },
@@ -19,7 +19,7 @@ const DEFAULT_QUICK_PROMPTS = [
 
 const QUICK_PROMPTS_KEY = 'quickPrompts';
 
-// @anchor: modules_quickPrompts_store
+// @anchor: quickPrompts_store
 // localStorage 读写：空则回落到默认值
 function loadQuickPrompts() {
     try {
@@ -40,13 +40,13 @@ function saveQuickPrompts() {
     } catch (e) {}
 }
 
-// @anchor: modules_quickPrompts_init
+// @anchor: quickPrompts_init
 // 渲染话术 chips 到 #quickPromptBar
 function initQuickPrompts() {
     renderQuickPrompts();
 }
 
-// @anchor: modules_quickPrompts_render
+// @anchor: quickPrompts_render
 // 渲染 chips 列表，末尾附一个"+"按钮
 function renderQuickPrompts() {
     const bar = document.getElementById('quickPromptBar');
@@ -80,7 +80,7 @@ function renderQuickPrompts() {
     bar.appendChild(addBtn);
 }
 
-// @anchor: modules_quickPrompts_add
+// @anchor: quickPrompts_add
 // 添加一条自定义话术
 function addQuickPrompt() {
     const label = prompt('话术名称（显示在按钮上，建议 2-4 字）:');
@@ -94,7 +94,7 @@ function addQuickPrompt() {
     renderQuickPrompts();
 }
 
-// @anchor: modules_quickPrompts_remove
+// @anchor: quickPrompts_remove
 // 删除指定索引的话术（confirm 后生效）
 function removeQuickPrompt(idx) {
     const target = quickPrompts[idx];
@@ -106,7 +106,7 @@ function removeQuickPrompt(idx) {
     renderQuickPrompts();
 }
 
-// @anchor: modules_quickPrompts_reset
+// @anchor: quickPrompts_reset
 // 恢复默认话术列表
 function resetQuickPrompts() {
     if (!confirm('恢复默认话术列表？当前自定义内容将丢失。')) return;
@@ -115,7 +115,7 @@ function resetQuickPrompts() {
     renderQuickPrompts();
 }
 
-// @anchor: modules_quickPrompts_append
+// @anchor: quickPrompts_append
 // 把话术追加到输入框末尾（Shift 点击则替换），触发 autoResize 并聚焦
 function appendQuickPrompt(text, replace) {
     const promptEl = document.getElementById('prompt');

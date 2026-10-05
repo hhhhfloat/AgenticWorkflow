@@ -1,9 +1,9 @@
-// @anchor: modules_tree_render
+// @anchor: treeRender_intro
 // 文件树渲染层：节点构建、目录渲染、文件点击
 
 // ===== 节点构建 =====
 
-// @anchor: modules_tree_buildFileNode
+// @anchor: treeRender_buildFileNode
 // 构建文件节点 DOM（图标 + 文件名 + 点击事件）
 function buildFileNode(filePath, fileName) {
     const fileDiv = document.createElement('div');
@@ -38,7 +38,7 @@ function buildFileNode(filePath, fileName) {
     return fileDiv;
 }
 
-// @anchor: modules_tree_buildNodeShell
+// @anchor: treeRender_buildNodeShell
 // 构建目录节点壳子：label + icon + name + badge + 操作按钮 + childrenContainer
 // 不绑定点击事件（由调用方按场景绑定）
 function buildNodeShell(path, opts) {
@@ -96,7 +96,7 @@ function buildNodeShell(path, opts) {
 
 // ===== 渲染主逻辑 =====
 
-// @anchor: modules_tree_renderTreeNode
+// @anchor: treeRender_renderTreeNode
 // 渲染一个目录节点。
 // cache/targetPaths 传入则优先从缓存读取数据（同步路径）；
 // 不传则点击时按需 fetch（异步懒加载路径）。
@@ -133,7 +133,7 @@ isTestProjects = false, cache = null, targetPaths = null) {
     container.appendChild(wrapper);
 }
 
-// @anchor: modules_tree_renderEntries
+// @anchor: treeRender_renderEntries
 // 遍历 entries 渲染到容器。
 // expand=true 时对 targetPaths 中命中的子目录同步展开（用于刷新保持展开态）。
 // entries 为空 / null 时展示空目录消息。
@@ -172,7 +172,7 @@ function renderEntries(container, parentPath, entries, cache, targetPaths, expan
 
 // ===== 文件点击 =====
 
-// @anchor: modules_tree_handleFileClick
+// @anchor: treeRender_handleFileClick
 // 处理文件点击：html 新窗口打开；md 跳转预览页
 function handleFileClick(filePath) {
     appendLog(`[系统] 点击文件: ${filePath}`);

@@ -1,7 +1,8 @@
-// @anchor: modules_tree_api
+// @anchor: treeApi_intro
 // 文件树数据层：目录浏览、项目元信息、配置读取
 
-// @anchor: modules_tree_fetchDir
+// @anchor: treeApi_fetchDir
+// 拉取指定目录的条目列表（JSON）
 async function fetchDir(path) {
     const url = `/browse?path=${encodeURIComponent(path)}`;
     const res = await fetch(url, {cache: 'no-cache'});
@@ -11,7 +12,7 @@ async function fetchDir(path) {
     return await res.json();
 }
 
-// @anchor: modules_tree_fetchMeta
+// @anchor: treeApi_fetchMeta
 // 拉取项目元信息，不存在或异常返回 null
 async function fetchProjectMeta(path) {
     try {
@@ -23,7 +24,7 @@ async function fetchProjectMeta(path) {
     }
 }
 
-// @anchor: modules_loadConfig
+// @anchor: treeApi_loadConfig
 // 从后端 /config 读取最大迭代次数并回填输入框
 async function loadConfig() {
     try {

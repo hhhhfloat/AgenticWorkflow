@@ -1,4 +1,4 @@
-// @anchor: clearApiKeyHandler_tot_desc
+// @anchor: clearApiKeyHandler_intro
 // 清除 API Key 处理器：POST /clear-api-key，标记后异步退出进程
 package com.myagent.workflow.http.handlers.system;
 

@@ -1,4 +1,4 @@
-// @anchor: httpServerMain_tot_desc
+// @anchor: httpServerMain_intro
 // HTTP 服务入口：校验 API Key、初始化配置与会话、注册路由并启动服务
 package com.myagent.workflow.http;
 
@@ -143,7 +143,7 @@ public class HttpServerMain {
                 // read() 返回 -1，主服务随之退出，避免孤儿进程
                 try {
                     while (System.in.read() != -1) { /* 忽略输入 */ }
-                } catch (java.io.IOException ignored) {
+                } catch (IOException ignored) {
                 }
                 System.out.println("父进程已断开，主服务退出");
             } else {
@@ -221,7 +221,7 @@ public class HttpServerMain {
             String path = "127.0.0.1".equals(bindAddr) ? "/" : "/qr.html";
             String url = "http://" + bindAddr + ":" + PORT + path;
             if (java.awt.Desktop.isDesktopSupported()) {
-                java.awt.Desktop.getDesktop().browse(new java.net.URI(url));
+                java.awt.Desktop.getDesktop().browse(new URI(url));
                 System.out.println("🌐 已自动打开浏览器: " + url);
             }
         } catch (Exception e) {
@@ -276,6 +276,7 @@ public class HttpServerMain {
     private static void startParentWatcher() {
         ProcessHandle parent = ProcessHandle.current().parent().orElse(null);
         if (parent == null) return;
+        System.err.println("[ParentWatcher] 监控父进程 PID=" + parent.pid());
         Thread t = new Thread(() -> {
             while (true) {
                 try {
@@ -284,8 +285,8 @@ public class HttpServerMain {
                     return;
                 }
                 if (!parent.isAlive()) {
-                    System.err.println("⚠️ 父进程已退出，主服务主动关闭");
-                    System.exit(0);   // 触发 shutdown hook → ProcessRegistry.killAll
+                    System.err.println("[ParentWatcher] 父进程 PID=" + parent.pid() + " 已退出，主服务主动关闭");
+                    System.exit(0);
                 }
             }
         }, "ParentWatcher");

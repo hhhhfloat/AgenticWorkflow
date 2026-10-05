@@ -1,4 +1,4 @@
-// @anchor: sessionManager_tot_desc
+// @anchor: sessionManager_intro
 // 会话管理器：内存活跃会话容器 + 磁盘存储协调者，并以信号量控制全局串行
 package com.myagent.workflow.session;
 

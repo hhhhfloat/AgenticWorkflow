@@ -1,4 +1,4 @@
-// @anchor: nodeProbe_tot_desc
+// @anchor: nodeProbe_intro
 // Node.js 探测：PATH → 常见安装位置与 nvm/scoop 目录
 package com.myagent.workflow.core.config.env;
 

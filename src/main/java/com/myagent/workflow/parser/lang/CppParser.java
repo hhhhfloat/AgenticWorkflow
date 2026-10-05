@@ -1,4 +1,4 @@
-// @anchor: cppParser_tot_desc
+// @anchor: cppParser_intro
 // C/C++ 结构解析器：提取锚点、#include、命名空间、类、方法与字段
 package com.myagent.workflow.parser.lang;
 

@@ -1,4 +1,4 @@
-// @anchor: stopHandler_tot_desc
+// @anchor: stopHandler_intro
 // 停止处理器：POST /stop，向指定会话发送停止信号
 package com.myagent.workflow.http.handlers.run;
 

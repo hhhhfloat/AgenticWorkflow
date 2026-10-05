@@ -1,4 +1,4 @@
-// @anchor: logFileWriter_tot_desc
+// @anchor: logFileWriter_intro
 // 运行日志写入器：在 HistoryOutput/{sessionId}/ 下按时间戳建日志文件并逐行落盘
 package com.myagent.workflow.http;
 

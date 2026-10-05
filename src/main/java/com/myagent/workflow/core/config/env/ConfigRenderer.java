@@ -1,4 +1,4 @@
-// @anchor: configRenderer_tot_desc
+// @anchor: configRenderer_intro
 // 配置渲染：properties 文本生成 + 探测摘要打印
 package com.myagent.workflow.core.config.env;
 

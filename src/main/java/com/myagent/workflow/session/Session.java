@@ -1,4 +1,4 @@
-// @anchor: session_tot_desc
+// @anchor: session_intro
 // 会话实体：多轮对话的一等公民，持有上下文、元数据、运行任务与日志转发
 package com.myagent.workflow.session;
 

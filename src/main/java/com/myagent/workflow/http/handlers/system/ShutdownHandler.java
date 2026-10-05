@@ -1,4 +1,4 @@
-// @anchor: shutdownHandler_tot_desc
+// @anchor: shutdownHandler_intro
 // 退出处理器：POST /shutdown，先回 200 再异步退出主服务进程
 package com.myagent.workflow.http.handlers.system;
 

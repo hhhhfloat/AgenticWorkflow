@@ -1,4 +1,4 @@
-// @anchor: agentConfig_tot_desc
+// @anchor: agentConfig_intro
 // 运行配置模型（record）：外部化工具链字段 + 系统级常量 + 配置加载与默认值兜底
 package com.myagent.workflow.core.config;
 

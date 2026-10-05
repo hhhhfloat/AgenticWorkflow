@@ -1,4 +1,4 @@
-// @anchor: shellPathResolver_tot_desc
+// @anchor: shellPathResolver_intro
 // PATH 探测：按 PATHEXT 依次尝试可执行文件后缀
 package com.myagent.workflow.core.config.env;
 

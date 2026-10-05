@@ -1,3 +1,5 @@
+// @anchor: classDefinition_intro
+// 类定义结构：名称、类型、父类、成员与锚点、行范围
 package com.myagent.workflow.model;
 
 import java.util.List;

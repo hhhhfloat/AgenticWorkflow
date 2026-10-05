@@ -1,4 +1,4 @@
-// @anchor: modules_sessionList
+// @anchor: sessionList_intro
 // 会话列表的加载 / 渲染 / 切换 / 高亮与会话历史回放
 
 // ===== 会话列表：渲染、切换、历史加载 =====

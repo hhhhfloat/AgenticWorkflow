@@ -1,3 +1,5 @@
+// @anchor: anchorManager_intro
+// 锚点工具统一入口：区间读写、脏文件刷新与索引重建
 package com.myagent.workflow.tools.anchor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;

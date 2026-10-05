@@ -1,3 +1,5 @@
+// @anchor: fileOperator_intro
+// 沙箱文件操作：写入/读取/删除/列目录（原子写）
 package com.myagent.workflow.tools;
 
 import org.slf4j.Logger;

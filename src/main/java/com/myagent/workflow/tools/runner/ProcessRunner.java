@@ -1,4 +1,4 @@
-// @anchor: processRunner_tot_desc
+// @anchor: processRunner_intro
 // 进程执行器：安全环境 + 工作目录校验 + 输出异步 drain + 超时/阻塞检测 + 进程树回收
 package com.myagent.workflow.tools.runner;
 

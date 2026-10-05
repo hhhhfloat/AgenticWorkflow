@@ -1,4 +1,4 @@
-// @anchor: sessionStorage_tot_desc
+// @anchor: sessionStorage_intro
 // 会话磁盘存储：负责 Session 的持久化（meta/jsonl/索引）与加载还原
 package com.myagent.workflow.session;
 

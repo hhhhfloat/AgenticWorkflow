@@ -1,4 +1,4 @@
-// @anchor: sessionHistoryHandler_tot_desc
+// @anchor: sessionHistoryHandler_intro
 // 会话历史处理器：GET /session/history，返回会话的持久消息与元信息
 package com.myagent.workflow.http.handlers.session;
 

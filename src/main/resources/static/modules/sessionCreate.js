@@ -1,7 +1,7 @@
-// @anchor: modules_sessionCreate
+// @anchor: sessionCreate_intro
 // 新建会话弹窗：选择工作项目后创建会话并切换
 
-// @anchor: modules_sessionCreate_open
+// @anchor: sessionCreate_open
 // 打开新建会话弹窗：拉取沙箱项目列表并渲染
 async function openSessionCreateModal() {
     const listEl = document.getElementById('projectList');
@@ -36,7 +36,7 @@ async function openSessionCreateModal() {
     }
 }
 
-// @anchor: modules_sessionCreate_create
+// @anchor: sessionCreate_create
 // 用指定项目创建会话，成功后切换并刷新列表
 async function createSessionWithProject(project) {
     try {
@@ -64,14 +64,14 @@ async function createSessionWithProject(project) {
     }
 }
 
-// @anchor: modules_sessionCreate_close
+// @anchor: sessionCreate_close
 // 关闭新建会话弹窗
 function closeSessionCreateModal() {
     const modal = document.getElementById('sessionCreateModal');
     if (modal) modal.style.display = 'none';
 }
 
-// @anchor: modules_sessionCreate_updateSelector
+// @anchor: sessionCreate_updateSelector
 // 更新顶部工作项目显示
 function updateProjectSelector(project) {
     const el = document.getElementById('currentProjectName');
@@ -79,7 +79,7 @@ function updateProjectSelector(project) {
     el.textContent = project || '未选择';
 }
 
-// @anchor: modules_sessionCreate_bindEvents
+// @anchor: sessionCreate_bindEvents
 // 绑定弹窗的关闭事件与遮罩点击
 document.addEventListener('DOMContentLoaded', () => {
     const closeBtn = document.getElementById('closeSessionCreateBtn');

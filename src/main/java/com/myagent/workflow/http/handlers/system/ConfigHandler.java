@@ -1,4 +1,4 @@
-// @anchor: configHandler_tot_desc
+// @anchor: configHandler_intro
 // 配置处理器：GET /config，向前端返回默认配置项
 package com.myagent.workflow.http.handlers.system;
 

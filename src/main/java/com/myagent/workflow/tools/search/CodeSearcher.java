@@ -1,3 +1,5 @@
+// @anchor: codeSearcher_intro
+// 检索门面：聚合文本检索、引用查找与调用图分析
 package com.myagent.workflow.tools.search;
 
 // @anchor: codeSearcher_class

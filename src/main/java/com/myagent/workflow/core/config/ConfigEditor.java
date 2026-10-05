@@ -1,4 +1,4 @@
-// @anchor: configEditor_tot_desc
+// @anchor: configEditor_intro
 // 运行配置装配器：把前端请求中的 config 字段覆盖到默认配置之上
 package com.myagent.workflow.core.config;
 

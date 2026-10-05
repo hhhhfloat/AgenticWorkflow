@@ -1,11 +1,11 @@
-// @anchor: modules_status
+// @anchor: status_intro
 // 后端状态轮询：驱动按钮状态、任务结束检测与首次重连
 
 // ===== 全局状态 =====
 let globalStatus = { running: false, sessionId: null, title: null, heartbeatStale: false };
 let lastAppliedRunning = null;
 
-// @anchor: modules_status_fetch
+// @anchor: status_fetch
 // 拉取 /status，失败返回 null（不阻塞轮询）
 async function fetchStatus() {
     try {
@@ -16,7 +16,7 @@ async function fetchStatus() {
     }
 }
 
-// @anchor: modules_applyStatusToUI
+// @anchor: status_applyStatusToUI
 // 根据 /status 结果刷新按钮；仅在 running 状态变化时更新，避免覆盖用户乐观状态
 function applyStatusToUI(s) {
     const running = !!s.running;
@@ -39,7 +39,7 @@ function applyStatusToUI(s) {
     }
 }
 
-// @anchor: modules_switchToWorkSession
+// @anchor: status_switchToWorkSession
 // 切换到正在运行的工作会话，并订阅其日志流
 async function switchToWorkSession() {
     const sid = globalStatus.sessionId;
@@ -57,7 +57,7 @@ async function switchToWorkSession() {
     if (typeof openStream === 'function') openStream(sid);
 }
 
-// @anchor: modules_pollStatus
+// @anchor: status_pollStatus
 // 周期性查询 /status，检测任务结束并驱动 UI
 async function pollStatus() {
     const data = await fetchStatus();
@@ -77,14 +77,14 @@ async function pollStatus() {
     }
 }
 
-// @anchor: modules_startStatusPolling
+// @anchor: status_startStatusPolling
 // 启动 3 秒一次的状态轮询
 function startStatusPolling() {
     pollStatus();
     setInterval(pollStatus, 3000);
 }
 
-// @anchor: modules_checkBackendStatus
+// @anchor: status_checkBackendStatus
 // 页面加载时首次检查：若有任务在跑，跳到工作会话并订阅日志
 async function checkBackendStatus() {
     const data = await fetchStatus();

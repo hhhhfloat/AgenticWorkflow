@@ -1,4 +1,4 @@
-// @anchor: mavenProbe_tot_desc
+// @anchor: mavenProbe_intro
 // Maven 探测：PATH → MAVEN_HOME/M2_HOME → IDE 自带与常见安装位置
 package com.myagent.workflow.core.config.env;
 

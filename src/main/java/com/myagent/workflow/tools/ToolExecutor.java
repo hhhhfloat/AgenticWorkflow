@@ -1,3 +1,5 @@
+// @anchor: toolExecutor_intro
+// 工具分发：按工具名校验后执行并返回结果
 package com.myagent.workflow.tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;

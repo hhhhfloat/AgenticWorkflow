@@ -1,4 +1,4 @@
-// @anchor: staticHandler_tot_desc
+// @anchor: staticHandler_intro
 // 静态资源处理器：把 classpath 下 /static 资源映射到根路径并提供访问
 package com.myagent.workflow.http.handlers.staticres;
 

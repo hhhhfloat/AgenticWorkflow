@@ -1,4 +1,4 @@
-// @anchor: modules_usageStore
+// @anchor: usageStore_intro
 // 会话用量面板：从后端拉取累计数据并渲染
 
 function renderUsagePanel() {

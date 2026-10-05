@@ -1,4 +1,4 @@
-// @anchor: streamHandler_tot_desc
+// @anchor: streamHandler_intro
 // 日志流处理器：GET /stream?sessionId=xxx，只读订阅会话实时日志
 package com.myagent.workflow.http.handlers.run;
 

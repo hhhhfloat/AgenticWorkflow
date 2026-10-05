@@ -1,3 +1,5 @@
+// @anchor: searchFilter_intro
+// 检索文件收集与过滤：扩展名匹配、默认排除目录
 package com.myagent.workflow.tools.search;
 
 import java.io.IOException;

@@ -1,3 +1,5 @@
+// @anchor: anchorFormatter_intro
+// 锚点描述输出：项目/目录/文件的锚点清单渲染
 package com.myagent.workflow.tools.anchor;
 
 import com.fasterxml.jackson.core.type.TypeReference;

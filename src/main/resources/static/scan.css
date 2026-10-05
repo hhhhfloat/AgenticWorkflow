@@ -1,7 +1,7 @@
-/* @anchor: scan_css */
+/* @anchor: scanStyle_intro */
 /* 大文件扫描页面样式 */
 
-/* @anchor: scan_css_override */
+/* @anchor: scanStyle_override */
 /* 覆盖主工作台的 html/body 布局：扫描页需要自然滚动 */
 html, body {
     height: auto;

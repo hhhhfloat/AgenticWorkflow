@@ -1,4 +1,4 @@
-// @anchor: sessionMeta_tot_desc
+// @anchor: sessionMeta_intro
 // 会话元数据模型：用于前端列表展示与磁盘持久化
 package com.myagent.workflow.session;
 

@@ -1,3 +1,5 @@
+// @anchor: textSearcher_intro
+// 文本检索：按关键字与文件模式搜索简单文本
 package com.myagent.workflow.tools.search;
 
 import com.myagent.workflow.tools.PathUtils;

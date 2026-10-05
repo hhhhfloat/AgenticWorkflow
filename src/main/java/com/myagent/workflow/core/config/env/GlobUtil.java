@@ -1,4 +1,4 @@
-// @anchor: globUtil_tot_desc
+// @anchor: globUtil_intro
 // 简易单级 glob 匹配 + 版本号排序
 package com.myagent.workflow.core.config.env;
 

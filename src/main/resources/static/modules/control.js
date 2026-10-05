@@ -1,4 +1,4 @@
-// @anchor: modules_control
+// @anchor: control_intro
 // 桌面端控制权：拉取服务到电脑端，或在被锁时显示 banner
 
 async function refreshController() {

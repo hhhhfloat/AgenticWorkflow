@@ -1,4 +1,4 @@
-// @anchor: securityConfig_tot_desc
+// @anchor: securityConfig_intro
 // 安全规则开关配置：当前默认全部启用，预留按规则 ID 配置的能力
 package com.myagent.workflow.security;
 

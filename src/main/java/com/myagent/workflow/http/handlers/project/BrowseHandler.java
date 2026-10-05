@@ -1,4 +1,4 @@
-// @anchor: browseHandler_tot_desc
+// @anchor: browseHandler_intro
 // 目录浏览处理器：GET /browse，列出 sandbox/TestProjects 下的条目
 package com.myagent.workflow.http.handlers.project;
 

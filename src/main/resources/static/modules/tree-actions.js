@@ -1,7 +1,7 @@
-// @anchor: modules_tree_actions
+// @anchor: treeActions_intro
 // 文件树操作层：节点按钮注入、更多菜单、上传对话框
 
-// @anchor: modules_tree_addActionButtons
+// @anchor: treeActions_addActionButtons
 // 节点操作按钮注入：合并为单个 ⋯ 菜单
 function addActionButtons(label, path, isRoot) {
     const parts = path.split('/');
@@ -81,7 +81,7 @@ function addActionButtons(label, path, isRoot) {
     }
 }
 
-// @anchor: modules_tree_uploadDialog
+// @anchor: treeActions_uploadDialog
 // 弹出文件选择框并上传到指定项目
 async function uploadFilesDialog(projectName) {
     const input = document.createElement('input');
@@ -98,7 +98,7 @@ async function uploadFilesDialog(projectName) {
     input.click();
 }
 
-// @anchor: modules_tree_moreBtn
+// @anchor: treeActions_moreBtn
 // 创建 ⋯ 按钮，点击时弹出操作菜单
 function createMoreBtn(items) {
     const btn = document.createElement('button');
@@ -115,7 +115,7 @@ function createMoreBtn(items) {
 
 // ===== 更多菜单 =====
 
-// @anchor: modules_tree_moreMenu
+// @anchor: treeActions_moreMenu
 // 全局单例菜单元素与显示/隐藏逻辑
 let _moreMenuEl = null;
 

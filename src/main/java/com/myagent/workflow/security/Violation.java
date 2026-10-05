@@ -1,4 +1,4 @@
-// @anchor: violation_tot_desc
+// @anchor: violation_intro
 // 单条违规记录模型：描述命中的规则、位置、文本与修复建议
 package com.myagent.workflow.security;
 

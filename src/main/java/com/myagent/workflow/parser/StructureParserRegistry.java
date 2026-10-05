@@ -1,4 +1,4 @@
-// @anchor: structureParserRegistry_tot_desc
+// @anchor: structureParserRegistry_intro
 // 解析器注册中心：按文件扩展名分发到对应语言的结构解析器
 package com.myagent.workflow.parser;
 

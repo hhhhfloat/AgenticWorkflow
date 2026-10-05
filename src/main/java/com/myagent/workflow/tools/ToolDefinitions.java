@@ -1,3 +1,5 @@
+// @anchor: toolDefinitions_intro
+// 工具定义：向模型暴露的工具 JSON schema
 package com.myagent.workflow.tools;
 
 import java.util.ArrayList;

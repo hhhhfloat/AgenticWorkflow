@@ -1,4 +1,4 @@
-// @anchor: pathPolicy_tot_desc
+// @anchor: pathPolicy_intro
 // 工具路径策略：沙箱边界、工作项目限定与 UPDATE.md 特殊规则
 package com.myagent.workflow.tools;
 

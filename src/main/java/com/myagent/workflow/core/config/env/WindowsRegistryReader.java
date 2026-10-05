@@ -1,4 +1,4 @@
-// @anchor: windowsRegistryReader_tot_desc
+// @anchor: windowsRegistryReader_intro
 // Windows 卸载注册表读取：筛选含关键词的安装目录
 package com.myagent.workflow.core.config.env;
 

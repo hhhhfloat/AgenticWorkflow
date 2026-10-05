@@ -1,3 +1,5 @@
+// @anchor: fileStructure_intro
+// 文件结构顶层容器：包、导入、类、函数、字段与锚点
 package com.myagent.workflow.model;
 
 import java.util.List;

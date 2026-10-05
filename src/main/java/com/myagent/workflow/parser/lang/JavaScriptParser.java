@@ -1,4 +1,4 @@
-// @anchor: javaScriptParser_tot_desc
+// @anchor: javaScriptParser_intro
 // JavaScript/TypeScript 结构解析器：提取锚点、导入、类、方法、字段与顶层函数
 package com.myagent.workflow.parser.lang;
 

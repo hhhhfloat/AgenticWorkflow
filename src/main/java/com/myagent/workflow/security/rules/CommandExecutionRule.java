@@ -1,4 +1,4 @@
-// @anchor: commandExecutionRule_tot_desc
+// @anchor: commandExecutionRule_intro
 // 命令执行规则：检测 Runtime.exec/ProcessBuilder/os.system/subprocess 等系统命令调用
 package com.myagent.workflow.security.rules;
 

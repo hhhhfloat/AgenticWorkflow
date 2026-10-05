@@ -1,4 +1,4 @@
-// @anchor: modules_sidebar
+// @anchor: sidebar_intro
 // 侧边栏整体折叠 / 展开切换
 
 // ===== 侧边栏折叠切换 =====

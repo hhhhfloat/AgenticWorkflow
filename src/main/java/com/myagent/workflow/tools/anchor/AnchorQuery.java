@@ -1,3 +1,5 @@
+// @anchor: anchorQuery_intro
+// 锚点查询：按 id、文件或全局定位锚点位置
 package com.myagent.workflow.tools.anchor;
 
 import com.fasterxml.jackson.core.type.TypeReference;

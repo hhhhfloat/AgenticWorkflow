@@ -1,3 +1,5 @@
+// @anchor: anchorIndex_intro
+// 锚点索引构建：生成与增量刷新 .anchors.json / .project_index.json
 package com.myagent.workflow.tools.anchor;
 
 import com.fasterxml.jackson.core.type.TypeReference;

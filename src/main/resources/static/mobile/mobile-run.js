@@ -1,3 +1,4 @@
+// @anchor: mobileRun_intro
 // 手机端运行：SSE 流、停止、心跳、usage、日志拉取
 
 // ===== SSE 事件处理 =====
@@ -94,7 +95,7 @@ async function runAgent() {
     }
 }
 
-// @anchor: mobile_abortRun
+// @anchor: mobileRun_abortRun
 // 主动断开 /run 的 SSE（不停止后端任务）；切会话时避免日志串台
 function abortRun() {
     if (mobileRunAbort) {
@@ -103,7 +104,7 @@ function abortRun() {
     }
 }
 
-// @anchor: mobile_renderRunLogs
+// @anchor: mobileRun_renderRunLogs
 // 从 /session/logs 拉取会话最近一轮日志，追加为折叠块
 async function renderRunLogs(sessionId) {
     if (!sessionId) return;
@@ -137,7 +138,7 @@ async function renderRunLogs(sessionId) {
     }
 }
 
-// @anchor: mobile_onTaskFinished
+// @anchor: mobileRun_onTaskFinished
 // 由 pollStatus 调用：任务结束时刷新 UI
 async function onTaskFinished(finishedSessionId) {
     await loadSessionList();

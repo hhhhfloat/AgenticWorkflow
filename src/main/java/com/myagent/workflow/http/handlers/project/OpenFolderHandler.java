@@ -1,4 +1,4 @@
-// @anchor: openFolderHandler_tot_desc
+// @anchor: openFolderHandler_intro
 // 打开文件夹处理器：GET /openFolder，白名单内调用系统资源管理器
 package com.myagent.workflow.http.handlers.project;
 

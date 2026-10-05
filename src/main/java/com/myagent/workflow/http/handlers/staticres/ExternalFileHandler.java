@@ -1,4 +1,4 @@
-// @anchor: externalFileHandler_tot_desc
+// @anchor: externalFileHandler_intro
 // 外部目录文件处理器：映射 /TestProjects 与 /sandbox 前缀到本地文件
 package com.myagent.workflow.http.handlers.staticres;
 

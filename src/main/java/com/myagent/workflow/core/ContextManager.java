@@ -1,4 +1,4 @@
-// @anchor: contextManager_tot_desc
+// @anchor: contextManager_intro
 // 上下文管理器：双区消息存储（不可变基础区 + 易失工作区）、多轮对话与快照恢复
 package com.myagent.workflow.core;
 

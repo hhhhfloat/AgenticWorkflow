@@ -1,4 +1,4 @@
-// @anchor: mingwProbe_tot_desc
+// @anchor: mingwProbe_intro
 // MinGW 探测：PATH → 由 gcc 反推 → 注册表 → 全盘限深扫描
 package com.myagent.workflow.core.config.env;
 

@@ -1,4 +1,4 @@
-// @anchor: modules_events
+// @anchor: events_intro
 // 绑定侧边栏视图切换与运行 / 停止 / 清空等界面事件
 
 // ===== 事件绑定 =====
@@ -69,7 +69,7 @@ window.addEventListener('beforeunload', () => {
     }
 });
 
-// @anchor: modules_visibility
+// @anchor: events_visibility
 // 页面切回前台时立即补发心跳，避免后端超时断开
 
 // ===== 页面可见性变化：切回前台时立即心跳，防止后端超时断开 =====
@@ -85,7 +85,7 @@ document.getElementById('logBtn').addEventListener('click', () => {
     openFolder('HistoryOutput');
 });
 
-// @anchor: modules_init
+// @anchor: events_init
 // 页面加载完成时初始化配置 / 会话 / 文件树 / 心跳
 
 // ===== DOMContentLoaded 初始化 =====

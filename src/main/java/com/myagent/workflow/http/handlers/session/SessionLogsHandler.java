@@ -1,4 +1,4 @@
-// @anchor: sessionLogsHandler_tot_desc
+// @anchor: sessionLogsHandler_intro
 // 会话日志处理器：GET /session/logs，返回指定会话最近一轮的运行日志尾部
 package com.myagent.workflow.http.handlers.session;
 

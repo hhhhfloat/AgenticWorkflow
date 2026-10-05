@@ -1,4 +1,4 @@
-// @anchor: modules_log_utils
+// @anchor: log_intro
 // 日志辅助：判断文本是否 Markdown、HTML 转义
 
 // ===== 日志输出工具函数 =====
@@ -22,7 +22,7 @@ function updateScrollBottomBtn() {
     btn.hidden = isScrolledToBottom(output);
 }
 
-// @anchor: modules_log_append
+// @anchor: log_append
 // 将消息按类型着色渲染到 #output，支持对话气泡与迭代提示
 
 // ===== 日志输出模块（整合迭代提示） =====
@@ -106,7 +106,7 @@ function appendMessage(role, content) {
     updateScrollBottomBtn();
 }
 
-// @anchor: modules_log_linkifySandbox
+// @anchor: log_linkifySandbox
 // 将 /sandbox/xxx.html 形式的相对路径转为 Markdown 链接，供浏览器点击预览
 function linkifySandboxPaths(text) {
     return text.replace(

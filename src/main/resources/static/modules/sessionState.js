@@ -1,4 +1,4 @@
-// @anchor: modules_sessionState
+// @anchor: sessionStateUi_intro
 // 当前会话 ID 的本地存储读写与草稿态判断
 
 // ===== 当前会话 ID 的本地存储 =====

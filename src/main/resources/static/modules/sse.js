@@ -1,10 +1,11 @@
-// @anchor: modules_sse
+// @anchor: sse_intro
 // 以 SSE 流式执行 Agent 请求，逐条渲染输出并处理特殊事件
 
 // ===== 运行中状态 =====
 let desktopRunAbort = null;
 
-// @anchor: modules_runAgent
+// @anchor: sse_runAgent
+// 运行 Agent：POST /run 建立 SSE 流并逐条渲染输出
 async function runAgent(prompt, maxIterations) {
     if (!isDraftSession()) {
         await loadSessionHistory(getCurrentSessionId());
@@ -79,7 +80,7 @@ async function runAgent(prompt, maxIterations) {
     }
 }
 
-// @anchor: modules_abortRun
+// @anchor: sse_abortRun
 // 主动断开 /run 的 SSE（不停止后端任务）；用于切换会话时避免日志串台
 function abortRun() {
     if (desktopRunAbort) {
@@ -88,7 +89,8 @@ function abortRun() {
     }
 }
 
-// @anchor: modules_handleSpecialEvent
+// @anchor: sse_handleSpecialEvent
+// 识别 usage/session 特殊事件，返回是否已被消费
 function handleSpecialEvent(data) {
     // [结束] 只是标记，UI 状态交给 pollStatus 判定
     if (data === '[结束]') return true;
@@ -120,7 +122,7 @@ function handleSpecialEvent(data) {
     return false;
 }
 
-// @anchor: modules_renderRunLogs
+// @anchor: sse_renderRunLogs
 // 从 /session/logs 拉取会话最近一轮日志，追加为折叠块
 async function renderRunLogs(sessionId) {
     if (!sessionId) return;
@@ -154,7 +156,7 @@ async function renderRunLogs(sessionId) {
     }
 }
 
-// @anchor: modules_onTaskFinished
+// @anchor: sse_onTaskFinished
 // 由 pollStatus 调用：任务结束时刷新 UI
 async function onTaskFinished(finishedSessionId) {
     refreshSandbox();
@@ -165,7 +167,7 @@ async function onTaskFinished(finishedSessionId) {
     }
 }
 
-// @anchor: modules_stop
+// @anchor: sse_stop
 // 请求 /stop 停止正在运行的任务
 async function stopAgent() {
     if (!isRunning) return;
@@ -190,7 +192,7 @@ async function stopAgent() {
     }
 }
 
-// @anchor: modules_desktop_stream
+// @anchor: sse_desktopStream
 // 桌面端只读日志流：订阅 /stream 观看正在运行任务的实时日志
 let desktopStreamAbort = null;
 

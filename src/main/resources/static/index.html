@@ -1,9 +1,11 @@
+<!-- @anchor: index_intro -->
+<!-- 桌面端工作台主页面：侧边栏、主工作区、配置弹窗与脚本加载 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <title>本地 Agent 工作台</title>
-    <!-- @anchor: html_head -->
+    <!-- @anchor: index_head -->
     <!-- 页面 head：引入 marked 渲染库与全局样式表 -->
     <script src="marked.min.js"></script>
     <link rel="stylesheet" href="style.css">
@@ -15,7 +17,7 @@
 </div>
 <div id="app">
     <!-- ===== 侧边栏 ===== -->
-    <!-- @anchor: html_sidebar -->
+    <!-- @anchor: index_sidebar -->
     <!-- 侧边栏：视图切换、工作项目、文件树视图与会话视图 -->
     <div id="sidebar">
         <div id="sidebarHeader">
@@ -53,7 +55,7 @@
     </div>
 
     <!-- ===== 主工作区 ===== -->
-    <!-- @anchor: html_main -->
+    <!-- @anchor: index_main -->
     <!-- 主工作区：标题、日志输出、用量面板与输入区 -->
     <div id="main">
         <div id="mainHeader">
@@ -67,7 +69,7 @@
 
         <div id="usagePanel" class="usage-panel"></div>
         <!-- 输入区（底部固定） -->
-        <!-- @anchor: html_inputArea -->
+        <!-- @anchor: index_inputArea -->
         <!-- 输入区：提示词、历史、迭代次数与运行/停止/清空/日志/配置按钮 -->
         <div id="inputArea">
             <textarea id="prompt" placeholder="输入你的需求，例如：写一个 HTML 计算器，支持加减乘除">写一个 HTML 计算器，支持加减乘除</textarea>
@@ -90,7 +92,7 @@
         </div>
 
         <!-- ===== 配置弹窗 ===== -->
-        <!-- @anchor: html_configModal -->
+        <!-- @anchor: index_configModal -->
         <!-- 配置弹窗：API Key、模型、编译工具链路径与安全扫描开关 -->
         <div id="configModal" class="modal" style="display:none;">
             <div class="modal-content">
@@ -165,7 +167,7 @@
         </div>
 
         <!-- ===== 新建会话弹窗 ===== -->
-        <!-- @anchor: html_sessionCreateModal -->
+        <!-- @anchor: index_sessionCreateModal -->
         <!-- 新建会话弹窗：选择工作项目后创建会话 -->
         <div id="sessionCreateModal" class="modal" style="display:none;">
             <div class="modal-content">
@@ -185,7 +187,7 @@
     </div>
 </div>
 
-<!-- @anchor: html_scripts -->
+<!-- @anchor: index_scripts -->
 <!-- 脚本加载顺序：第三方库 → 核心模块 → 各功能模块 → 事件绑定与初始化 -->
 <!-- 第三方库 -->
 <script src="tips.js"></script>

@@ -1,3 +1,5 @@
+// @anchor: pathUtils_intro
+// 沙箱路径解析：归一化并强制限制在 ./sandbox 内
 package com.myagent.workflow.tools;
 
 

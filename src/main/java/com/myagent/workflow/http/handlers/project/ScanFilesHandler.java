@@ -1,4 +1,4 @@
-// @anchor: scanFilesHandler_tot_desc
+// @anchor: scanFilesHandler_intro
 // 大文件扫描处理器：GET /scan-files，统计项目内文本文件字符数并按倒序返回
 package com.myagent.workflow.http.handlers.project;
 

@@ -1,4 +1,4 @@
-// @anchor: sessionCloseHandler_tot_desc
+// @anchor: sessionCloseHandler_intro
 // 会话关闭处理器：POST /session/close，停止并归档会话后从内存卸载
 package com.myagent.workflow.http.handlers.session;
 

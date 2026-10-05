@@ -1,3 +1,5 @@
+// @anchor: anchorScanner_intro
+// 锚点扫描：从源文件抽取锚点、描述与所属符号
 package com.myagent.workflow.tools.anchor;
 
 import com.myagent.workflow.model.ClassDefinition;

@@ -1,3 +1,4 @@
+// @anchor: mobileSession_intro
 // 手机端会话：本地 ID 存取、列表、历史、切换、新建、抽屉与 tab
 
 // ===== 会话 ID 本地存取 =====
