@@ -57,18 +57,27 @@ public class AnchorManager {
     // @anchor: anchorManager_insertAtAnchor
 // 在锚点前/后插入代码，并标记文件为脏
     String insertAtAnchor(String anchorId, String content, String position, String file) {
-        if(anchorId == null || anchorId.isBlank()){
+        if (anchorId == null || anchorId.isBlank()) {
             return "❌ 缺少参数 anchor_id";
         }
         if (content == null) return "❌ 缺少参数 content";
-        if(!"before".equals(position) && !"after".equals(position)){
+        if (!"before".equals(position) && !"after".equals(position)) {
             return "❌ position 必须是 'before' 或 'after'，收到: " + position;
         }
-        AnchorLocation loc = resolveAnchor(anchorId,file);
+        AnchorLocation loc = resolveAnchor(anchorId, file);
         if (loc == null) return buildResolveError(anchorId, file);
 
         if (workProject != null && !workProject.equals(loc.projectPath)) {
             return "❌ 只能修改工作项目 [" + workProject + "]，当前锚点属于: " + loc.projectPath;
+        }
+
+        // UPDATE.md 特殊约束：末尾锚点只能在其之前插入
+        if ("after".equals(position)
+                && loc.filePath != null
+                && loc.filePath.toLowerCase().endsWith("update.md")
+                && isLastAnchorInFile(loc)) {
+            return "❌ UPDATE.md 的末尾锚点 [" + anchorId + "] 只能在其之前插入。\n" +
+                    "  请改用 position='before'，以保证末尾锚点始终位于文件末尾。\n";
         }
 
         try {
@@ -316,6 +325,28 @@ public class AnchorManager {
         sb.append("请在 file 参数中指定目标文件。\n");
         sb.append("建议：后续避免跨文件使用相同锚点 ID。");
         return sb.toString();
+    }
+
+    // @anchor: anchorManager_isLastAnchorInFile
+    /**
+     * 判断给定锚点是否是其所在文件中的末位锚点（行号最大）。
+     * 用于 UPDATE.md 的末尾锚点插入约束。
+     * 查询失败时返回 false，保守放行（不阻塞正常插入）。
+     */
+    private boolean isLastAnchorInFile(AnchorLocation loc) {
+        try {
+            Path filePath = PathUtils.safeResolve(loc.projectPath, loc.filePath);
+            if (!Files.exists(filePath)) return false;
+            List<Map<String, Object>> anchors = AnchorScanner.scan(filePath);
+            int maxLine = 0;
+            for (Map<String, Object> a : anchors) {
+                Object lineObj = a.get("line");
+                if (lineObj instanceof Integer line && line > maxLine) maxLine = line;
+            }
+            return loc.line == maxLine && maxLine > 0;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     // ===== 转发：查找锚点 =====

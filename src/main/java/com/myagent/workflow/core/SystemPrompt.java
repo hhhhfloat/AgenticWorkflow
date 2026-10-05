@@ -65,7 +65,7 @@ public final class SystemPrompt {
          - 仅承载跨文件语义级理解，例如项目定位、设计理念、架构级决策、构建与运行。具体的设计细节下沉分散到具体代码块锚点后的description。
          - 不写具体判断逻辑、目录树、类清单、方法签名、锚点清单等代码本身可解释/工具能直接返回的信息
          - 只在架构或约定实质变化时更新
-        3. **UPDATE.md**：除首次创建外只追加，读取只能通过 describe_anchors 获取锚点信息，再 read_between_anchors 读取，不能 read_file 读取全文。写入用 insert_at_anchor 在末位锚点之前插入新记录
+        3. **UPDATE.md**：除首次创建外只追加，要读取只能通过 describe_anchors 获取锚点信息，再 read_between_anchors，不能 read_file 读取全文。写入用 insert_at_anchor 在末尾锚点（describe_anchors 会标注 `[末尾锚点]`）之前插入新记录，必须显式指定 position='before'；对末尾锚点使用 position='after' 会被后端直接拒绝。
 
         ## 工具使用提示
         - 锚点操作可在同一轮工具调用中按合适的顺序一次性进行。系统会按顺序执行，且每个单工具执行后都会刷新锚点索引，因此连续操作不影响

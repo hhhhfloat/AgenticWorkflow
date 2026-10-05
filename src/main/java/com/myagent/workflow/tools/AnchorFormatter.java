@@ -180,6 +180,12 @@ class AnchorFormatter {
             sb.append("   （无锚点）\n\n");
             return;
         }
+        // 计算末位锚点行号（文件中行号最大的锚点）
+        int maxLine = -1;
+        for (Map<String, Object> a : anchors) {
+            Object lineObj = a.get("line");
+            if (lineObj instanceof Integer line && line > maxLine) maxLine = line;
+        }
         for (Map<String, Object> a : anchors) {
             String id = (String) a.get("id");
             int line = (int) a.get("line");
@@ -188,6 +194,7 @@ class AnchorFormatter {
             if (desc == null || desc.isEmpty()) desc = "（无描述）";
             sb.append("L").append(line).append(" | ").append(id);
             if (symbol != null && !symbol.isEmpty()) sb.append(" | ").append(symbol);
+            if (line == maxLine) sb.append(" | [末尾锚点]");
             sb.append(" | ").append(desc).append("\n");
         }
         sb.append("\n");

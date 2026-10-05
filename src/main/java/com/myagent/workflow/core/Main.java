@@ -240,10 +240,8 @@ public class Main {
                     String functionName = tc.get("function").get("name").asText();
                     String argumentsJson = tc.get("function").get("arguments").asText();
 
-                    String outputJson = (argumentsJson.length() > 100)
-                            ? argumentsJson.substring(0, 100) + "...[共 " + argumentsJson.length() + " 字符]"
-                            : argumentsJson;
-                    session.log("🤖 调用工具 [" + functionName + "] 参数: " + outputJson);
+                    session.log("🤖 调用工具 [" + functionName + "] 参数: "
+                            + ToolLogFormatter.formatArgs(argumentsJson));
 
                     Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
                     checkStop();
@@ -258,7 +256,8 @@ public class Main {
                     toolMsg.put("content", result);
                     currentRound.add(toolMsg);
 
-                    session.log("工具 [" + functionName + "] 结果: " + getDisplayResult(functionName, result));
+                    session.log("工具 [" + functionName + "] 结果: "
+                            + ToolLogFormatter.formatResult(functionName, result));
                 }
                 // 一轮工具执行完毕，统一刷新锚点索引
                 toolExecutor.flushDirtyAnchors();
@@ -402,15 +401,6 @@ public class Main {
         if (iterationListener != null) {
             iterationListener.onIteration(iteration + 1, prompt, cached, completion, cost);
         }
-    }
-
-    // @anchor: main_getDisplayResult
-    // 裁剪过长的工具结果，避免日志刷屏
-    private static String getDisplayResult(String functionName, String result) {
-        if ("read_file".equals(functionName) && result.length() > 300) {
-            return result.substring(0, 200) + "... [共 " + result.length() + " 字符]";
-        }
-        return result;
     }
 
     // ==================== 停止 ====================
