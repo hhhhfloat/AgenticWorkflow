@@ -1,15 +1,20 @@
 // @anchor: treeApi_intro
 // 文件树数据层：目录浏览、项目元信息、配置读取
 
-// @anchor: treeApi_fetchDir
-// 拉取指定目录的条目列表（JSON）
+// @anchor: modules_tree_fetchDir
 async function fetchDir(path) {
     const url = `/browse?path=${encodeURIComponent(path)}`;
-    const res = await fetch(url, {cache: 'no-cache'});
-    if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10_000);
+    try {
+        const res = await fetch(url, {cache: 'no-cache', signal: controller.signal});
+        if (!res.ok) {
+            throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        return await res.json();
+    } finally {
+        clearTimeout(timer);
     }
-    return await res.json();
 }
 
 // @anchor: treeApi_fetchMeta
