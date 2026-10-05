@@ -1,4 +1,4 @@
-// @anchor: genericParser_tot_desc
+// @anchor: genericParser_intro
 // 通用兜底解析器：仅提取锚点并粗略判断语言，不解析结构
 package com.myagent.workflow.parser;
 

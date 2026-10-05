@@ -1,8 +1,8 @@
-// @anchor: sessionManager_tot_desc
+// @anchor: sessionManager_intro
 // 会话管理器：内存活跃会话容器 + 磁盘存储协调者，并以信号量控制全局串行
 package com.myagent.workflow.session;
 
-import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.core.config.AgentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,18 +53,21 @@ public class SessionManager {
 
     // @anchor: sessionManager_create
     // 创建新会话：加入内存并立即落盘
-    /**
-     * 创建一个新会话，自动落盘并加入内存。
-     */
     public Session create(AgentConfig config) {
-        Session session = new Session(config);
+        return create(config, null);
+    }
+
+    // @anchor: sessionManager_createWithProject
+    // 创建新会话并指定工作项目，加入内存并立即落盘
+    public Session create(AgentConfig config, String workProject) {
+        Session session = new Session(config, workProject);
         activeSessions.put(session.getSessionId(), session);
         try {
             storage.save(session);
         } catch (IOException e) {
             logger.error("创建会话时落盘失败", e);
         }
-        logger.info("📂 新会话已创建: {}", session.getSessionId());
+        logger.info("📂 新会话已创建: {} (项目: {})", session.getSessionId(), (workProject==null)?"不限":workProject);
         return session;
     }
 
@@ -97,43 +100,6 @@ public class SessionManager {
     // 仅从内存映射中获取会话（不触发磁盘加载）
     public Session get(String sessionId) {
         return activeSessions.get(sessionId);
-    }
-
-    // ==================== 切换 ====================
-
-    // @anchor: sessionManager_switchTo
-    // 切换会话：存在运行中任务时抛出异常，否则确保目标会话在内存并返回
-    /**
-     * 切换会话。
-     * <p>
-     * 语义：
-     * - 从 fromId 的会话如果没有运行任务，直接离开（不落盘，因为它随时在内存里）
-     * - 要进入的 toId 会话如果不在内存，从磁盘加载
-     * <p>
-     * 返回目标会话。
-     */
-    public Session switchTo(String sessionId, AgentConfig config) throws IOException {
-        // 检查当前是否有任务在跑
-        Session running = findRunningSession();
-        if (running != null && !running.getSessionId().equals(sessionId)) {
-            throw new IOException(
-                    "另一个会话正在运行（" + running.getSessionId() + "），请先停止后再切换。");
-        }
-
-        Session target = get(sessionId, config);
-        if (target == null) {
-            throw new IOException("会话不存在: " + sessionId);
-        }
-        return target;
-    }
-
-    // @anchor: sessionManager_findRunningSession
-    // 查找当前处于运行状态的会话
-    private Session findRunningSession() {
-        for (Session s : activeSessions.values()) {
-            if (s.isRunning()) return s;
-        }
-        return null;
     }
 
     // ==================== 关闭 ====================
@@ -169,23 +135,27 @@ public class SessionManager {
     }
 
     // @anchor: sessionManager_close
-    // 关闭会话：运行中先停止、压缩日志并等待空闲，然后落盘并从内存移除
-    /**
-     * 关闭会话：落盘后从内存移除。
-     * 如果会话正在运行，先停止。
-     */
+// 关闭会话：运行中先停止并等待 idle；超时则保留在内存等任务自然结束
     public void close(String sessionId) {
         Session session = activeSessions.get(sessionId);
         if (session == null) return;
 
         if (session.isRunning()) {
             session.stopTask();
-            if(session.getContextManager() != null){
+            if (session.getContextManager() != null) {
                 session.getContextManager().compressRawLog();
             }
-            // 等待任务自然退出（最多 5 秒）
-            waitForIdle(session, 5000);
+            boolean idle = waitForIdle(session, 5000);
+            if (!idle) {
+                // 超时：任务线程仍在跑。
+                // 若继续 markIdle + save + 移出内存，任务 finally 会再次 save 把会话写回 index.json，
+                // 表现为“关了又冒出来”。保留在内存，交给任务线程的 finally 完成落盘。
+                logger.warn("⚠️ 会话 {} 停止超时，保留在内存等待任务自然结束", sessionId);
+                return;
+            }
         }
+
+        session.markIdle();
 
         try {
             storage.save(session);
@@ -197,17 +167,18 @@ public class SessionManager {
     }
 
     // @anchor: sessionManager_waitForIdle
-    // 轮询等待会话退出运行状态，超时即返回
-    private void waitForIdle(Session session, long timeoutMs) {
+    // 轮询等待会话退出运行状态；返回 true 表示已 idle，false 表示超时
+    private boolean waitForIdle(Session session, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (session.isRunning() && System.currentTimeMillis() < deadline) {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return;
+                return false;
             }
         }
+        return !session.isRunning();
     }
 
     // ==================== 并发控制 ====================
@@ -273,6 +244,8 @@ public class SessionManager {
                 }
                 waitForIdle(session, 5000);
             }
+            // 落盘前强制归一化为 IDLE
+            session.markIdle();
             try {
                 storage.save(session);
             } catch (IOException e) {

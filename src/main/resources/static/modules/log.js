@@ -1,4 +1,4 @@
-// @anchor: modules_log_utils
+// @anchor: log_intro
 // 日志辅助：判断文本是否 Markdown、HTML 转义
 
 // ===== 日志输出工具函数 =====
@@ -12,11 +12,22 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// @anchor: modules_log_append
+function isScrolledToBottom(el) {
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+}
+
+function updateScrollBottomBtn() {
+    const btn = document.getElementById('scrollBottomBtn');
+    if (!btn) return;
+    btn.hidden = isScrolledToBottom(output);
+}
+
+// @anchor: log_append
 // 将消息按类型着色渲染到 #output，支持对话气泡与迭代提示
 
 // ===== 日志输出模块（整合迭代提示） =====
 function appendLog(msg) {
+    const stick = isScrolledToBottom(output);
     let color = 'log-info';
     if (msg.startsWith('[错误]')) color = 'log-error';
     else if (msg.startsWith('[完成]') || msg.includes('✅')) color = 'log-success';
@@ -51,7 +62,8 @@ function appendLog(msg) {
         output.removeChild(output.firstChild);
     }
 
-    output.scrollTop = output.scrollHeight;
+    if (stick) output.scrollTop = output.scrollHeight;
+    updateScrollBottomBtn();
 
     // 迭代提示（不变）
     if (msg.includes('--- 第') && msg.includes('次迭代 ---')) {
@@ -62,7 +74,8 @@ function appendLog(msg) {
             while (output.children.length > MAX_LOGS) {
                 output.removeChild(output.firstChild);
             }
-            output.scrollTop = output.scrollHeight;
+            if (stick) output.scrollTop = output.scrollHeight;
+            updateScrollBottomBtn();
         }
     }
 }
@@ -73,6 +86,7 @@ function appendLog(msg) {
  */
 function appendMessage(role, content) {
     if (!output || !content) return;
+    const stick = isScrolledToBottom(output);
 
     const wrap = document.createElement('div');
     wrap.className = `msg msg-${role}`;
@@ -88,10 +102,11 @@ function appendMessage(role, content) {
 
     wrap.appendChild(body);
     output.appendChild(wrap);
-    output.scrollTop = output.scrollHeight;
+    if (stick) output.scrollTop = output.scrollHeight;
+    updateScrollBottomBtn();
 }
 
-// @anchor: modules_log_linkifySandbox
+// @anchor: log_linkifySandbox
 // 将 /sandbox/xxx.html 形式的相对路径转为 Markdown 链接，供浏览器点击预览
 function linkifySandboxPaths(text) {
     return text.replace(
@@ -99,3 +114,5 @@ function linkifySandboxPaths(text) {
         (m) => `[${m}](${m})`
     );
 }
+
+

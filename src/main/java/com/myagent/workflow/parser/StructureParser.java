@@ -1,4 +1,4 @@
-// @anchor: structureParser_tot_desc
+// @anchor: structureParser_intro
 // 文件结构解析器接口：按语言提取类、方法、字段与锚点信息
 package com.myagent.workflow.parser;
 

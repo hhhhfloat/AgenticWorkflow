@@ -1,4 +1,4 @@
-// @anchor: securityScanner_tot_desc
+// @anchor: securityScanner_intro
 // 安全扫描器：单例入口，对文件/目录调用规则匹配并汇总违规，含扫描缓存
 package com.myagent.workflow.security;
 

@@ -1,0 +1,46 @@
+<!-- @anchor: scanHtml_intro -->
+<!-- 大文件扫描页面结构：工具栏、档位 tab 与文件表格 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>大文件扫描</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="scan.css">
+</head>
+<body>
+<div id="scanApp">
+    <header id="scanHeader">
+        <h2 id="scanTitle">📊 大文件扫描</h2>
+        <div id="scanSummary"></div>
+    </header>
+
+    <div id="scanTabs"></div>
+
+    <div id="scanToolbar">
+        <label><input type="checkbox" id="selectAll"> 全选当前列表</label>
+        <span id="selectedInfo">已选 0 个</span>
+        <button id="exportSelectedBtn">📥 导出选中</button>
+        <button id="copySelectedBtn">📋 复制选中</button>
+        <button id="exportFilteredBtn">📥 导出当前筛选</button>
+    </div>
+
+    <div id="scanBody">
+        <table id="scanTable">
+            <thead>
+            <tr>
+                <th width="40"></th>
+                <th>路径</th>
+                <th width="100">字符数</th>
+                <th width="80">行数</th>
+                <th width="100">档位</th>
+            </tr>
+            </thead>
+            <tbody id="scanTbody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script src="scan.js"></script>
+</body>
+</html>

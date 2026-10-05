@@ -1,4 +1,4 @@
-// @anchor: contextManager_tot_desc
+// @anchor: contextManager_intro
 // 上下文管理器：双区消息存储（不可变基础区 + 易失工作区）、多轮对话与快照恢复
 package com.myagent.workflow.core;
 
@@ -121,6 +121,17 @@ public class ContextManager {
         if (round == null || round.isEmpty()) return;
         volatileWorking.addAll(round);
     }
+
+    // @anchor: contextManager_clearVolatileWorking
+    // 清空工作区（任务被中断时调用），不合并任何摘要
+    public void clearVolatileWorking() {
+        int before = volatileWorking.size();
+        volatileWorking.clear();
+        if (before > 0) {
+            log("📌 [系统] 任务被中断，工作区已清空（原 " + before + " 条消息）");
+        }
+    }
+
 
     // ==================== 构建 ====================
 

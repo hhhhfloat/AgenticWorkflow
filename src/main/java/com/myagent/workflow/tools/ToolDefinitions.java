@@ -1,3 +1,5 @@
+// @anchor: toolDefinitions_intro
+// 工具定义：向模型暴露的工具 JSON schema
 package com.myagent.workflow.tools;
 
 import java.util.ArrayList;
@@ -69,7 +71,7 @@ public final class ToolDefinitions {
                 "get_file_structure",
                 "获取文件的代码结构信息（类、方法、字段、锚点等），帮助快速了解文件内容，而不需要读取整个文件。",
                 defineParams()
-                        .prop("filename", "string", "文件相对路径，例如 'src/Main.java'")
+                        .prop("filename", "string", "文件相对沙箱根的路径，例如 'project/src/Main.java'")
                         .build(),
                 List.of("filename")
         ));
@@ -78,7 +80,7 @@ public final class ToolDefinitions {
 // 工具：read_file 读取文件内容
         tools.add(defineTool(
                 "read_file",
-                "读取沙箱目录下指定文件的内容（文本格式），返回文件内容。支持 Java、HTML、TXT 等文本文件。读取大小限制为 5000 字符，超过则截断并提示。",
+                "读取沙箱目录下指定文件的内容（文本格式），返回文件内容。支持 Java、HTML、TXT 等文本文件。读取大小限制为 50000 字符，超过则截断并提示。",
                 defineParams()
                         .prop("filename", "string", "文件名（相对路径），例如 'calculator.html' 或 'src/Tool.java'。")
                         .build(),
@@ -156,7 +158,7 @@ public final class ToolDefinitions {
                 defineParams()
                         .prop("startAnchor", "string", "起始锚点 ID")
                         .prop("endAnchor", "string", "结束锚点 ID")
-                        .prop("file", "string", "可选。锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
+                        .prop("file", "string", "锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
                         .build(),
                 List.of("startAnchor", "endAnchor")
         ));
@@ -205,7 +207,7 @@ public final class ToolDefinitions {
 // 工具：describe_anchors 列出锚点及其职责描述
         tools.add(defineTool(
                 "describe_anchors",
-                "返回锚点信息。file 支持逗号分隔多个片段。每个片段：先按文件匹配（精确或后缀），命中则列出该文件的全部功能锚点（id / 行号 / symbol / 描述）；未命中则按目录匹配，列出该目录下所有文件的 _intro 锚点描述（文件职责概览）；传 '.' 表示整个项目。不返回 _end 锚点。",
+                "返回锚点信息。file 支持逗号分隔多个片段。每个片段：先按文件匹配（精确或后缀），命中则列出该文件的全部锚点（含 _end，按行号升序）；未命中则按目录匹配，列出该目录下所有文件的 _intro 锚点描述（文件职责概览）；传 '.' 表示整个项目。",
                 defineParams()
                         .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
                         .prop("file", "string", "必填。文件相对路径（逗号分隔多个文件）或目录路径（如 'src/main/java/game'）。传 '.' 表示整个项目。")

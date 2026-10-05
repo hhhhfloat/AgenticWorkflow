@@ -1,3 +1,5 @@
+<!-- @anchor: qr_intro -->
+<!-- 手机访问二维码页：展示访问地址并提供切回桌面端按钮 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -69,30 +71,23 @@
 <div class="url-label">访问地址（点击可全选复制）</div>
 <div class="url-box" id="urlText">...</div>
 
-<button class="enter-btn" onclick="switchToLocal()">
-    在电脑端进入工作台（切回本地模式）
+<button class="enter-btn" onclick="goToDesktop()">
+    💻 打开电脑端工作台
 </button>
 
 <script>
-    function switchToLocal() {
-        if (!confirm('服务将重启并切回本地模式。\n重启后请手动打开 http://127.0.0.1:8080')) return;
-
-        fetch('/switch-to-local', {method: 'POST'})
-            .finally(() => {
-            document.body.innerHTML = `
-                <h1>🔄 服务正在重启</h1>
-                <p class="hint">即将切回本地模式</p>
-                <div class="url-box">http://127.0.0.1:8080</div>
-                <p class="url-label">重启完成后请在电脑端打开上述地址</p>
-            `;
-        });
+    async function goToDesktop() {
+        // 把控制权切回桌面端（qr.html 一般在电脑上打开，UA 是桌面）
+        try {
+            await fetch('/control/switch', {method: 'POST'});
+        } catch (e) {}
+        window.location.href = 'http://' + location.hostname + ':8080/';
     }
 </script>
 
 <script src="qrcode.min.js"></script>
 <script>
-    // 用当前页面的 origin，无论绑定哪个 IP 都对
-    const url = window.location.origin;
+    const url = window.location.origin + "/mobile/";
 
     // 渲染 URL 文本
     document.getElementById('urlText').textContent = url;

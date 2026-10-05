@@ -1,15 +1,17 @@
-// @anchor: session_tot_desc
+// @anchor: session_intro
 // 会话实体：多轮对话的一等公民，持有上下文、元数据、运行任务与日志转发
 package com.myagent.workflow.session;
 
-import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.core.config.AgentConfig;
 import com.myagent.workflow.core.ContextManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 // @anchor: session_class
@@ -21,7 +23,7 @@ import java.util.function.Consumer;
  * 1. 持有会话的上下文管理器（ContextManager）
  * 2. 记录会话的元数据和状态
  * 3. 管理当前运行的任务（Main 实例 + 线程）
- * 4. 处理日志转发（供 HTTP 层的 SSE 使用）
+ * 4. 将日志多播给所有订阅者（/run 与 /stream）
  * <p>
  * 注意：
  * - ContextManager 采用"延迟注入"模式：Session 构造时不创建它，
@@ -39,7 +41,7 @@ public class Session {
     // 会话字段：不可变标识/配置、可变元数据、运行时状态与当前任务
     // ===== 不可变字段 =====
     private final String sessionId;
-    private final AgentConfig config;
+    private volatile AgentConfig config;
 
     // ===== 可变元数据（通过 SessionMeta 的 with* 方法更新） =====
     private volatile SessionMeta meta;
@@ -47,12 +49,15 @@ public class Session {
     // ===== 运行时状态 =====
     private volatile SessionState state;
     private volatile ContextManager contextManager;   // 延迟注入
-    private volatile Consumer<String> logConsumer;    // 由 SSE 连接建立后设置
+
+    // 支持多个消费者（运行端 + 拉取端同时订阅）
+    private final List<Consumer<String>> logConsumers = new CopyOnWriteArrayList<>();
 
     // ===== 当前运行的任务（临时，任务结束后清空） =====
     private volatile Object runningAgent;             // 用 Object 避免循环依赖 core.Main
     private volatile Thread runningThread;
     private volatile long lastHeartbeatTime;
+    private volatile long runningStartedAt;           // 任务开始时间（硬超时用）
 
     // ==================== 构造 ====================
 
@@ -65,7 +70,7 @@ public class Session {
         this.state = SessionState.IDLE;
 
         String now = LocalDateTime.now().format(TIME_FMT);
-        this.meta = new SessionMeta(sessionId, "新会话", now, now, 0, SessionState.IDLE);
+        this.meta = new SessionMeta(sessionId, "新会话", now, now, 0, SessionState.IDLE, null);
     }
 
     // @anchor: session_constructorNew
@@ -73,6 +78,17 @@ public class Session {
     /** 创建新会话时使用 */
     public Session(AgentConfig config) {
         this(generateSessionId(), config);
+    }
+
+    // @anchor: session_constructorWithProject
+    // 创建新会话并指定工作项目（相对沙箱的项目名）
+    public Session(AgentConfig config, String workProject) {
+        this.sessionId = generateSessionId();
+        this.config = config;
+        this.state = SessionState.IDLE;
+        String now = LocalDateTime.now().format(TIME_FMT);
+        String title = (workProject != null && !workProject.isBlank()) ? workProject : "新会话";
+        this.meta = new SessionMeta(sessionId, title, now, now, 0, SessionState.IDLE, workProject);
     }
 
     // @anchor: session_generateSessionId
@@ -94,6 +110,14 @@ public class Session {
      */
     public void attachContextManager(ContextManager contextManager) {
         this.contextManager = contextManager;
+    }
+
+    // @anchor: session_updateConfig
+    // 更新会话配置：本次 /run 的请求配置生效
+    public void updateConfig(AgentConfig newConfig) {
+        if (newConfig != null) {
+            this.config = newConfig;
+        }
     }
 
     // @anchor: session_touch
@@ -163,6 +187,7 @@ public class Session {
     public synchronized void markRunning(Object agent) {
         this.runningAgent = agent;
         this.runningThread = Thread.currentThread();
+        this.runningStartedAt = System.currentTimeMillis();
         this.lastHeartbeatTime = System.currentTimeMillis();
         this.state = SessionState.RUNNING;
         this.meta = meta.withState(SessionState.RUNNING);
@@ -174,6 +199,30 @@ public class Session {
      * 标记任务结束（成功或失败）。
      */
     public synchronized void markIdle() {
+        this.runningAgent = null;
+        this.runningThread = null;
+        this.runningStartedAt = 0;
+        this.state = SessionState.IDLE;
+        this.meta = meta.withState(SessionState.IDLE);
+        touch();
+    }
+    // @anchor: session_getRunningStartedAt
+    // 返回当前任务的开始时间戳（毫秒）；未运行时为 0
+    public long getRunningStartedAt() {
+        return runningStartedAt;
+    }
+
+    // @anchor: session_forceIdle
+    // 强制将会话置为 IDLE，不依赖 runningAgent 是否存在；用于清理卡死会话
+    public synchronized void forceIdle() {
+        if (runningAgent != null) {
+            try {
+                runningAgent.getClass().getMethod("stop").invoke(runningAgent);
+            } catch (Exception ignored) {}
+        }
+        if (runningThread != null && runningThread != Thread.currentThread()) {
+            runningThread.interrupt();
+        }
         this.runningAgent = null;
         this.runningThread = null;
         this.state = SessionState.IDLE;
@@ -189,6 +238,10 @@ public class Session {
      */
     public synchronized void stopTask() {
         if (runningAgent == null) {
+            // 僵尸状态：state 是 RUNNING 但 agent 已消失，直接归一化
+            if (state == SessionState.RUNNING) {
+                forceIdle();
+            }
             return;
         }
         // 用反射/接口方式调用 stop，避免直接依赖 core.Main
@@ -218,15 +271,18 @@ public class Session {
 
     // ==================== 日志转发 ====================
 
-    // @anchor: session_setLogConsumer
-    // 设置日志消费者（SSE 建立后），并同步注入到上下文管理器
-    public void setLogConsumer(Consumer<String> consumer) {
-        this.logConsumer = consumer;
-        // 同步给 ContextManager（如果已注入）
-        if (contextManager != null) {
-            // 注意：ContextManager 需要提供 setLogConsumer 方法，Step 2 会改造
-            contextManager.setLogConsumer(consumer);
+    // @anchor: session_addLogConsumer
+    // 追加一个日志消费者，供 /stream 与 /run 同时订阅
+    public void addLogConsumer(Consumer<String> consumer) {
+        if (consumer != null && !logConsumers.contains(consumer)) {
+            logConsumers.add(consumer);
         }
+    }
+
+    // @anchor: session_removeLogConsumer
+    // 移除指定日志消费者，SSE 断开时调用
+    public void removeLogConsumer(Consumer<String> consumer) {
+        logConsumers.remove(consumer);
     }
 
     // @anchor: session_log
@@ -235,11 +291,15 @@ public class Session {
      * 内部日志入口，供 ContextManager 和 Main 调用。
      */
     public void log(String message) {
-        Consumer<String> consumer = this.logConsumer;
-        if (consumer != null) {
-            consumer.accept(message);
-        } else {
-            logger.info(message);
+        // 服务端日志始终记录，便于排障
+        logger.info(message);
+        // 分发给所有消费者
+        for (Consumer<String> c : logConsumers) {
+            try {
+                c.accept(message);
+            } catch (Exception ignored) {
+                // 单个消费者异常不影响其他消费者
+            }
         }
     }
 
@@ -250,6 +310,11 @@ public class Session {
      * 仅在 SessionStorage.load() 中调用。
      */
     public void restoreMeta(SessionMeta meta) {
+        // 磁盘上的 RUNNING 不代表运行时真相：进程已退出，任务不可能还在跑
+        // 归一化为 IDLE，避免恢复后 isRunning() 恒真导致永久 409
+        if (meta.state() == SessionState.RUNNING) {
+            meta = meta.withState(SessionState.IDLE);
+        }
         this.meta = meta;
         this.state = meta.state();
     }
@@ -285,4 +350,9 @@ public class Session {
     public boolean hasActiveTask() {
         return runningAgent != null;
     }
+
+    public String getWorkProject(){
+        return meta.workProject();
+    }
 }
+

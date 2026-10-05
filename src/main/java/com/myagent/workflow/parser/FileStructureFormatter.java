@@ -1,4 +1,4 @@
-// @anchor: fileStructureFormatter_tot_desc
+// @anchor: fileStructureFormatter_intro
 // 结构文本格式化器：把 FileStructure 渲染成精简可读的文本供 Agent 阅读
 package com.myagent.workflow.parser;
 

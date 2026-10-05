@@ -1,4 +1,4 @@
-// @anchor: modules_events
+// @anchor: events_intro
 // 绑定侧边栏视图切换与运行 / 停止 / 清空等界面事件
 
 // ===== 事件绑定 =====
@@ -26,8 +26,15 @@ function switchSidebarView(view) {
 
 document.getElementById('viewFilesBtn').addEventListener('click', () => switchSidebarView('files'));
 document.getElementById('viewSessionsBtn').addEventListener('click', () => switchSidebarView('sessions'));
-document.getElementById('newSessionBtn').addEventListener('click', createNewSession);
-// ⭐ 新增：页面卸载标志，防止误报断联日志
+document.getElementById('newSessionBtn').addEventListener('click', () => {
+    const btn = document.getElementById('newSessionBtn');
+    if (btn.dataset.mode === 'switch') {
+            switchToWorkSession();
+        } else {
+        createNewSession();
+    }
+});
+// 页面卸载标志，防止误报断联日志
 window._isPageUnloading = false;
 
 // 清空按钮
@@ -54,18 +61,15 @@ runBtn.addEventListener('click', () => {
 
 // 停止按钮
 stopBtn.addEventListener('click', stopAgent);
-
-
-// ⭐ 关键修改：页面卸载时只标记，不杀 Agent，也不触发断联日志
+// 页面卸载时只标记，不杀 Agent，也不触发断联日志
 window.addEventListener('beforeunload', () => {
     window._isPageUnloading = true;  // 标记正在卸载
     if (isRunning) {
         stopHeartbeat();  // 停止发送心跳
-        // ⭐ 不发送 /stop，让后端自己超时清理
     }
 });
 
-// @anchor: modules_visibility
+// @anchor: events_visibility
 // 页面切回前台时立即补发心跳，避免后端超时断开
 
 // ===== 页面可见性变化：切回前台时立即心跳，防止后端超时断开 =====
@@ -81,12 +85,15 @@ document.getElementById('logBtn').addEventListener('click', () => {
     openFolder('HistoryOutput');
 });
 
-// @anchor: modules_init
+// @anchor: events_init
 // 页面加载完成时初始化配置 / 会话 / 文件树 / 心跳
 
 // ===== DOMContentLoaded 初始化 =====
 document.addEventListener('DOMContentLoaded', async function() {
     loadConfig();
+    if (typeof initQuickPrompts === 'function') {
+        initQuickPrompts();
+    }
     if (typeof checkBackendStatus === 'function') {
         checkBackendStatus();
     }
@@ -134,35 +141,27 @@ document.addEventListener('DOMContentLoaded', async function() {
             this.value = val;
         });
     }
+    const scrollBottomBtn = document.getElementById('scrollBottomBtn');
+    if (scrollBottomBtn) {
+        scrollBottomBtn.addEventListener('click', () => {
+            output.scrollTop = output.scrollHeight;
+            updateScrollBottomBtn();
+        });
+    }
+    output.addEventListener('scroll', updateScrollBottomBtn);
+
     startHeartbeat();
+    startStatusPolling();
 });
 
-// @anchor: modules_mobileLockDetect
-// 检测并展示手机独占锁提示条
-function initMobileLockDetection() {
-    fetch('/lock-status')
-        .then(r => r.json())
-        .then(data => {
-        if (data.mobileLocked && !data.youAreMobile) showMobileLockBanner();
-    })
-        .catch(() => {});
-
-    const originalFetch = window.fetch;
-    window.fetch = async function(...args) {
-        const res = await originalFetch.apply(this, args);
-        if (res.status === 403) {
-            try {
-                const clone = res.clone();
-                const data = await clone.json();
-                if (data.code === 'mobile-locked') showMobileLockBanner();
-            } catch (e) {}
-        }
-        return res;
-    };
-}
-initMobileLockDetection();
-
-function showMobileLockBanner() {
-    const banner = document.getElementById('mobileLockBanner');
-    if (banner) banner.style.display = 'block';
-}
+// ===== 回到底部按钮 =====
+(function initScrollBottomBtn() {
+        const btn = document.getElementById('scrollBottomBtn');
+        if (btn) {
+            btn.addEventListener('click', () => {
+                output.scrollTop = output.scrollHeight;
+                updateScrollBottomBtn();
+            });
+    }
+    output.addEventListener('scroll', updateScrollBottomBtn);
+})();

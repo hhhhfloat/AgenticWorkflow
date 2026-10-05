@@ -1,20 +1,23 @@
+<!-- @anchor: index_intro -->
+<!-- 桌面端工作台主页面：侧边栏、主工作区、配置弹窗与脚本加载 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <title>本地 Agent 工作台</title>
-    <!-- @anchor: html_head -->
+    <!-- @anchor: index_head -->
     <!-- 页面 head：引入 marked 渲染库与全局样式表 -->
     <script src="marked.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="mobileLockBanner" style="display:none;">
-    📱 手机正在使用中，本设备操作已暂停（本机模式重启服务可释放）
+    <span id="lockBannerText">另一端正在控制中</span>
+    <button id="lockBannerSwitchBtn">💻 接管到电脑端</button>
 </div>
 <div id="app">
     <!-- ===== 侧边栏 ===== -->
-    <!-- @anchor: html_sidebar -->
+    <!-- @anchor: index_sidebar -->
     <!-- 侧边栏：视图切换、工作项目、文件树视图与会话视图 -->
     <div id="sidebar">
         <div id="sidebarHeader">
@@ -28,10 +31,10 @@
             <button id="viewSessionsBtn">💬 会话</button>
         </div>
 
-        <!-- 工作项目占位（阶段 2 改为下拉） -->
+        <!-- 当前会话绑定的工作项目 -->
         <div id="projectSelector">
             <span class="label">📌 工作项目：</span>
-            <span class="value">未选择</span>
+            <span class="value" id="currentProjectName">未选择</span>
         </div>
 
         <!-- 文件视图 -->
@@ -52,20 +55,25 @@
     </div>
 
     <!-- ===== 主工作区 ===== -->
-    <!-- @anchor: html_main -->
+    <!-- @anchor: index_main -->
     <!-- 主工作区：标题、日志输出、用量面板与输入区 -->
     <div id="main">
-        <h2>Agentic 工作台</h2>
+        <div id="mainHeader">
+            <h2>Agentic 工作台</h2>
+            <button id="switchControllerBtn" class="switch-controller-btn">⇄ 切到手机端</button>
+        </div>
 
         <!-- 日志区（顶部，占据剩余空间） -->
         <div id="output">等待输入...</div>
+        <button id="scrollBottomBtn" class="scroll-bottom-btn" hidden>↓</button>
 
         <div id="usagePanel" class="usage-panel"></div>
         <!-- 输入区（底部固定） -->
-        <!-- @anchor: html_inputArea -->
+        <!-- @anchor: index_inputArea -->
         <!-- 输入区：提示词、历史、迭代次数与运行/停止/清空/日志/配置按钮 -->
         <div id="inputArea">
             <textarea id="prompt" placeholder="输入你的需求，例如：写一个 HTML 计算器，支持加减乘除">写一个 HTML 计算器，支持加减乘除</textarea>
+            <div id="quickPromptBar"></div>
             <div id="historyContainer"></div>
 
             <div class="iteration-control">
@@ -84,7 +92,7 @@
         </div>
 
         <!-- ===== 配置弹窗 ===== -->
-        <!-- @anchor: html_configModal -->
+        <!-- @anchor: index_configModal -->
         <!-- 配置弹窗：API Key、模型、编译工具链路径与安全扫描开关 -->
         <div id="configModal" class="modal" style="display:none;">
             <div class="modal-content">
@@ -129,6 +137,7 @@
                     <div class="setting-row">
                         <label>C++ 编译器类型</label>
                         <select id="setCppCompilerType">
+                            <option value="">（自动探测）</option>
                             <option value="msvc">MSVC</option>
                             <option value="mingw">MinGW</option>
                         </select>
@@ -157,10 +166,28 @@
             </div>
         </div>
 
+        <!-- ===== 新建会话弹窗 ===== -->
+        <!-- @anchor: index_sessionCreateModal -->
+        <!-- 新建会话弹窗：选择工作项目后创建会话 -->
+        <div id="sessionCreateModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span>📌 选择工作项目</span>
+                    <button id="closeSessionCreateBtn" class="close-btn">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div id="projectList" class="project-list"></div>
+                    <p class="hint-text" style="margin-top:12px;">
+                        没有想要的项目？请到左侧文件树中 sandbox 节点下创建后再试。
+                    </p>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
-<!-- @anchor: html_scripts -->
+<!-- @anchor: index_scripts -->
 <!-- 脚本加载顺序：第三方库 → 核心模块 → 各功能模块 → 事件绑定与初始化 -->
 <!-- 第三方库 -->
 <script src="tips.js"></script>
@@ -176,21 +203,32 @@
 <script src="modules/log.js"></script>
 <!-- 历史记录 -->
 <script src="modules/history.js"></script>
+<!-- 常用话术 -->
+<script src="modules/quickPrompts.js"></script>
 <script src="modules/sessionState.js"></script>
 <script src="modules/usageStore.js"></script>
 <script src="modules/sessionList.js"></script>
 <!-- 心跳机制 -->
 <script src="modules/heartbeat.js"></script>
 <!-- 文件树 -->
-<script src="modules/tree.js"></script>
+<script src="modules/tree-api.js"></script>
+<script src="modules/tree-render.js"></script>
+<script src="modules/tree-state.js"></script>
+<script src="modules/tree-actions.js"></script>
 <!-- 归档/创建/上传 -->
 <script src="modules/archive.js"></script>
 <!-- 打开文件夹 -->
 <script src="modules/openFolder.js"></script>
+<!-- 调用后端工具 -->
+<script src="modules/toolApi.js"></script>
+<!-- 新建会话（选择工作项目） -->
+<script src="modules/sessionCreate.js"></script>
 <!-- SSE 流式请求 -->
 <script src="modules/sse.js"></script>
 <!-- 配置管理 -->
 <script src="modules/settings.js"></script>  <!-- ✅ 新增 -->
+<!-- 控制权切换 -->
+<script src="modules/control.js"></script>
 <!-- 侧边栏切换 -->
 <script src="modules/sidebar.js"></script>
 <!-- 运行模块 -->

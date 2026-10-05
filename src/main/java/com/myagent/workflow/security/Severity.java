@@ -1,4 +1,4 @@
-// @anchor: severity_tot_desc
+// @anchor: severity_intro
 // 违规严重级别枚举：定义 ERROR/WARNING/INFO 三档处置语义
 package com.myagent.workflow.security;
 

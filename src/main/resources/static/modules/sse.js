@@ -1,98 +1,100 @@
-// @anchor: modules_sse
+// @anchor: sse_intro
 // 以 SSE 流式执行 Agent 请求，逐条渲染输出并处理特殊事件
 
-// ===== SSE 流式请求模块 =====
+// ===== 运行中状态 =====
+let desktopRunAbort = null;
 
-// ===== 本轮运行日志缓冲（用于结束后折叠展示） =====
-let currentRunLog = [];
-
+// @anchor: sse_runAgent
+// 运行 Agent：POST /run 建立 SSE 流并逐条渲染输出
 async function runAgent(prompt, maxIterations) {
-    currentRunLog = [];   // ← 新增：清空上一轮缓冲
-
     if (!isDraftSession()) {
         await loadSessionHistory(getCurrentSessionId());
     } else {
         output.innerHTML = '';
     }
-    // 用户 prompt → 绿色气泡
     appendMessage('user', prompt);
-
     appendLog(`────────── 运行中 ──────────\n`);
 
     isRunning = true;
     runBtn.disabled = true;
     stopBtn.disabled = false;
 
-    const settings = getEffectiveSettings ? getEffectiveSettings() : {};
-    const config = buildRunConfig(settings);
-    const sessionId = getCurrentSessionId(); // 可能为 null，后端会自动创建
+    const sessionId = getCurrentSessionId();
+    const myAbort = new AbortController();
+    desktopRunAbort = myAbort;
 
-    fetch(BASE_URL + '/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            prompt: prompt,
-            maxIterations: maxIterations,
-            sessionId: sessionId,
-            config: config
-        })
-    })
-        .then(response => {
-        if (!response.ok) {
-            return response.text().then(text => {
-                throw new Error(`HTTP ${response.status}: ${text}`);
-            });
+    let response;
+    try {
+        response = await fetch(BASE_URL + '/run', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                prompt: prompt,
+                maxIterations: maxIterations,
+                sessionId: sessionId,
+                config: buildRunConfig(loadSettings())
+            }),
+            signal: myAbort.signal
+        });
+    } catch (err) {
+        if (err.name !== 'AbortError' && !window._isPageUnloading) {
+            appendLog('[连接错误] ' + err.message + '\n请确保 HTTP 服务已启动');
         }
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let buffer = '';
-
-        function readChunk() {
-            reader.read().then(({ done, value }) => {
-                if (done) {
-                    finishRun(true);
-                    return;
-                }
-                buffer += decoder.decode(value, { stream: true });
-                const events = buffer.split('\n\n');
-                buffer = events.pop();
-                for (const event of events) {
-                    if (event.startsWith('data: ')) {
-                        const data = event.substring(6).trim().replace(/\\n/g, '\n');
-                        if (handleSpecialEvent(data)) continue;
-                        currentRunLog.push(data);   // ← 新增：记录到缓冲
-                        appendLog(data);
-                    }
-                }
-                readChunk();
-            }).catch(err => {
-                if (!window._isPageUnloading) {
-                    appendLog('[错误] ' + err.message);
-                }
-                finishRun();
-            });
-        }
-        readChunk();
-    })
-        .catch(err => {
-        if (!window._isPageUnloading) {
-            appendLog('[连接错误] ' + err.message + '\n请确保 HTTP 服务已启动（运行 start.bat）');
-        }
-        finishRun();
-    });
-}
-
-/**
- * 处理特殊 SSE 事件。返回 true 表示已处理，不再作为普通日志输出。
- */
-function handleSpecialEvent(data) {
-    // [结束] 标志
-    if (data === '[结束]') {
-        finishRun(true);
-        return true;
+        if (desktopRunAbort === myAbort) desktopRunAbort = null;
+        return;
     }
 
-    // 新增：usage 事件
+    if (!response.ok) {
+        const text = await response.text();
+        appendLog('HTTP ' + response.status + ': ' + text);
+        if (desktopRunAbort === myAbort) desktopRunAbort = null;
+        return;
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+
+    try {
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop();
+            for (const event of events) {
+                if (!event.startsWith('data: ')) continue;
+                // abort 后立即停止输出，避免最后一批 buffer 写进别人的视图
+                if (desktopRunAbort !== myAbort) return;
+                const data = event.substring(6).trim().replace(/\\n/g, '\n');
+                if (handleSpecialEvent(data)) continue;
+                appendLog(data);
+            }
+        }
+    } catch (err) {
+        if (err.name !== 'AbortError' && !window._isPageUnloading) {
+            appendLog('[错误] ' + err.message);
+        }
+    } finally {
+        if (desktopRunAbort === myAbort) desktopRunAbort = null;
+    }
+}
+
+// @anchor: sse_abortRun
+// 主动断开 /run 的 SSE（不停止后端任务）；用于切换会话时避免日志串台
+function abortRun() {
+    if (desktopRunAbort) {
+        desktopRunAbort.abort();
+        desktopRunAbort = null;
+    }
+}
+
+// @anchor: sse_handleSpecialEvent
+// 识别 usage/session 特殊事件，返回是否已被消费
+function handleSpecialEvent(data) {
+    // [结束] 只是标记，UI 状态交给 pollStatus 判定
+    if (data === '[结束]') return true;
+
     if (data.startsWith('{') && data.indexOf('"type":"usage"') !== -1) {
         try {
             const obj = JSON.parse(data);
@@ -102,7 +104,6 @@ function handleSpecialEvent(data) {
             }
         } catch (e) {}
     }
-    // 首条 session 事件：{"type":"session","sessionId":"xxx","isNew":true/false}
     if (data.startsWith('{') && data.indexOf('"type":"session"') !== -1) {
         try {
             const obj = JSON.parse(data);
@@ -110,7 +111,7 @@ function handleSpecialEvent(data) {
                 const prevId = getCurrentSessionId();
                 setCurrentSessionId(obj.sessionId);
                 if (obj.isNew || !prevId) {
-                    loadSessionList();  // 新会话 → 刷新列表
+                    loadSessionList();
                 } else {
                     highlightCurrentSession();
                 }
@@ -121,80 +122,124 @@ function handleSpecialEvent(data) {
     return false;
 }
 
-// @anchor: modules_finishRun
-// 运行结束后复位按钮状态、刷新会话并把本轮日志折叠归档
+// @anchor: sse_renderRunLogs
+// 从 /session/logs 拉取会话最近一轮日志，追加为折叠块
+async function renderRunLogs(sessionId) {
+    if (!sessionId) return;
+    try {
+        const res = await fetch(BASE_URL + '/session/logs?sessionId=' +
+        encodeURIComponent(sessionId) + '&tail=500');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.lines || data.lines.length === 0) return;
 
-// ===== 运行结束清理 =====
-function finishRun(normal = false) {
-    if (!normal && !window._isPageUnloading && isRunning) {
-        appendLog('[系统] ⚠️ 任务意外终止，请检查后端服务状态');
+        const details = document.createElement('details');
+        details.className = 'run-detail';
+
+        const summary = document.createElement('summary');
+        const total = data.total || 0;
+        const shown = data.lines.length;
+        summary.textContent = total > shown
+            ? `▸ 查看最近一轮运行详情（已截断，共 ${total} 行，显示最后 ${shown} 行）`
+            : `▸ 查看最近一轮运行详情（共 ${shown} 行）`;
+        details.appendChild(summary);
+
+        const pre = document.createElement('pre');
+        pre.textContent = data.lines.join('\n');
+        details.appendChild(pre);
+
+        output.appendChild(details);
+        if (isScrolledToBottom(output)) output.scrollTop = output.scrollHeight;
+        updateScrollBottomBtn();
+    } catch (e) {
+        // 静默
     }
-    runBtn.disabled = false;
-    stopBtn.disabled = true;
-    isRunning = false;
+}
+
+// @anchor: sse_onTaskFinished
+// 由 pollStatus 调用：任务结束时刷新 UI
+async function onTaskFinished(finishedSessionId) {
     refreshSandbox();
-
-    if (!isDraftSession()) {
-        loadSessionList();
-
-        if (normal) {
-            // 结束后精炼 + 附加折叠详情
-            setTimeout(async () => {
-                await loadSessionHistory(getCurrentSessionId());
-                appendRunDetail();
-            }, 300);
-        }
+    await loadSessionList();
+    // 仅当用户当前就在看结束的会话时，才重载视图（避免打断浏览其他会话）
+    if (finishedSessionId && getCurrentSessionId() === finishedSessionId) {
+        await loadSessionHistory(finishedSessionId);
     }
 }
 
-/**
- * 把本轮实时日志包装成折叠块，附加到 #output 末尾。
- */
-function appendRunDetail() {
-    if (currentRunLog.length === 0) return;
-
-    const details = document.createElement('details');
-    details.className = 'run-detail';
-
-    const summary = document.createElement('summary');
-    summary.textContent = '▸ 查看本轮运行详情';
-    details.appendChild(summary);
-
-    const pre = document.createElement('pre');
-    pre.textContent = currentRunLog.join('\n');
-    details.appendChild(pre);
-
-    output.appendChild(details);
-    output.scrollTop = output.scrollHeight;
-}
-
-// @anchor: modules_stop
-// 请求 /stop 停止当前会话任务并复位界面状态
-
-// ===== 停止 Agent =====
-function stopAgent() {
+// @anchor: sse_stop
+// 请求 /stop 停止正在运行的任务
+async function stopAgent() {
     if (!isRunning) return;
     stopBtn.disabled = true;
     appendLog('[系统] 正在停止任务...');
 
-    const sessionId = getCurrentSessionId();
-    fetch(BASE_URL + '/stop', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId: sessionId })
-    })
-        .then(response => response.json())
-        .then(data => {
+    const sessionId = globalStatus.sessionId || getCurrentSessionId();
+    try {
+        const response = await fetch(BASE_URL + '/stop', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: sessionId })
+        });
+        const data = await response.json();
         appendLog('[系统] ' + data.message);
-        stopBtn.disabled = true;
-        runBtn.disabled = false;
-        isRunning = false;
-        finishRun(true);
-    })
-        .catch(err => {
+        // 不主动复位，交给 pollStatus
+    } catch (err) {
         if (!window._isPageUnloading) {
             appendLog('[错误] 停止请求失败: ' + err.message);
         }
         stopBtn.disabled = false;
-    });
+    }
+}
+
+// @anchor: sse_desktopStream
+// 桌面端只读日志流：订阅 /stream 观看正在运行任务的实时日志
+let desktopStreamAbort = null;
+
+async function openStream(sessionId) {
+    closeStream();
+    if (!sessionId) return;
+    const myAbort = new AbortController();
+    desktopStreamAbort = myAbort;
+    try {
+        const res = await fetch(BASE_URL + '/stream?sessionId=' + encodeURIComponent(sessionId), {
+            signal: myAbort.signal
+        });
+        if (!res.ok) {
+            appendLog('[系统] 日志流订阅失败: HTTP ' + res.status);
+            return;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const events = buffer.split('\n\n');
+            buffer = events.pop();
+            for (const ev of events) {
+                if (!ev.startsWith('data: ')) continue;
+                if (desktopStreamAbort !== myAbort) return;
+                const data = ev.substring(6).trim().replace(/\\n/g, '\n');
+                if (data === '[stream-end]' || data === '[stream-timeout]') {
+                    appendLog('[系统] 日志流已结束');
+                    closeStream();
+                    return;
+                }
+                appendLog(data);
+            }
+        }
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            appendLog('[系统] 日志流中断: ' + e.message);
+        }
+    }
+}
+
+function closeStream() {
+    if (desktopStreamAbort) {
+        desktopStreamAbort.abort();
+        desktopStreamAbort = null;
+    }
 }

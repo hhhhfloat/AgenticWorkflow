@@ -1,4 +1,4 @@
-// @anchor: guardedHandler_tot_desc
+// @anchor: guardedHandler_intro
 // 设备保护包装器：手机锁定期间，桌面端的受保护请求返回 403
 package com.myagent.workflow.http;
 
@@ -25,17 +25,33 @@ public class GuardedHandler implements HttpHandler {
     // 入口：手机请求置锁；受保护路径在锁定时拒绝桌面请求
     @Override
     public void handle(HttpExchange exchange) throws IOException {
-        boolean isMobile = isMobile(exchange);
+        String caller = detectCaller(exchange);
+        String path = exchange.getRequestURI().getPath();
 
-        // 任何手机请求 → 抢占锁
-        if (isMobile && !HttpServerMain.isMobileLocked()) {
-            HttpServerMain.lockForMobile();
-            System.out.println("📱 手机已接管控制权（重启服务可释放）");
+        // /control/* 永久放行，任何一端都能查询和切换控制权
+        if (path.startsWith("/control/")) {
+            delegate.handle(exchange);
+            return;
         }
 
-        // 锁定时，桌面端受保护请求被拒
-        if (protect && !isMobile && HttpServerMain.isMobileLocked()) {
-            byte[] body = "{\"status\":\"error\",\"code\":\"mobile-locked\",\"message\":\"手机正在使用中，本设备操作已暂停\"}"
+        // 读路由不参与控制权判定，直接放行（避免读请求抢占控制权）
+        if (!protect) {
+            delegate.handle(exchange);
+            return;
+        }
+
+        // 受保护路由：首访者自动成为控制端
+        String controller = HttpServerMain.getActiveController();
+        if (controller == null) {
+            HttpServerMain.setActiveController(caller);
+            controller = caller;
+        }
+
+        // 非控制端访问受保护路由 → 403
+        if (!caller.equals(controller)) {
+            byte[] body = ("{\"status\":\"error\",\"code\":\"device-locked\","
+                    + "\"controller\":\"" + controller + "\","
+                    + "\"message\":\"另一端正在控制中\"}")
                     .getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().set("Content-Type", "application/json; charset=utf-8");
             exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
@@ -49,9 +65,21 @@ public class GuardedHandler implements HttpHandler {
         delegate.handle(exchange);
     }
 
-    // @anchor: guardedHandler_isMobile
-    // 基于 User-Agent 判断请求来自手机还是桌面
-    private boolean isMobile(HttpExchange exchange) {
+    // @anchor: guardedHandler_detectCaller
+    // 判定请求来自哪一端：优先读显式声明 X-Client-Device，UA 作 fallback
+    private String detectCaller(HttpExchange exchange) {
+        String declared = exchange.getRequestHeaders().getFirst("X-Client-Device");
+        if (declared != null) {
+            String v = declared.trim().toLowerCase();
+            if (v.equals("mobile")) return "MOBILE";
+            if (v.equals("desktop")) return "DESKTOP";
+        }
+        return isMobileUA(exchange) ? "MOBILE" : "DESKTOP";
+    }
+
+    // @anchor: guardedHandler_isMobileUA
+    // User-Agent 启发式判定，仅在没有显式声明时使用
+    private boolean isMobileUA(HttpExchange exchange) {
         String ua = exchange.getRequestHeaders().getFirst("User-Agent");
         if (ua == null) return false;
         ua = ua.toLowerCase();

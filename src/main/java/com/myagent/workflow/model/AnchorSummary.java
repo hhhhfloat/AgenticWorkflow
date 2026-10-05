@@ -1,3 +1,5 @@
+// @anchor: anchorSummary_intro
+// 锚点摘要数据载体：id、行号与预览
 package com.myagent.workflow.model;
 
 // @anchor: anchorSummary_class

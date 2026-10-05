@@ -1,4 +1,4 @@
-// @anchor: sessionMeta_tot_desc
+// @anchor: sessionMeta_intro
 // 会话元数据模型：用于前端列表展示与磁盘持久化
 package com.myagent.workflow.session;
 
@@ -17,30 +17,37 @@ public record SessionMeta(
         String createdAt,
         String lastActiveAt,
         int messageCount,
-        SessionState state
+        SessionState state,
+        String workProject
 ) {
 
     // @anchor: sessionMeta_withTitle
     // 返回替换标题后的新元数据实例
     public SessionMeta withTitle(String newTitle) {
-        return new SessionMeta(sessionId, newTitle, createdAt, lastActiveAt, messageCount, state);
+        return new SessionMeta(sessionId, newTitle, createdAt, lastActiveAt, messageCount, state, workProject);
     }
 
     // @anchor: sessionMeta_withLastActiveAt
     // 返回更新最后活跃时间后的新元数据实例
     public SessionMeta withLastActiveAt(String newTime) {
-        return new SessionMeta(sessionId, title, createdAt, newTime, messageCount, state);
+        return new SessionMeta(sessionId, title, createdAt, newTime, messageCount, state, workProject);
     }
 
     // @anchor: sessionMeta_withMessageCount
     // 返回更新消息计数后的新元数据实例
     public SessionMeta withMessageCount(int newCount) {
-        return new SessionMeta(sessionId, title, createdAt, lastActiveAt, newCount, state);
+        return new SessionMeta(sessionId, title, createdAt, lastActiveAt, newCount, state, workProject);
     }
 
     // @anchor: sessionMeta_withState
     // 返回更新会话状态后的新元数据实例
     public SessionMeta withState(SessionState newState) {
-        return new SessionMeta(sessionId, title, createdAt, lastActiveAt, messageCount, newState);
+        return new SessionMeta(sessionId, title, createdAt, lastActiveAt, messageCount, newState, workProject);
+    }
+
+    // @anchor: sessionMeta_withWorkProject
+    // 返回更新工作项目后的新元数据实例
+    public SessionMeta withWorkProject(String newProject) {
+        return new SessionMeta(sessionId, title, createdAt, lastActiveAt, messageCount, state, newProject);
     }
 }

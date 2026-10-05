@@ -1,4 +1,4 @@
-// @anchor: filePathRule_tot_desc
+// @anchor: filePathRule_intro
 // 文件路径规则：检测 ..\\ / ../ 或盘符等路径穿越写法
 package com.myagent.workflow.security.rules;
 

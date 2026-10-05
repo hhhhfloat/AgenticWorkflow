@@ -1,4 +1,4 @@
-// @anchor: usageTracker_tot_desc
+// @anchor: usageTracker_intro
 // 用量与成本追踪：累计 Token 消耗，按峰谷时段计算价格并输出统计文本
 package com.myagent.workflow.core;
 
@@ -86,7 +86,7 @@ public class UsageTracker {
      */
     public double calculateCost(String model, long promptTokens, long cachedTokens, long completionTokens) {
         boolean peak = isPeakHour();
-        long uncached = promptTokens - cachedTokens;
+        long uncached = Math.max(0, promptTokens - cachedTokens);
 
         double inHit = peak ? FLASH_IN_HIT_PEAK : FLASH_IN_HIT_OFF_PEAK;
         double inNotHit = peak ? FLASH_IN_NOT_HIT_PEAK : FLASH_IN_NOT_HIT_OFF_PEAK;

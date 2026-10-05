@@ -1,4 +1,4 @@
-// @anchor: modules_openFolder
+// @anchor: openFolder_intro
 // 请求后端在系统文件管理器中打开指定目录
 
 // ===== 打开文件夹 =====

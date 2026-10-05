@@ -1,10 +1,12 @@
-// @anchor: main_tot_desc
+// @anchor: main_intro
 // Agent 主循环：驱动 DeepSeek 多轮对话、分发工具调用、记录用量并刷新索引
 package com.myagent.workflow.core;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.myagent.workflow.core.config.AgentConfig;
+import com.myagent.workflow.core.config.ConfigEditor;
 import com.myagent.workflow.session.Session;
 import com.myagent.workflow.tools.ToolDefinitions;
 import com.myagent.workflow.tools.ToolExecutor;
@@ -103,7 +105,8 @@ public class Main {
         // ToolExecutor 绑定日志到 Session
         this.toolExecutor = new ToolExecutor(
                 runConfig,
-                objectMapper
+                objectMapper,
+                session.getWorkProject()
         );
         this.toolExecutor.setLogConsumer(session::log);
     }
@@ -170,19 +173,26 @@ public class Main {
      */
     public String run(String userRequest, int maxIterations) throws IOException {
         this.runningThread = Thread.currentThread();
-        session.markRunning(this);
-        session.touch();
 
-        long startPrompt = contextManager.getTotalPromptTokens();
-        long startCached = contextManager.getTotalCachedTokens();
-        long startCompletion = contextManager.getTotalCompletionTokens();
-        int startCalls = contextManager.getApiCallCount();
-        double startPrice = contextManager.getTotalPrice();
+        long startPrompt = 0, startCached = 0, startCompletion = 0;
+        int startCalls = 0;
+        double startPrice = 0;
 
         String finalContent = null;
         try {
+
+            // 移进 try：保证与 finally 里的 markIdle 严格配对
+            session.markRunning(this);
+            session.touch();
+
+            startPrompt = contextManager.getTotalPromptTokens();
+            startCached = contextManager.getTotalCachedTokens();
+            startCompletion = contextManager.getTotalCompletionTokens();
+            startCalls = contextManager.getApiCallCount();
+            startPrice = contextManager.getTotalPrice();
+
             // 1. 准备用户消息（内部处理首轮/后续分支，并同步 meta）
-            session.prepareUserMessage(userRequest, SystemPrompt.get());
+            session.prepareUserMessage(userRequest, SystemPrompt.get(session.getWorkProject()));
 
             // 2. 工具定义
             List<Map<String, Object>> tools = ToolDefinitions.build();
@@ -232,10 +242,8 @@ public class Main {
                     String functionName = tc.get("function").get("name").asText();
                     String argumentsJson = tc.get("function").get("arguments").asText();
 
-                    String outputJson = (argumentsJson.length() > 100)
-                            ? argumentsJson.substring(0, 100) + "...[共 " + argumentsJson.length() + " 字符]"
-                            : argumentsJson;
-                    session.log("🤖 调用工具 [" + functionName + "] 参数: " + outputJson);
+                    session.log("🤖 调用工具 [" + functionName + "] 参数: "
+                            + ToolLogFormatter.formatArgs(argumentsJson));
 
                     Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
                     checkStop();
@@ -250,7 +258,8 @@ public class Main {
                     toolMsg.put("content", result);
                     currentRound.add(toolMsg);
 
-                    session.log("工具 [" + functionName + "] 结果: " + getDisplayResult(functionName, result));
+                    session.log("工具 [" + functionName + "] 结果: "
+                            + ToolLogFormatter.formatResult(functionName, result));
                 }
                 // 一轮工具执行完毕，统一刷新锚点索引
                 toolExecutor.flushDirtyAnchors();
@@ -265,24 +274,51 @@ public class Main {
             return finalContent;
 
         } finally {
-            this.lastTaskUsage = new TaskUsage(
-                    contextManager.getTotalPromptTokens() - startPrompt,
-                    contextManager.getTotalCachedTokens() - startCached,
-                    contextManager.getTotalCompletionTokens() - startCompletion,
-                    contextManager.getApiCallCount() - startCalls,
-                    contextManager.getTotalPrice() - startPrice
-            );
-            if (finalContent != null) {
-                contextManager.mergeSummaryToBase(buildTaskSummary(finalContent));
+            // ===== best-effort 阶段：任何一步失败不影响清理 =====
+
+            try {
+                this.lastTaskUsage = new TaskUsage(
+                        contextManager.getTotalPromptTokens() - startPrompt,
+                        contextManager.getTotalCachedTokens() - startCached,
+                        contextManager.getTotalCompletionTokens() - startCompletion,
+                        contextManager.getApiCallCount() - startCalls,
+                        contextManager.getTotalPrice() - startPrice
+                );
+            } catch (Exception e) {
+                logger.warn("记录 usage 失败", e);
             }
+
+            try {
+                if (finalContent != null) {
+                    contextManager.mergeSummaryToBase(buildTaskSummary(finalContent));
+                } else {
+                    // 任务被用户停止或异常中断：清空残留工作区，避免污染下一次任务
+                    contextManager.clearVolatileWorking();
+                }
+            } catch (Exception e) {
+                logger.warn("清理任务上下文失败", e);
+            }
+
             try {
                 toolExecutor.refreshAllProjectIndexes();
             } catch (Exception e) {
                 logger.warn("刷新项目索引失败", e);
             }
-            contextManager.flushRawLog();
-            contextManager.compressRawLog();
-            contextManager.printStats();
+
+            try {
+                contextManager.flushRawLog();
+                contextManager.compressRawLog();
+            } catch (Exception e) {
+                logger.warn("落盘原始日志失败", e);
+            }
+
+            try {
+                contextManager.printStats();
+            } catch (Exception e) {
+                logger.warn("打印统计失败", e);
+            }
+
+            // ===== 关键清理：必须执行 =====
             session.markIdle();
             this.runningThread = null;
         }
@@ -367,15 +403,6 @@ public class Main {
         if (iterationListener != null) {
             iterationListener.onIteration(iteration + 1, prompt, cached, completion, cost);
         }
-    }
-
-    // @anchor: main_getDisplayResult
-    // 裁剪过长的工具结果，避免日志刷屏
-    private static String getDisplayResult(String functionName, String result) {
-        if ("read_file".equals(functionName) && result.length() > 300) {
-            return result.substring(0, 200) + "... [共 " + result.length() + " 字符]";
-        }
-        return result;
     }
 
     // ==================== 停止 ====================

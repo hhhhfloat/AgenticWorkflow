@@ -1,4 +1,4 @@
-// @anchor: modules_archive
+// @anchor: archive_intro
 // 把沙箱项目归档到 TestProjects（含覆盖确认）并刷新目录树
 
 // ===== 归档功能 =====
@@ -46,22 +46,22 @@ async function archiveProject(projectName) {
     }
 }
 
-// @anchor: modules_refreshRoot
+// @anchor: archive_refreshRoot
 // 保持展开状态刷新指定根目录的子树
 
 // ===== 归档功能 =====
 
-let refreshLock = false;  // ← 添加全局锁
+const refreshLocks = new Map();
 
 // ============================================================
 // 修复 refreshRoot：如果根节点原本是展开的，即使没有子目录展开，也保持展开并刷新内容
 // ============================================================
 async function refreshRoot(rootPath) {
-    if (refreshLock) {
+    if (refreshLock.get(rootPath)) {
         console.log(`⏭️ 跳过并发刷新: ${rootPath}`);
         return;
     }
-    refreshLock = true;
+    refreshLock.set(rootPath, true);
 
     try {
         const sidebarContent = document.getElementById('sidebarContent');
@@ -104,28 +104,39 @@ async function refreshRoot(rootPath) {
         childrenContainer.innerHTML = '';
         childrenContainer.dataset.loaded = '';
 
-        // ⭐ 关键修复 2：如果之前是展开的，或者有展开的子节点，设置为 block
         if (wasExpanded || expandedPaths.length > 0) {
             childrenContainer.style.display = 'block';
-            childrenContainer.dataset.loaded = 'true';
 
-            // 从缓存渲染根节点下的内容（直接子节点）
             const data = cache.get(rootPath);
-            if (data && data.entries) {
-                if(data.entries.length === 0){
+
+            // ⭐ 关键修复：preload 失败（cache miss）时不清空 loaded，
+            // 让用户下次点击能重新 fetch；否则会出现"空目录 + 点不开"
+            if (!data) {
+                console.warn(`⚠️ refreshRoot: ${rootPath} 预加载失败，保持未加载状态`);
+                childrenContainer.dataset.loaded = '';
+                showErrorMessage(childrenContainer, '加载失败，请点击重试');
+                return;
+            }
+
+            try {
+                if (data.entries.length === 0) {
                     showEmptyMessage(childrenContainer);
                 } else {
-                    renderAndExpand(childrenContainer, rootPath, data.entries, cache, targetPaths);
+                    renderEntries(childrenContainer, rootPath, data.entries, cache, targetPaths, true);
                 }
-            } else {
-                showEmptyMessage(childrenContainer);
+                childrenContainer.dataset.loaded = 'true';
+            } catch (err) {
+                console.error('refreshRoot 渲染失败:', err);
+                childrenContainer.dataset.loaded = '';
+                childrenContainer.innerHTML = '';
+                showErrorMessage(childrenContainer, err.message);
             }
         } else {
             childrenContainer.style.display = 'none';
         }
 
     } finally {
-        refreshLock = false;
+        refreshLocks.set(rootPath, false);
     }
 }
 
@@ -144,7 +155,7 @@ async function refreshSidebar() {
     await refreshRoot('TestProjects');
 }
 
-// @anchor: modules_createProject
+// @anchor: archive_createProject
 // 在 sandbox 下创建新项目文件夹并刷新目录树
 
 // ===== 创建项目 =====
@@ -173,7 +184,7 @@ async function createProject(projectName) {
     }
 }
 
-// @anchor: modules_upload
+// @anchor: archive_upload
 // 向指定项目上传文件（含重名覆盖确认）并刷新目录树
 
 // ===== 文件上传 =====

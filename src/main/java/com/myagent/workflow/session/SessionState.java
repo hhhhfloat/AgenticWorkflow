@@ -1,4 +1,4 @@
-// @anchor: sessionState_tot_desc
+// @anchor: sessionState_intro
 // 会话状态枚举：描述会话的空闲/运行/挂起/归档四种状态
 package com.myagent.workflow.session;
 

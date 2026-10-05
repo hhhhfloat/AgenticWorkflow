@@ -1,4 +1,4 @@
-// @anchor: modules_history
+// @anchor: history_intro
 // 以 localStorage 读写并渲染 prompt 历史记录
 
 // ===== 历史记录模块 =====

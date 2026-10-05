@@ -1,10 +1,10 @@
-// @anchor: sessionStorage_tot_desc
+// @anchor: sessionStorage_intro
 // 会话磁盘存储：负责 Session 的持久化（meta/jsonl/索引）与加载还原
 package com.myagent.workflow.session;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.core.config.AgentConfig;
 import com.myagent.workflow.core.ContextManager;
 
 import java.io.IOException;
@@ -96,6 +96,9 @@ public class SessionStorage {
         if (session.getContextManager() != null) {
             writeJsonl(sessionDir.resolve(BASE_FILE),
                     session.getContextManager().getImmutableBaseSnapshot());
+            // volatile_working.jsonl 在 load() 中不读取（工作区是易失的）。
+            // 保留写入是为了诊断“落盘时 finally 尚未执行完”的异常残留；
+            // 正常任务结束时工作区已清空，此文件为空。
             writeJsonl(sessionDir.resolve(WORKING_FILE),
                     session.getContextManager().getVolatileWorkingSnapshot());
         }
@@ -136,11 +139,7 @@ public class SessionStorage {
         List<Map<String, Object>> base = readJsonl(sessionDir.resolve(BASE_FILE));
         cm.restoreImmutableBase(base);
 
-        Path workingFile = sessionDir.resolve(WORKING_FILE);
-        if (Files.exists(workingFile)) {
-            List<Map<String, Object>> working = readJsonl(workingFile);
-            cm.restoreVolatileWorking(working);
-        }
+        // 工作区是易失的：磁盘上的残留只可能来自被中断的任务，不应恢复。volatile_working.jsonl 应为空文件。
 
         return session;
     }

@@ -1,4 +1,4 @@
-// @anchor: ruleRegistry_tot_desc
+// @anchor: ruleRegistry_intro
 // 规则注册中心：单例维护已启用的安全规则集合
 package com.myagent.workflow.security.rules;
 

@@ -1,4 +1,4 @@
-// @anchor: modules_sessionList
+// @anchor: sessionList_intro
 // 会话列表的加载 / 渲染 / 切换 / 高亮与会话历史回放
 
 // ===== 会话列表：渲染、切换、历史加载 =====
@@ -32,6 +32,9 @@ function renderSessionList(sessions) {
     const currentId = getCurrentSessionId();
 
     sessions.forEach(session => {
+        if (session.sessionId === currentId) {
+            updateProjectSelector(session.workProject);
+        }
         const item = document.createElement('div');
         item.className = 'session-item';
         if (session.sessionId === currentId) item.classList.add('active');
@@ -40,6 +43,13 @@ function renderSessionList(sessions) {
         const title = document.createElement('div');
         title.className = 'session-title';
         title.textContent = session.title || '新会话';
+
+        if (session.workProject) {
+            const projTag = document.createElement('div');
+            projTag.className = 'session-project';
+            projTag.textContent = '📌 ' + session.workProject;
+            item.appendChild(projTag);
+        }
 
         const time = document.createElement('div');
         time.className = 'session-time';
@@ -57,7 +67,7 @@ function renderSessionList(sessions) {
         item.appendChild(title);
         item.appendChild(time);
         item.appendChild(renameBtn);
-        item.addEventListener('click', () => switchToSession(session.sessionId));
+        item.addEventListener('click', () => switchToSession(session.sessionId, session.workProject));
         container.appendChild(item);
     });
 }
@@ -163,21 +173,16 @@ function formatRelativeTime(timeStr) {
 /**
  * 切换到某个会话。
  */
-async function switchToSession(sessionId) {
+async function switchToSession(sessionId, workProject) {
     if (sessionId === getCurrentSessionId()) return;
 
-    if (isRunning) {
-        if (!confirm('当前任务正在运行，是否停止并切换？')) return;
-        stopAgent();
-        await new Promise(r => setTimeout(r, 400));
-    }
-
-    currentRunLog = [];   // ← 新增：切会话清空缓冲
-
+    if (typeof abortRun === 'function') abortRun();
+    if (typeof closeStream === 'function') closeStream();
     setCurrentSessionId(sessionId);
     await loadSessionHistory(sessionId);
     highlightCurrentSession();
-    renderUsagePanel();   // ← 新增
+    renderUsagePanel();
+    updateProjectSelector(workProject);
 }
 
 /**
@@ -191,23 +196,10 @@ function highlightCurrentSession() {
 }
 
 /**
- * "新对话"按钮 —— 进入草稿状态。
+ * "新对话"按钮 —— 弹出项目选择框，选完后再创建会话。
  */
 async function createNewSession() {
-    // 已经是空白草稿 → 无效果
-    if (isDraftSession() && output.innerHTML.trim() === '等待输入...') {
-        return;
-    }
-    if (isRunning) {
-        if (!confirm('当前任务正在运行，是否停止并开启新对话？')) return;
-        stopAgent();
-        await new Promise(r => setTimeout(r, 400));
-    }
-
-    clearCurrentSessionId();
-    output.innerHTML = '等待输入...';
-    highlightCurrentSession();
-    renderUsagePanel();
+    openSessionCreateModal();
 }
 
 /**
@@ -225,6 +217,7 @@ async function loadSessionHistory(sessionId) {
         }
         const data = await res.json();
         renderHistoryMessages(data.messages || []);
+        await renderRunLogs(sessionId);
     } catch (err) {
         console.error('加载会话历史失败', err);
     }

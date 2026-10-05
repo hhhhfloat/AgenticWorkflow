@@ -1,3 +1,4 @@
+// @anchor: tips_intro
 // 备选文案列表（可随时增删改）
 const QUOTES = [
     "🔁\"服务器繁忙，请稍候再试\"🐋 (doge",

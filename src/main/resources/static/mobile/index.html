@@ -1,0 +1,101 @@
+<!-- @anchor: mobileIndex_intro -->
+<!-- 手机端页面结构：顶栏、输出区、抽屉与会话/文件面板 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <meta name="theme-color" content="#0d1117">
+    <title>Agentic</title>
+    <link rel="stylesheet" href="mobile.css">
+</head>
+<body>
+
+<header id="topbar">
+    <button id="menuBtn" class="icon-btn" aria-label="会话列表">☰</button>
+    <div class="title-area">
+        <div id="sessionTitle" class="session-title">新对话</div>
+        <div class="status-line">
+            <span id="statusDot" class="dot idle"></span>
+            <span id="statusText">空闲</span>
+            <span id="projectTag" class="project-tag" hidden></span>
+        </div>
+    </div>
+    <button id="switchControllerBtn" class="icon-btn" title="切换控制端">⇄</button>
+</header>
+
+<main id="output">
+    <div class="hint">输入需求开始对话</div>
+</main>
+
+<div id="usageBar" class="usage-bar"></div>
+
+<footer id="inputArea">
+    <div class="input-wrapper">
+        <textarea id="prompt" rows="1" placeholder="发消息…"></textarea>
+        <button id="runBtn" class="send-btn" title="发送">▶</button>
+    </div>
+</footer>
+
+<!-- 全屏会话抽屉 -->
+<aside id="drawer" class="drawer">
+    <header class="drawer-header">
+        <div class="drawer-tabs">
+          <button id="tabSessionsBtn" class="tab-btn active">💬 会话</button>
+          <button id="tabFilesBtn" class="tab-btn">📁 文件</button>
+        </div>
+        <button id="closeDrawerBtn" class="icon-btn">✕</button>
+    </header>
+
+    <div id="drawerSessions" class="drawer-pane">
+        <button id="newSessionBtn" class="new-session-btn">＋ 新对话</button>
+        <div id="sessionListView" class="session-list"></div>
+    </div>
+
+    <div id="drawerFiles" class="drawer-pane" hidden>
+        <div id="treeRoots" class="tree-roots"></div>
+    </div>
+
+    <footer class="drawer-footer">
+        <label class="iter-row">
+            <span>🔄 最大迭代次数</span>
+            <input type="number" id="maxIterations" value="100" min="3" max="100">
+        </label>
+        <button id="shutdownBtn" class="shutdown-btn">⏻ 退出服务</button>
+    </footer>
+</aside>
+
+<!-- 新建会话弹窗 -->
+<div id="createMask" class="modal-mask">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span>新建会话</span>
+            <button id="closeCreateBtn" class="icon-btn">✕</button>
+        </div>
+        <div class="modal-body">
+            <label class="field-label">从已有项目选择</label>
+                <div id="projectPickerList" class="project-picker-list">
+                    <div class="picker-empty">加载中…</div>
+                </div>
+                <div class="divider">或</div>
+                <label class="field-label">新建项目</label>
+                <input id="newProjectName" type="text" placeholder="例如 my-app">
+                <p class="hint-text">项目将在 sandbox/ 下按此名创建</p>
+        </div>
+        <div class="modal-footer">
+            <button id="cancelCreateBtn" class="ghost-btn">取消</button>
+            <button id="confirmCreateBtn" class="primary-btn">创建</button>
+        </div>
+    </div>
+</div>
+
+<button id="scrollBottomBtn" class="scroll-bottom-btn" hidden>↓</button>
+<script src="mobile-core.js"></script>
+<script src="mobile-session.js"></script>
+<script src="mobile-run.js"></script>
+<script src="mobile-tree.js"></script>
+<script src="mobile-status.js"></script>
+<script src="mobile-control.js"></script>
+<script src="mobile.js"></script>
+</body>
+</html>

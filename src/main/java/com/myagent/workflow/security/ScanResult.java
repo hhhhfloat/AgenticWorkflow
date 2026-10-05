@@ -1,4 +1,4 @@
-// @anchor: scanResult_tot_desc
+// @anchor: scanResult_intro
 // 安全扫描结果模型：汇总是否通过、违规列表与摘要文本
 package com.myagent.workflow.security;
 
