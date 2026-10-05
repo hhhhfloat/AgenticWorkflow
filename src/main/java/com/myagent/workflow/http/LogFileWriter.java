@@ -21,6 +21,7 @@ public class LogFileWriter implements AutoCloseable {
     private static final Path ROOT_DIR = Paths.get("./HistoryOutput");
     private static final DateTimeFormatter FILE_TS_FMT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
+    // 开发期，手动清理即可，因此保留很久
     private static final int RETENTION_DAYS = 3000;
 
     private final Path logFile;

@@ -1,7 +1,7 @@
 package com.myagent.workflow.tools;
 
 
-import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.core.config.AgentConfig;
 
 import java.io.IOException;
 import java.nio.file.Path;

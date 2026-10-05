@@ -13,7 +13,7 @@ const DEFAULT_SETTINGS = {
     javaHome: '',
     pythonInterpreter: '',
     nodeInterpreter: '',
-    cppCompilerType: 'msvc',
+    cppCompilerType: '',
     msvcCompiler: '',
     msvcInclude: '',
     msvcLib: '',
@@ -59,7 +59,7 @@ function applySettingsToForm(settings) {
     document.getElementById('setJavaHome').value = settings.javaHome || '';
     document.getElementById('setPythonInterpreter').value = settings.pythonInterpreter || '';
     document.getElementById('setNodeInterpreter').value = settings.nodeInterpreter || '';
-    document.getElementById('setCppCompilerType').value = settings.cppCompilerType || 'msvc';
+    document.getElementById('setCppCompilerType').value = settings.cppCompilerType || '';
     document.getElementById('setMsvcCompiler').value = settings.msvcCompiler || '';
     document.getElementById('setMingwCompiler').value = settings.mingwCompiler || '';
     document.getElementById('setEnableSecurityScan').checked = settings.enableSecurityScan !== false;

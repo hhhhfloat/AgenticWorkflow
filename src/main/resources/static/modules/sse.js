@@ -30,7 +30,8 @@ async function runAgent(prompt, maxIterations) {
             body: JSON.stringify({
                 prompt: prompt,
                 maxIterations: maxIterations,
-                sessionId: sessionId
+                sessionId: sessionId,
+                config: buildRunConfig(loadSettings())
             }),
             signal: myAbort.signal
         });

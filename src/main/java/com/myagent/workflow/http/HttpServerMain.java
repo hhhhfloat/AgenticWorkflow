@@ -2,10 +2,16 @@
 // HTTP 服务入口：校验 API Key、初始化配置与会话、注册路由并启动服务
 package com.myagent.workflow.http;
 
-import com.myagent.workflow.core.AgentConfig;
-import com.myagent.workflow.core.ConfigEditor;
+import com.myagent.workflow.core.config.AgentConfig;
+import com.myagent.workflow.core.config.BindAddressResolver;
+import com.myagent.workflow.core.config.ConfigEditor;
 import com.myagent.workflow.core.Main;
-import com.myagent.workflow.http.handlers.*;
+import com.myagent.workflow.http.handlers.project.*;
+import com.myagent.workflow.http.handlers.run.*;
+import com.myagent.workflow.http.handlers.session.*;
+import com.myagent.workflow.http.handlers.staticres.ExternalFileHandler;
+import com.myagent.workflow.http.handlers.staticres.StaticHandler;
+import com.myagent.workflow.http.handlers.system.*;
 import com.myagent.workflow.session.SessionManager;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
@@ -64,14 +70,8 @@ public class HttpServerMain {
         server.createContext(path, new GuardedHandler(handler, protect));
     }
 
-    /**
-     * 默认绑定：仅本机可访问
-     */
-    public static final String DEFAULT_BIND = "127.0.0.1";
-    /**
-     * 环境变量 key：设置后覆盖默认绑定地址（例如 Tailscale IP）
-     */
-    public static final String BIND_ENV_KEY = "AGENT_BIND";
+    public static final String DEFAULT_BIND = BindAddressResolver.DEFAULT_BIND;
+    public static final String BIND_ENV_KEY = BindAddressResolver.BIND_ENV_KEY;
 
     public static SessionManager getSessionManager() {
         return sessionManager;
@@ -87,56 +87,6 @@ public class HttpServerMain {
 
     public static void markApiKeyCleared() {
         apiKeyClearedByUser = true;
-    }
-
-    // @anchor: httpServerMain_resolveBindAddress
-
-    /**
-     * 解析 HTTP 服务绑定地址：
-     * - 环境变量 AGENT_BIND 优先（如 Tailscale 的 100.x.x.x）
-     * - 未设置时默认 127.0.0.1（仅本机可访问）
-     */
-    private static String resolveBindAddress() {
-        String v = System.getenv(BIND_ENV_KEY);
-        if (v != null && !v.isBlank()) return v.trim();
-
-        String ts = detectTailscaleIp();
-        if (ts != null) {
-            System.out.println("📱 自动检测到 Tailscale IP: " + ts);
-            return ts;
-        }
-
-        System.out.println("⚠️ 未检测到 Tailscale IP，回退到 127.0.0.1（仅本机可访问）");
-        return "127.0.0.1";
-    }
-
-    // @anchor: launcherMain_detectTailscaleIp
-    // 遍历网卡，找 100.64.0.0/10 段（Tailscale CGNAT）的 IPv4 地址
-    private static String detectTailscaleIp() {
-        try {
-            Enumeration<NetworkInterface> ifaces = NetworkInterface.getNetworkInterfaces();
-            while (ifaces.hasMoreElements()) {
-                NetworkInterface ni = ifaces.nextElement();
-                if (!ni.isUp() || ni.isLoopback()) continue;
-                for (InterfaceAddress ia : ni.getInterfaceAddresses()) {
-                    InetAddress ip = ia.getAddress();
-                    if (ip instanceof Inet4Address && isTailscaleCgnat(ip)) {
-                        return ip.getHostAddress();
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-        }
-        return null;
-    }
-
-    // @anchor: launcherMain_isTailscaleCgnat
-    // 判断是否落在 100.64.0.0/10 网段
-    private static boolean isTailscaleCgnat(InetAddress ip) {
-        byte[] b = ip.getAddress();
-        int first = b[0] & 0xFF;
-        int second = b[1] & 0xFF;
-        return first == 100 && second >= 64 && second <= 127;
     }
 
     // ==================== 入口 ====================
@@ -176,7 +126,7 @@ public class HttpServerMain {
         // 5. 启动 HTTP 服务
         HttpServer server;
         try {
-            String bindAddr = resolveBindAddress();
+            String bindAddr = BindAddressResolver.resolve();
             server = HttpServer.create(new InetSocketAddress(bindAddr, PORT), 0);
             registerRoutes(server);
             server.setExecutor(Executors.newCachedThreadPool());
@@ -185,6 +135,7 @@ public class HttpServerMain {
             openBrowser(bindAddr);
             System.out.println("🚀 Agent 服务已启动（按 Enter 停止...）");
             startHeartbeatMonitor();
+            startParentWatcher();
 
             boolean daemonMode = args.length > 0 && java.util.Arrays.asList(args).contains("--daemon");
             if (daemonMode) {
@@ -319,5 +270,26 @@ public class HttpServerMain {
                 }
             }
         }, "HeartbeatMonitor").start();
+    }
+    // @anchor: httpServerMain_startParentWatcher
+    // 父进程存活监视：父进程退出后主动关闭 JVM，触发 ProcessRegistry 清理
+    private static void startParentWatcher() {
+        ProcessHandle parent = ProcessHandle.current().parent().orElse(null);
+        if (parent == null) return;
+        Thread t = new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(2_000);
+                } catch (InterruptedException e) {
+                    return;
+                }
+                if (!parent.isAlive()) {
+                    System.err.println("⚠️ 父进程已退出，主服务主动关闭");
+                    System.exit(0);   // 触发 shutdown hook → ProcessRegistry.killAll
+                }
+            }
+        }, "ParentWatcher");
+        t.setDaemon(true);
+        t.start();
     }
 }

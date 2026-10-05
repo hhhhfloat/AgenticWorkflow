@@ -4,7 +4,7 @@ package com.myagent.workflow.session;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.core.config.AgentConfig;
 import com.myagent.workflow.core.ContextManager;
 
 import java.io.IOException;
@@ -96,6 +96,9 @@ public class SessionStorage {
         if (session.getContextManager() != null) {
             writeJsonl(sessionDir.resolve(BASE_FILE),
                     session.getContextManager().getImmutableBaseSnapshot());
+            // volatile_working.jsonl 在 load() 中不读取（工作区是易失的）。
+            // 保留写入是为了诊断“落盘时 finally 尚未执行完”的异常残留；
+            // 正常任务结束时工作区已清空，此文件为空。
             writeJsonl(sessionDir.resolve(WORKING_FILE),
                     session.getContextManager().getVolatileWorkingSnapshot());
         }

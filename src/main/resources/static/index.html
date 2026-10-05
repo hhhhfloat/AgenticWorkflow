@@ -135,6 +135,7 @@
                     <div class="setting-row">
                         <label>C++ 编译器类型</label>
                         <select id="setCppCompilerType">
+                            <option value="">（自动探测）</option>
                             <option value="msvc">MSVC</option>
                             <option value="mingw">MinGW</option>
                         </select>
@@ -208,7 +209,10 @@
 <!-- 心跳机制 -->
 <script src="modules/heartbeat.js"></script>
 <!-- 文件树 -->
-<script src="modules/tree.js"></script>
+<script src="modules/tree-api.js"></script>
+<script src="modules/tree-render.js"></script>
+<script src="modules/tree-state.js"></script>
+<script src="modules/tree-actions.js"></script>
 <!-- 归档/创建/上传 -->
 <script src="modules/archive.js"></script>
 <!-- 打开文件夹 -->

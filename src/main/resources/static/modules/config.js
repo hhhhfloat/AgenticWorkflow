@@ -40,7 +40,7 @@ function buildRunConfig(settings) {
         javaHome: settings.javaHome || '',
         pythonInterpreter: settings.pythonInterpreter || '',
         nodeInterpreter: settings.nodeInterpreter || '',
-        cppCompilerType: settings.cppCompilerType || 'msvc',
+        cppCompilerType: settings.cppCompilerType || '',
         msvcCompiler: settings.msvcCompiler || '',
         msvcInclude: '',
         msvcLib: '',

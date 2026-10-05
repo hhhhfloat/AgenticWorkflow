@@ -2,7 +2,7 @@
 // 会话管理器：内存活跃会话容器 + 磁盘存储协调者，并以信号量控制全局串行
 package com.myagent.workflow.session;
 
-import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.core.config.AgentConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -135,26 +135,26 @@ public class SessionManager {
     }
 
     // @anchor: sessionManager_close
-    // 关闭会话：运行中先停止、压缩日志并等待空闲，然后落盘并从内存移除
-    /**
-     * 关闭会话：落盘后从内存移除。
-     * 如果会话正在运行，先停止。
-     */
+// 关闭会话：运行中先停止并等待 idle；超时则保留在内存等任务自然结束
     public void close(String sessionId) {
         Session session = activeSessions.get(sessionId);
         if (session == null) return;
 
         if (session.isRunning()) {
             session.stopTask();
-            if(session.getContextManager() != null){
+            if (session.getContextManager() != null) {
                 session.getContextManager().compressRawLog();
             }
-            // 等待任务自然退出（最多 5 秒）
-            waitForIdle(session, 5000);
+            boolean idle = waitForIdle(session, 5000);
+            if (!idle) {
+                // 超时：任务线程仍在跑。
+                // 若继续 markIdle + save + 移出内存，任务 finally 会再次 save 把会话写回 index.json，
+                // 表现为“关了又冒出来”。保留在内存，交给任务线程的 finally 完成落盘。
+                logger.warn("⚠️ 会话 {} 停止超时，保留在内存等待任务自然结束", sessionId);
+                return;
+            }
         }
 
-        // 落盘前强制归一化为 IDLE：磁盘状态不应是 RUNNING
-        // 若 waitForIdle 超时，任务线程可能仍在跑，但会话即将从内存移除
         session.markIdle();
 
         try {
@@ -167,17 +167,18 @@ public class SessionManager {
     }
 
     // @anchor: sessionManager_waitForIdle
-    // 轮询等待会话退出运行状态，超时即返回
-    private void waitForIdle(Session session, long timeoutMs) {
+    // 轮询等待会话退出运行状态；返回 true 表示已 idle，false 表示超时
+    private boolean waitForIdle(Session session, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (session.isRunning() && System.currentTimeMillis() < deadline) {
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                return;
+                return false;
             }
         }
+        return !session.isRunning();
     }
 
     // ==================== 并发控制 ====================

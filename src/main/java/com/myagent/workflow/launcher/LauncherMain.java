@@ -2,6 +2,7 @@
 // 守护启动器：常驻 8081，按需拉起/停止同 jar 内的主服务
 package com.myagent.workflow.launcher;
 
+import com.myagent.workflow.core.config.BindAddressResolver;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
@@ -24,6 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 // @anchor: launcherMain_class
 // 启动器主类：管理主服务子进程，暴露 /start /stop /status 三个 HTTP 接口
@@ -33,8 +35,8 @@ public class LauncherMain {
     // 端口、绑定地址与主服务就绪探测参数
     public static final int LAUNCHER_PORT = 8081;
     public static final int MAIN_PORT = 8080;
-    public static final String BIND_ENV_KEY = "AGENT_BIND";
-    public static final String DEFAULT_BIND = "127.0.0.1";
+    public static final String BIND_ENV_KEY = BindAddressResolver.BIND_ENV_KEY;
+    public static final String DEFAULT_BIND = BindAddressResolver.DEFAULT_BIND;
     private static final long READY_TIMEOUT_MS = 30_000;
     private static final long READY_POLL_MS = 500;
 
@@ -64,7 +66,7 @@ public class LauncherMain {
     // @anchor: launcherMain_main
     // 启动守护服务，绑定地址并注册路由
     public static void main(String[] args) throws IOException {
-        launcherBindAddress = resolveBindAddress();
+        launcherBindAddress = BindAddressResolver.resolve();
         String bindAddr = launcherBindAddress;
         HttpServer server = HttpServer.create(new InetSocketAddress(bindAddr, LAUNCHER_PORT), 0);
 
@@ -96,15 +98,9 @@ public class LauncherMain {
 
         server.setExecutor(Executors.newCachedThreadPool());
         server.start();
-
-        // launcher 退出时带走子进程，避免孤儿进程占用文件句柄
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             if (mainProcess != null && mainProcess.isAlive()) {
-                mainProcess.destroy();
-                try {
-                    mainProcess.waitFor();
-                } catch (InterruptedException ignored) {
-                }
+                try { mainProcess.destroyForcibly(); } catch (Exception ignored) {}
             }
         }));
 
@@ -171,12 +167,7 @@ public class LauncherMain {
             writeJson(exchange, 200, "{\"status\":\"not_running\"}");
             return;
         }
-        mainProcess.destroy();
-        try {
-            mainProcess.waitFor();
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
+        killProcessTree(mainProcess);
         mainProcess = null;
         writeJson(exchange, 200, "{\"status\":\"stopped\"}");
     }
@@ -229,15 +220,11 @@ public class LauncherMain {
             env.put("DEEPSEEK_API_KEY", apiKey);
         }
 
-        // 主服务跟随 launcher 的绑定地址，保证两边一致走 Tailscale
-        String bind = System.getenv(BIND_ENV_KEY);
-        if (bind == null || bind.isBlank()) {
-            bind = launcherBindAddress;
+        // 主服务跟随 launcher 的绑定地址（已由 BindAddressResolver 统一解析）
+        // 下发后主服务不再重复探测，保证两边一致走 Tailscale
+        if (launcherBindAddress != null && !launcherBindAddress.isBlank()) {
+            env.put(BindAddressResolver.BIND_ENV_KEY, launcherBindAddress);
         }
-        if (bind != null && !bind.isBlank()) {
-            env.put(BIND_ENV_KEY, bind);
-        }
-
         mainProcess = pb.start();
         lastError = null;
         System.out.println("▶ 主服务已启动 PID=" + mainProcess.pid());
@@ -311,12 +298,6 @@ public class LauncherMain {
         throw new IOException("无法定位 jar 文件，请确认 launcher 以 -jar 方式启动");
     }
 
-    private static String resolveBindAddress() {
-        String v = System.getenv(BIND_ENV_KEY);
-        if (v == null || v.isBlank()) return DEFAULT_BIND;
-        return v.trim();
-    }
-
     // ==================== 工具 ====================
 
     private static void writeJson(HttpExchange exchange, int code, String json) throws IOException {
@@ -332,5 +313,47 @@ public class LauncherMain {
     private static String jsonString(String s) {
         if (s == null) return "null";
         return "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
+    }
+
+    // @anchor: launcherMain_killProcessTree
+// 递归终止进程及其全部后代：先温和 destroy，超时后强制 destroyForcibly
+    private static void killProcessTree(Process p) {
+        if (p == null || !p.isAlive()) return;
+
+        // 先取 descendants 快照（进程死后拿不到）
+        List<ProcessHandle> descendants;
+        try {
+            descendants = p.descendants().toList();
+        } catch (Exception e) {
+            descendants = List.of();
+        }
+
+        // 温和终止
+        try { p.destroy(); } catch (Exception ignored) {}
+        for (ProcessHandle ph : descendants) {
+            try { ph.destroy(); } catch (Exception ignored) {}
+        }
+
+        // 等待一段时间
+        try {
+            p.waitFor(5, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+
+        // 存活的后代强制终止
+        for (ProcessHandle ph : descendants) {
+            if (ph.isAlive()) {
+                try { ph.destroyForcibly(); } catch (Exception ignored) {}
+            }
+        }
+
+        // 主进程仍存活则强制终止
+        if (p.isAlive()) {
+            try { p.destroyForcibly(); } catch (Exception ignored) {}
+            try { p.waitFor(3, TimeUnit.SECONDS); } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
     }
 }

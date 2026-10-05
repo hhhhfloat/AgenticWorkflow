@@ -2,15 +2,13 @@
 // 会话实体：多轮对话的一等公民，持有上下文、元数据、运行任务与日志转发
 package com.myagent.workflow.session;
 
-import com.myagent.workflow.core.AgentConfig;
+import com.myagent.workflow.core.config.AgentConfig;
 import com.myagent.workflow.core.ContextManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -43,7 +41,7 @@ public class Session {
     // 会话字段：不可变标识/配置、可变元数据、运行时状态与当前任务
     // ===== 不可变字段 =====
     private final String sessionId;
-    private final AgentConfig config;
+    private volatile AgentConfig config;
 
     // ===== 可变元数据（通过 SessionMeta 的 with* 方法更新） =====
     private volatile SessionMeta meta;
@@ -112,6 +110,14 @@ public class Session {
      */
     public void attachContextManager(ContextManager contextManager) {
         this.contextManager = contextManager;
+    }
+
+    // @anchor: session_updateConfig
+    // 更新会话配置：本次 /run 的请求配置生效
+    public void updateConfig(AgentConfig newConfig) {
+        if (newConfig != null) {
+            this.config = newConfig;
+        }
     }
 
     // @anchor: session_touch
