@@ -37,10 +37,18 @@ public class PathPolicy {
     );
 
     private final String workProject;
+    private final boolean manualMode;
 
     // @anchor: pathPolicy_constructor
     public PathPolicy(String workProject) {
+        this(workProject, false);
+    }
+
+    // @anchor: pathPolicy_constructorManual
+    // manualMode = true 表示用户手动操作（/runProject），不限制工作项目
+    public PathPolicy(String workProject, boolean manualMode) {
         this.workProject = workProject;
+        this.manualMode = manualMode;
     }
 
     // @anchor: pathPolicy_check
@@ -62,6 +70,9 @@ public class PathPolicy {
     // 写工具的工作项目限定校验：目标路径必须落在 workProject 内
     private String checkWorkProject(String toolName, Args args) {
         if (!WRITE_TOOLS.contains(toolName)) return null;
+
+        // 手动模式（/runProject）：用户主动操作，不限制工作项目
+        if (manualMode) return null;
 
         // 未绑定工作项目：只允许写 tmp/
         if (workProject == null) {

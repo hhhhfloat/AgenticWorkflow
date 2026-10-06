@@ -49,21 +49,32 @@ public class ToolExecutor {
 
     // @anchor: toolExecutor_constructor
     public ToolExecutor(AgentConfig config, ObjectMapper objectMapper, String workProject) {
+        this(config, objectMapper, workProject, false);
+    }
+
+    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper) {
+        this(config, objectMapper, null, false);
+    }
+
+    // @anchor: toolExecutor_forManualRun
+    // 手动执行模式：用于 /runProject 这类用户主动操作，跳过 workProject 写约束
+    public static ToolExecutor forManualRun(AgentConfig config, ObjectMapper mapper) {
+        return new ToolExecutor(config, mapper, null, true);
+    }
+
+    private ToolExecutor(AgentConfig config, ObjectMapper objectMapper,
+                         String workProject, boolean manualMode) {
         this.config = config;
         this.fileOp = new FileOperator();
         this.objectMapper = objectMapper;
         this.anchorMgr = new AnchorManager(objectMapper, workProject);
         this.searcher = new CodeSearcher(anchorMgr);
         this.workProject = workProject;
-        this.pathPolicy = new PathPolicy(workProject);
+        this.pathPolicy = new PathPolicy(workProject, manualMode);
         Compiler compiler = new Compiler(config);
         this.compileRunner = new CompileRunner(config, compiler);
         this.fileStructureRunner = new FileStructureRunner(anchorMgr);
         registerHandlers();
-    }
-
-    public ToolExecutor(AgentConfig config, ObjectMapper objectMapper) {
-        this(config, objectMapper, null);
     }
 
     // @anchor: toolExecutor_registerHandlers
@@ -151,6 +162,7 @@ public class ToolExecutor {
     }
 
     // ==================== 工具调度入口 ====================
+
     /**
      * 根据工具名和参数分发执行，返回结果字符串。
      */
