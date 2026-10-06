@@ -15,14 +15,13 @@
 // ===== 项目运行模块 =====
 
 // runner.js
-async function runRegisteredProject(projectName, filename, mode, displayPath) {
-    // displayPath 可选，默认为 sandbox
-    const path = displayPath || `sandbox/${projectName}`;
-    await runProjectWithPath(path, filename, mode);
-}
-
-async function runProjectWithPath(projectName, filename, mode) {
-    const logPrefix = `[系统] ▶ 正在运行项目 ${projectName} (${mode}模式)...`;
+ async function runRegisteredProject(projectName, filename, mode, displayPath) {
+     // displayPath 是执行时的实际根路径，projectName 是给人看的名字
+     const execPath = displayPath || `sandbox/${projectName}`;
+     await runProjectWithPath(projectName, execPath, filename, mode);
+ }
+async function runProjectWithPath(displayName, execPath, filename, mode) {
+    const logPrefix = `[系统] ▶ 正在运行项目 ${displayName} (${mode}模式)...`;
     appendLog(logPrefix);
 
     const settings = getEffectiveSettings ? getEffectiveSettings() : {};

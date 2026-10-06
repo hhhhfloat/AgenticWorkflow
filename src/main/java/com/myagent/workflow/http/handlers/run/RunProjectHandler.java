@@ -79,9 +79,8 @@ public class RunProjectHandler implements HttpHandler {
 
         try {
             AgentConfig config = ConfigEditor.buildFromRequest(root);
-            // contextManager 传 null：本接口是一次性执行，不需要上下文
-            ToolExecutor executor = new ToolExecutor(config, mapper);
-
+            // 手动执行模式：用户主动操作，不限制工作项目写约束
+            ToolExecutor executor = ToolExecutor.forManualRun(config, mapper);
             Map<String, Object> args = new HashMap<>();
             args.put("filename", filename);
             args.put("mode", mode);
@@ -89,9 +88,14 @@ public class RunProjectHandler implements HttpHandler {
 
             String result = executor.dispatch("compile_and_run", args);
 
+            // 按结果前缀判断成功/失败，避免把错误渲染成"运行完成"
+            boolean ok = result != null && !result.startsWith("❌");
             Map<String, Object> response = new LinkedHashMap<>();
-            response.put("status", "success");
+            response.put("status", ok ? "success" : "error");
             response.put("output", result);
+            if (!ok) {
+                response.put("error", result);
+            }
 
             writeJson(exchange, 200, mapper.writeValueAsString(response));
         } catch (Exception e) {

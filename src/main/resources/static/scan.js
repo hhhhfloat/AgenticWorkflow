@@ -174,14 +174,14 @@ async function copySelected() {
         alert('没有选中任何文件');
         return;
     }
-    try {
-        await navigator.clipboard.writeText(Array.from(selectedPaths).join('\n'));
+    const text = Array.from(selectedPaths).join('\n');
+    const ok = await copyToClipboard(text);
+    if (ok) {
         alert('已复制 ' + selectedPaths.size + ' 个路径到剪贴板');
-    } catch (e) {
-        alert('复制失败：' + e.message);
+    } else {
+        alert('复制失败：浏览器不支持或无权限');
     }
 }
-
 // @anchor: scan_exportFiltered
 // 导出当前筛选列表
 function exportFiltered() {
@@ -226,3 +226,35 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('exportFilteredBtn').addEventListener('click', exportFiltered);
     initScan();
 });
+
+// @anchor: scan_copyToClipboard
+// 复制文本到剪贴板：优先 Clipboard API，回退 execCommand（非安全上下文兼容）
+async function copyToClipboard(text) {
+    // 优先：Clipboard API（仅在 HTTPS 或 localhost 下可用）
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (e) {
+            // 权限被拒或异常，落回 fallback
+        }
+    }
+
+    // 回退：execCommand（HTTP 下也可用）
+    try {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.top = '-9999px';
+        ta.style.left = '-9999px';
+        ta.setAttribute('readonly', '');
+        document.body.appendChild(ta);
+        ta.select();
+        ta.setSelectionRange(0, ta.value.length);  // iOS 兼容
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        return ok;
+    } catch (e) {
+        return false;
+    }
+}

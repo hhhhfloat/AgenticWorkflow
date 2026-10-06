@@ -37,7 +37,7 @@ function addActionButtons(label, path, isRoot) {
                 const meta = await fetchProjectMeta('sandbox/' + projectName);
                 if (!meta) { appendLog('[系统] ❌ 该项目未注册运行入口'); return; }
                 if (typeof runRegisteredProject === 'function') {
-                    await runRegisteredProject(projectName, meta.filename, meta.mode, 'TestProjects');
+                    await runRegisteredProject(projectName, meta.filename, meta.mode);
                 } else {
                     appendLog('[系统] ❌ runner.js 未加载');
                 }
@@ -70,7 +70,7 @@ function addActionButtons(label, path, isRoot) {
                 const meta = await fetchProjectMeta(path);
                 if (!meta) { appendLog('[系统] ❌ 该项目未注册运行入口'); return; }
                 if (typeof runRegisteredProject === 'function') {
-                    await runRegisteredProject(projectName, meta.filename, meta.mode, path);
+                    await runRegisteredProject(projectName, meta.filename, meta.mode);
                 }
             }
         });
