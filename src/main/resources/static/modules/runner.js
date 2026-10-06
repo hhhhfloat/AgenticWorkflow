@@ -20,8 +20,10 @@
      const execPath = displayPath || `sandbox/${projectName}`;
      await runProjectWithPath(projectName, execPath, filename, mode);
  }
-async function runProjectWithPath(displayName, execPath, filename, mode) {
-    const logPrefix = `[系统] ▶ 正在运行项目 ${displayName} (${mode}模式)...`;
+// @anchor: runner_runProjectWithPath
+// 运行项目并把编译运行结果回显到日志
+async function runProjectWithPath(projectName, filename, mode) {
+    const logPrefix = `[系统] ▶ 正在运行项目 ${projectName} (${mode}模式)...`;
     appendLog(logPrefix);
 
     const settings = getEffectiveSettings ? getEffectiveSettings() : {};
@@ -32,7 +34,7 @@ async function runProjectWithPath(displayName, execPath, filename, mode) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                filename: filename,   // 直接传注册表里的 filename（相对路径）
+                filename: filename,
                 mode: mode,
                 config: config
             })
