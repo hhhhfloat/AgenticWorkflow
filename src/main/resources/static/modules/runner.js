@@ -1,25 +1,11 @@
 // @anchor: runner_intro
 // 项目运行模块：按注册表信息请求后端编译并运行项目
 
-// ===== 项目运行模块 =====
-
-/**
- * 运行已注册的项目
- * @param {string} projectName - 项目名称（如 'calculator'）
- * @param {string} filename - 入口文件名（如 'Main.java'）
- * @param {string} mode - 编译模式（如 'java'、'auto'）
- */
 // @anchor: runner_runRegisteredProject
 // 运行已注册项目并把编译运行结果回显到日志
-
-// ===== 项目运行模块 =====
-
-// runner.js
- async function runRegisteredProject(projectName, filename, mode, displayPath) {
-     // displayPath 是执行时的实际根路径，projectName 是给人看的名字
-     const execPath = displayPath || `sandbox/${projectName}`;
-     await runProjectWithPath(projectName, execPath, filename, mode);
- }
+async function runRegisteredProject(projectName, filename, mode) {
+    await runProjectWithPath(projectName, filename, mode);
+}
 // @anchor: runner_runProjectWithPath
 // 运行项目并把编译运行结果回显到日志
 async function runProjectWithPath(projectName, filename, mode) {
