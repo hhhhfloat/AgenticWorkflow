@@ -21,6 +21,9 @@ class AnchorFormatter {
     private static final String PROJECT_INDEX_NAME = ".project_index.json";
 
     private final ObjectMapper objectMapper;
+    // @anchor: anchorFormatter_maxDisplayed
+// 单文件锚点列表的展示上限；超出时保留首锚点 + 最后 (N-1) 条
+    private static final int MAX_DISPLAYED_ANCHORS = 30;
 
     AnchorFormatter(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
@@ -176,6 +179,8 @@ class AnchorFormatter {
         return null;
     }
 
+    // @anchor: anchorFormatter_appendFileDetail
+// 渲染单文件锚点列表；超出 MAX_DISPLAYED_ANCHORS 时保留首锚点与最新若干条
     private void appendFileDetail(StringBuilder sb, String fileKey,
                                   List<Map<String, Object>> anchors) {
         sb.append("📄 ").append(fileKey).append("\n");
@@ -183,13 +188,30 @@ class AnchorFormatter {
             sb.append("   （无锚点）\n\n");
             return;
         }
+
         // 计算末位锚点行号（文件中行号最大的锚点）
         int maxLine = -1;
         for (Map<String, Object> a : anchors) {
             Object lineObj = a.get("line");
             if (lineObj instanceof Integer line && line > maxLine) maxLine = line;
         }
-        for (Map<String, Object> a : anchors) {
+
+        // 截断：超出上限时保留第 1 条 + 最后 (N-1) 条，中间折叠
+        List<Map<String, Object>> toShow;
+        int omitted;
+        if (anchors.size() <= MAX_DISPLAYED_ANCHORS) {
+            toShow = anchors;
+            omitted = 0;
+        } else {
+            int keepTail = MAX_DISPLAYED_ANCHORS - 1;
+            toShow = new ArrayList<>(MAX_DISPLAYED_ANCHORS);
+            toShow.add(anchors.get(0));
+            toShow.addAll(anchors.subList(anchors.size() - keepTail, anchors.size()));
+            omitted = anchors.size() - MAX_DISPLAYED_ANCHORS;
+        }
+
+        for (int i = 0; i < toShow.size(); i++) {
+            Map<String, Object> a = toShow.get(i);
             String id = (String) a.get("id");
             int line = (int) a.get("line");
             String desc = (String) a.getOrDefault("desc", "");
@@ -199,6 +221,13 @@ class AnchorFormatter {
             if (symbol != null && !symbol.isEmpty()) sb.append(" | ").append(symbol);
             if (line == maxLine) sb.append(" | [末尾锚点]");
             sb.append(" | ").append(desc).append("\n");
+
+            // 首锚点之后插入省略提示
+            if (omitted > 0 && i == 0) {
+                sb.append("   ... [已省略 ").append(omitted)
+                        .append(" 条中间锚点，仅显示首锚点与最新 ")
+                        .append(MAX_DISPLAYED_ANCHORS - 1).append(" 条] ...\n");
+            }
         }
         sb.append("\n");
     }
