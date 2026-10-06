@@ -47,7 +47,8 @@ class AnchorFormatter {
 
             String content = Files.readString(indexFile, StandardCharsets.UTF_8);
             Map<String, List<Map<String, Object>>> projectAnchors =
-                    objectMapper.readValue(content, new TypeReference<>() {});
+                    objectMapper.readValue(content, new TypeReference<>() {
+                    });
 
             StringBuilder sb = new StringBuilder();
             for (String raw : filePath.split("[,;]")) {
@@ -65,7 +66,7 @@ class AnchorFormatter {
     // @anchor: anchorFormatter_appendOne
     private void appendDescribeOne(StringBuilder sb, String hint,
                                    Map<String, List<Map<String,
-                                   Object>>> projectAnchors,
+                                           Object>>> projectAnchors,
                                    Path projectDir) {
         List<String> fileMatches = new ArrayList<>();
         for (String key : projectAnchors.keySet()) {
@@ -158,11 +159,12 @@ class AnchorFormatter {
                     }
                     if (Files.isDirectory(candidate)) {
                         sb.append("📌 ").append(rawHint)
-                              .append(" 目录存在，但目录下没有锚点记录。\n\n");
+                                .append(" 目录存在，但目录下没有锚点记录。\n\n");
                         return;
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             sb.append("📌 ").append(rawHint).append(" 不存在，或没有锚点记录。\n\n");
             return;
         }
@@ -196,10 +198,11 @@ class AnchorFormatter {
             if (lineObj instanceof Integer line && line > maxLine) maxLine = line;
         }
 
-        // 截断：超出上限时保留第 1 条 + 最后 (N-1) 条，中间折叠
+        // 仅对 UPDATE.md 生效：代码文件的锚点列表本身就是索引，全列供 Agent 精确选读
+        boolean isUpdateLog = isUpdateLogFile(fileKey);
         List<Map<String, Object>> toShow;
         int omitted;
-        if (anchors.size() <= MAX_DISPLAYED_ANCHORS) {
+        if (!isUpdateLog || anchors.size() <= MAX_DISPLAYED_ANCHORS) {
             toShow = anchors;
             omitted = 0;
         } else {
@@ -209,7 +212,6 @@ class AnchorFormatter {
             toShow.addAll(anchors.subList(anchors.size() - keepTail, anchors.size()));
             omitted = anchors.size() - MAX_DISPLAYED_ANCHORS;
         }
-
         for (int i = 0; i < toShow.size(); i++) {
             Map<String, Object> a = toShow.get(i);
             String id = (String) a.get("id");
@@ -230,5 +232,15 @@ class AnchorFormatter {
             }
         }
         sb.append("\n");
+    }
+
+    // @anchor: anchorFormatter_isUpdateLogFile
+    // 判断相对路径对应的文件名是否为 UPDATE.md（大小写不敏感）
+    private boolean isUpdateLogFile(String fileKey) {
+        if (fileKey == null) return false;
+        String n = fileKey.replace('\\', '/');
+        int slash = n.lastIndexOf('/');
+        String baseName = slash >= 0 ? n.substring(slash + 1) : n;
+        return "UPDATE.md".equalsIgnoreCase(baseName);
     }
 }
