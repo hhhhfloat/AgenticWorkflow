@@ -56,12 +56,12 @@
 
 - **core（编排与上下文）**：`Main` 是 Agent 主循环——组装请求、调用大模型、分发工具调用、累计用量；`ContextManager` 实现双区上下文与快照；`SystemPrompt` 集中存放交给模型的全部行为规范与锚点约定；`UsageTracker` 计费，`HistoryRecorder` 落盘并压缩原始 API 日志，`ToolLogFormatter` 只负责人类可读的工具日志，`ProcessRegistry` 登记所有子进程以便 JVM 退出时统一回收。
 - **core.config（配置与环境探测）**：`AgentConfig` 是运行配置 record（工具链字段 + 系统级常量）与默认值兜底；`ConfigEditor` 把前端请求里的覆盖项叠加到默认配置；`BindAddressResolver` 解析绑定地址；`config.env` 子包是一个探测器体系——`EnvDetector` 门面遍历若干 `Probe`（Java/Maven/MinGW/MSVC/Node/Python）并配合 `ShellPathResolver`、`WindowsRegistryReader`、`GlobUtil`、`EnvUtil`、`CommandRunner`、`ConfigRenderer`，在本机自动探测工具链路径并生成配置文件。
-- **session（会话）**：`Session` 聚合上下文、元数据（`SessionMeta`）、状态（`SessionState`）与日志多播，并持有运行中的 Agent 引用与心跳；`SessionManager` 是内存容器 + 磁盘协调者，用信号量把并发限制为全局串行（N=1）；`SessionStorage` 只做"存 / 取"，负责 `./sessions` 下的 meta / jsonl / 索引 / 用量文件；`SessionUsage` 记录会话级累计用量。
+- **session（会话）**：`Session` 聚合上下文、元数据（`SessionMeta`）、状态（`SessionState`）与日志多播，并持有运行中的 Agent 引用与心跳；日志多播面向 `LogSink` 抽象（`offer` 非阻塞、`close` 幂等），`SseLogSink` 以有界队列 + 独立写线程落 socket，使多个观察者互不阻塞、慢连接不拖累 Agent 主线程；`SessionManager` 是内存容器 + 磁盘协调者，用信号量把并发限制为全局串行（N=1）；`SessionStorage` 只做“存 / 取”，负责 `./sessions` 下的 meta / jsonl / 索引 / 用量文件；`SessionUsage` 记录会话级累计用量。
 - **tools（Agent 能力）**：`ToolDefinitions` 声明暴露给模型的工具 schema，`ToolExecutor` 按工具名校验后分发，`PathPolicy` 统一裁决写类工具的沙箱边界与工作项目限定，`Args` 做类型宽容的参数提取。底层能力拆成：`FileOperator`（沙箱读写/列目录）、`PathUtils`（路径安全解析）、`anchor`（`AnchorManager` 门面 + `AnchorIndex`/`AnchorQuery`/`AnchorScanner`/`AnchorFormatter`）、`search`（`CodeSearcher` 门面 + `TextSearcher`/`ReferenceFinder`/`CallGraphAnalyzer`/`SearchFileFilter`）、`runner`（`Compiler` 门面 + `CompileRunner` 编排，及 Java/Python/Node/C++/Maven/Html 各语言运行器与 `ProcessRunner`/`FileStructureRunner`）。
 - **parser（结构解析）**：`StructureParserRegistry` 单例按扩展名把文件分发给语言解析器（`lang` 子包：Java 走 javac AST、失败降级正则；Python/C++/JS/HTML/CSS 为缩进或正则解析），`GenericParser` 兜底；`FileStructureFormatter` 把解析结构渲染成紧凑文本。产物模型在 `model` 包。
-- **security（安全扫描）**：`SecurityScanner` 单例在编译前对单文件/目录按规则匹配，`RuleRegistry` 内置"命令执行"与"路径穿越"两条 ERROR 级规则（`parsers` 先剥离注释、`filters` 放行无害 import），并带"未变更文件跳过"缓存；`SecurityConfig` 预留规则开关。
+- **security（安全扫描）**：`SecurityScanner` 单例在编译前对单文件/目录按规则匹配，`RuleRegistry` 内置“命令执行”与“路径穿越”两条 ERROR 级规则（`parsers` 先剥离注释、`filters` 放行无害 import），并带“未变更文件跳过”缓存；`SecurityConfig` 预留规则开关。
 - **model**：解析产物与锚点位置的数据载体（record / POJO）。
-- **http（服务层）**：`HttpServerMain` 是入口与路由表；`GuardedHandler` 是设备保护包装器；`handlers` 按域分四个子包——`session`（会话 CRUD/历史/日志/用量）、`run`（运行、停止、日志流、前端工具调用、手动跑项目）、`project`（项目列表/元信息/浏览/归档/上传/建项目/扫描/开目录）、`staticres`（静态资源与外部目录映射）、`system`（状态、心跳、控制权、配置、重启、退出、清 Key）；`utils.HandlerUtils` 提供查询串/JSON 公共工具；`LogFileWriter` 把每轮运行日志写入 `./HistoryOutput/{sessionId}/`。
+- **http（服务层）**：`HttpServerMain` 是入口与路由表；`GuardedHandler` 是设备保护包装器；`handlers` 按域分五个子包——`session`（会话 CRUD/历史/日志/用量）、`run`（运行、停止、日志流、前端工具调用、手动跑项目）、`project`（项目列表/元信息/浏览/归档/上传/建项目/扫描/开目录）、`staticres`（静态资源与外部目录映射）、`system`（状态、心跳、控制权、配置、重启、退出、清 Key）；`utils.HandlerUtils` 提供查询串/JSON 公共工具；`LogFileWriter` 把每轮运行日志写入 `./HistoryOutput/{sessionId}/`。
 - **launcher**：守护启动器（见上）。
 
 ---
@@ -71,11 +71,11 @@
 ## 一次任务的生命周期
 
 1. 前端 `POST /run`（携带 `prompt`、可选 `sessionId`、`maxIterations` 与运行配置）。`RunHandler` 完成预检：清 Key 检查、CORS 预检、参数校验与配置覆盖。
-2. 获取或新建会话；检查"该会话是否已在跑"（是则 409）与"全局是否已有任务"（信号量获取失败则 409）。
+2. 获取或新建会话；检查“该会话是否已在跑”（是则 409）与“全局是否已有任务”（信号量获取失败则 409）。
 3. 建立 SSE 响应，先发一条 `{"type":"session",...}` 告知前端会话号，并启动保活 ping 线程；在后台线程里 `new Main(session).run(...)`。
 4. 主循环逐轮：`ContextManager.buildMessages()` → `sendAndReceive` 调大模型 → 记录 usage → 若有 `tool_calls` 则逐条 `ToolExecutor.dispatch` 执行并把结果作为 `tool` 消息回灌，一轮结束批量刷新锚点脏文件；无 `tool_calls` 即任务完成。
 5. `finally` 阶段（best-effort）：生成本轮用量增量、把任务摘要并入基础区、刷新沙箱内各项目索引、落盘并压缩原始日志、打印统计，最后 `markIdle` 并释放信号量。
-6. SSE 侧：无论成败都追加会话级用量并推 `{"type":"usage",...}`，随后发 `[完成]`/`[错误]` 与 `[结束]`，落盘会话、清理消费者与连接。
+6. SSE 侧：无论成败都追加会话级用量并推 `{"type":"usage",...}`，随后发 `done` / `error`（JSON 控制事件，分别携带 `summary` / `message`）与 `{"type":"end"}`，落盘会话、清理消费者与连接。
 
 模型可调用的工具由 `ToolDefinitions` 与 `ToolExecutor.dispatch` 一一对应，包括：文件类（list_directory / read_file / write_file / delete_file / get_file_structure）、锚点类（read_between_anchors / insert_at_anchor / delete_between_anchors / build_anchor_index / describe_anchors）、检索类（search_text / find_references / find_callers / find_callees）与执行类（compile_and_run）。
 
@@ -90,7 +90,7 @@
 - **桌面端**：`index.html` + `style.css`，逻辑按职能拆进 `modules/`——配置与 DOM 引用、SSE 运行（`sse.js`）、状态轮询、会话列表/创建/状态、历史、文件树（`tree-api` / `tree-render` / `tree-state` / `tree-actions`）、归档/上传/建项目与打开目录、心跳、控制权、日志渲染、话术、用量面板（`usageStore`）、前端工具调用（`toolApi`）等。初始化与事件绑定集中在 `events.js`。
 - **移动端**：`mobile/index.html` + `mobile.css`，`mobile-*.js` 各自对应核心、会话、运行、文件树、状态、控制权等模块，UI 为顶栏 + 抽屉式会话/文件面板。移动入口会自动给所有请求打上设备标识。
 - **辅助页**：`qr.html`（手机扫码访问 + 一键把控制权切回桌面）、`md.html`（Markdown 预览，基于 `marked.min.js`）、`scan.html`/`scan.js`/`scan.css`（大文件扫描与导出）。
-- **与后端的契约**：运行走 `POST /run` 的 SSE 流，只有 `data:` 行有意义，换行以 `\n` 转义；特殊事件 `{"type":"session"}`、`{"type":"usage"}` 与标记行 `[完成]/[错误]/[结束]` 由前端单独识别。观看其他会话的实时日志走只读 `GET /stream`。心跳 `POST /heartbeat` 续活，`GET /status` 轮询任务状态。
+- **与后端的契约**：运行走 `POST /run` 的 SSE 流——普通日志以原生多行 `data:` 帧传输（前端拼回换行），控制事件为单行 JSON `data: {"type":...}`（`session` / `usage` / `done` / `error` / `end`），由前端单独识别，界面上的 `[完成]/[错误]` 只是前端前缀。观看他端正在运行会话的实时日志走只读 `GET /stream`：任务结束推 `stream-end`、触达最大生命周期推 `stream-timeout`，前端在任务仍运行时按退避重连；本端自发运行时用 `isLocalRunActive()` 守卫、`openStream` 幂等，避免 `/run` 与 `/stream` 重复订阅。心跳 `POST /heartbeat` 续活，`GET /status` 轮询任务状态。
 - **本地持久化**：`localStorage` 保存提示词历史、配置面板设置、当前会话号与自定义话术，键名与后端默认配置保持同步（改配置后调用 `/restart` 生效）。
 
 ---
