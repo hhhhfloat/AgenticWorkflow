@@ -6,10 +6,7 @@ import com.myagent.workflow.core.config.BindAddressResolver;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.lang.management.ManagementFactory;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -30,6 +27,8 @@ import java.util.concurrent.TimeUnit;
 // @anchor: launcherMain_class
 // 启动器主类：管理主服务子进程，暴露 /start /stop /status 三个 HTTP 接口
 public class LauncherMain {
+
+    private static final long LOG_MAX_BYTES = 4*1024*1024; // 单次运行最多保留 4MB
 
     // @anchor: launcherMain_constants
     // 端口、绑定地址与主服务就绪探测参数
@@ -195,6 +194,11 @@ public class LauncherMain {
         List<String> cmd = new ArrayList<>();
         cmd.add(javaExe);
 
+        // 强制子进程以 UTF-8 输出到 PIPE，否则 Windows 下是 GBK
+        cmd.add("-Dfile.encoding=UTF-8");
+        cmd.add("-Dstdout.encoding=UTF-8");
+        cmd.add("-Dstderr.encoding=UTF-8");
+
         // 复用 launcher 自己的 JVM 参数（--add-modules、--add-exports 等）
         for (String arg : ManagementFactory.getRuntimeMXBean().getInputArguments()) {
             if (arg.startsWith("-agentlib") || arg.startsWith("-javaagent")) continue;
@@ -208,10 +212,7 @@ public class LauncherMain {
         ProcessBuilder pb = new ProcessBuilder(cmd);
         pb.directory(workDir);
         pb.redirectErrorStream(true);
-        pb.redirectOutput(ProcessBuilder.Redirect.appendTo(new File(workDir, "launcher-main.log")));
-
-        // 注意：不要调用 pb.redirectInput(...)，stdin 默认是 pipe，
-        // 子进程通过读到 EOF 感知父进程退出（详见 HttpServerMain --daemon 分支）
+        // 不用 appendTo：默认走 PIPE，由 startLogPump 以 UTF-8 接管并滚动
 
         Map<String, String> env = pb.environment();
         env.put("AGENT_MANAGED_BY_LAUNCHER", "1");
@@ -228,6 +229,7 @@ public class LauncherMain {
         mainProcess = pb.start();
         lastError = null;
         System.out.println("▶ 主服务已启动 PID=" + mainProcess.pid());
+        startLogPump(mainProcess.getInputStream(), new File(workDir, "launcher-main.log"));
     }
 
     private static boolean isMainRunning() {
@@ -354,6 +356,62 @@ public class LauncherMain {
             try { p.waitFor(3, TimeUnit.SECONDS); } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
+        }
+    }
+
+    // @anchor: launcherMain_startLogPump
+// 接管子进程 stdout：UTF-8 解码后写入滚动日志
+    private static void startLogPump(InputStream in, File logFile) {
+        Thread t = new Thread(() -> {
+            try (BufferedReader br = new BufferedReader(
+                    new InputStreamReader(in, StandardCharsets.UTF_8));
+                 RollingLogWriter lw = new RollingLogWriter(logFile, LOG_MAX_BYTES)) {
+                String line;
+                while ((line = br.readLine()) != null) {
+                    lw.writeLine(line);
+                }
+            } catch (IOException ignored) {
+            }
+        }, "LauncherLogPump");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    // @anchor: launcherMain_RollingLogWriter
+// 滚动日志写入器：超过 maxBytes 时原地清空重写，只保留最新一段
+    private static final class RollingLogWriter implements Closeable {
+        private final File file;
+        private final long maxBytes;
+        private BufferedWriter writer;
+        private long written;
+
+        RollingLogWriter(File file, long maxBytes) throws IOException {
+            this.file = file;
+            this.maxBytes = maxBytes;
+            // 覆盖模式：每次 launcher 启动新实例时清空旧日志
+            this.writer = new BufferedWriter(new OutputStreamWriter(
+                    new FileOutputStream(file, false), StandardCharsets.UTF_8));
+            this.written = 0;
+        }
+
+        synchronized void writeLine(String line) throws IOException {
+            if (written >= maxBytes) {
+                writer.close();
+                writer = new BufferedWriter(new OutputStreamWriter(
+                        new FileOutputStream(file, false), StandardCharsets.UTF_8));
+                written = 0;
+                writer.write("--- 日志超过 " + (maxBytes / 1024 / 1024) + "MB，已截断重写 ---");
+                writer.newLine();
+            }
+            writer.write(line);
+            writer.newLine();
+            writer.flush();
+            written += line.length() + 1;
+        }
+
+        @Override
+        public synchronized void close() throws IOException {
+            if (writer != null) writer.close();
         }
     }
 }
