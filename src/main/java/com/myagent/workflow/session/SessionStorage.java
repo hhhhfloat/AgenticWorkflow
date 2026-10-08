@@ -9,10 +9,7 @@ import com.myagent.workflow.core.ContextManager;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -189,20 +186,45 @@ public class SessionStorage {
 
     // ==================== 内部：索引维护 ====================
 
-    // @anchor: sessionStorage_updateIndex
-    // 同步更新 index.json：移除同 ID 旧记录后写入新元数据
     private synchronized void updateIndex(SessionMeta meta) throws IOException {
         Path indexFile = SESSIONS_DIR.resolve(INDEX_FILE);
-        IndexRoot root = Files.exists(indexFile) ? readJson(indexFile, IndexRoot.class) : new IndexRoot();
-
+        IndexRoot root;
+        if (Files.exists(indexFile)) {
+            try {
+                root = readJson(indexFile, IndexRoot.class);
+            } catch (IOException e) {
+                // index.json 损坏：备份 + 尝试从 meta.json 重建
+                System.err.println("⚠️ index.json 损坏，尝试从会话目录重建: " + e.getMessage());
+                Path backup = indexFile.resolveSibling(INDEX_FILE + ".corrupt." + System.currentTimeMillis());
+                try { Files.move(indexFile, backup); } catch (IOException ignored) {}
+                root = rebuildIndexFromMeta();
+            }
+        } else {
+            root = new IndexRoot();
+        }
         if (root.sessions == null) root.sessions = new ArrayList<>();
-
-        // 移除旧的（如果有）
         root.sessions.removeIf(m -> m.sessionId().equals(meta.sessionId()));
-        // 加入新的
         root.sessions.add(meta);
-
         writeJson(indexFile, root);
+    }
+
+    // 扫描 ./sessions/*/meta.json 重建索引
+    private IndexRoot rebuildIndexFromMeta() {
+        IndexRoot root = new IndexRoot();
+        try (Stream<Path> dirs = Files.list(SESSIONS_DIR)) {
+            dirs.filter(Files::isDirectory).forEach(dir -> {
+                Path metaFile = dir.resolve(META_FILE);
+                if (!Files.exists(metaFile)) return;
+                try {
+                    SessionMeta m = readJson(metaFile, SessionMeta.class);
+                    root.sessions.add(m);
+                } catch (IOException ignored) {}
+            });
+        } catch (IOException e) {
+            System.err.println("⚠️ 重建索引失败: " + e.getMessage());
+        }
+        System.err.println("📂 已从会话目录重建索引，共 " + root.sessions.size() + " 条");
+        return root;
     }
 
     // @anchor: sessionStorage_removeFromIndex
@@ -220,13 +242,27 @@ public class SessionStorage {
 
     // ==================== 内部：JSON 读写 ====================
 
-    // @anchor: sessionStorage_writeJson
-    // 将对象序列化为缩进 JSON 并以覆盖方式写入文件
-    private void writeJson(Path file, Object obj) throws IOException {
-        String json = objectMapper.writeValueAsString(obj);
-        Files.writeString(file, json, StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-    }
+        // @anchor: sessionStorage_writeJson
+                // 原子写 JSON：先写 .tmp，再 rename 覆盖，避免进程中途被杀导致的文件截断
+                private void writeJson(Path file, Object obj) throws IOException {
+                String json = objectMapper.writeValueAsString(obj);
+                writeAtomic(file, json);
+            }
+
+            // @anchor: sessionStorage_writeAtomic
+            // 通用原子写：临时文件 + ATOMIC_MOVE
+            private void writeAtomic(Path file, String content) throws IOException {
+                Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
+                Files.writeString(tmp, content, StandardCharsets.UTF_8,
+                                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+                try {
+                        Files.move(tmp, file,
+                                        StandardCopyOption.ATOMIC_MOVE,
+                                        StandardCopyOption.REPLACE_EXISTING);
+                    } catch (AtomicMoveNotSupportedException e) {
+                        Files.move(tmp, file, StandardCopyOption.REPLACE_EXISTING);
+                    }
+            }
 
     // @anchor: sessionStorage_readJson
     // 读取文件内容并反序列化为指定类型对象
@@ -242,8 +278,7 @@ public class SessionStorage {
         for (Map<String, Object> msg : messages) {
             sb.append(jsonlMapper.writeValueAsString(msg)).append(System.lineSeparator());  // ← jsonlMapper
         }
-        Files.writeString(file, sb.toString(), StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        writeAtomic(file, sb.toString());
     }
 
     // @anchor: sessionStorage_readJsonl
