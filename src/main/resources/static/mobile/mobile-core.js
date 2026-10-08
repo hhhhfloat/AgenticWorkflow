@@ -17,7 +17,7 @@
 })();
 
 const BASE_URL = '';
-const HEARTBEAT_MS = 30000;
+const HEARTBEAT_MS = 10000;
 const SESSION_KEY = 'mobileCurrentSessionId';
 
 let currentSessionId = null;

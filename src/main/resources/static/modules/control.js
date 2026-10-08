@@ -62,10 +62,8 @@ async function switchController() {
                 renderUsagePanel();
                 await loadSessionList();
             }
-            if (typeof openStream === 'function') {
-                if(typeof isRunning !== 'undefined' && !isRunning){
-                    openStream(data.runningSessionId);
-                }
+            if (typeof openStream === 'function' && !isLocalRunActive()) {
+                openStream(data.runningSessionId);
             }
         }
     } catch (e) {

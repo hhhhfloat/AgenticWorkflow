@@ -53,10 +53,15 @@ async function pollStatus() {
     setStatus(nowRunning);
     updateNewSessionBtn(nowRunning);
 
-    // 任务刚结束：刷新会话列表 + 重载历史拿最新摘要
     if (wasRunning && !nowRunning) {
         if (typeof onTaskFinished === 'function') {
             await onTaskFinished(prevSessionId);
+        }
+    }
+
+    if (!wasRunning && nowRunning && data.sessionId === currentSessionId) {
+        if (!isLocalRunActive() && typeof openStream === 'function') {
+            openStream(data.sessionId);
         }
     }
 }

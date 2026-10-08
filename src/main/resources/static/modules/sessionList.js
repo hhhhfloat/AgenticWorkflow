@@ -175,7 +175,6 @@ function formatRelativeTime(timeStr) {
  */
 async function switchToSession(sessionId, workProject) {
     if (sessionId === getCurrentSessionId()) return;
-
     if (typeof abortRun === 'function') abortRun();
     if (typeof closeStream === 'function') closeStream();
     setCurrentSessionId(sessionId);
@@ -183,6 +182,13 @@ async function switchToSession(sessionId, workProject) {
     highlightCurrentSession();
     renderUsagePanel();
     updateProjectSelector(workProject);
+
+    if (typeof openStream === 'function'
+    && !isLocalRunActive()
+    && globalStatus && globalStatus.running
+    && globalStatus.sessionId === sessionId) {
+        openStream(sessionId);
+    }
 }
 
 /**

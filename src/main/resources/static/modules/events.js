@@ -15,6 +15,8 @@ function switchSidebarView(view) {
         sessionsView.style.display = 'none';
         filesBtn.classList.add('active');
         sessionsBtn.classList.remove('active');
+        if (typeof refreshSandbox === 'function') refreshSandbox();
+        if (typeof refreshSidebar === 'function') refreshSidebar();
     } else {
         filesView.style.display = 'none';
         sessionsView.style.display = '';
@@ -77,6 +79,13 @@ document.addEventListener('visibilitychange', function() {
     if (!document.hidden) {
         console.log('🔄 页面回到前台，立即发送心跳续命...');
         sendHeartbeat();
+        // 当前会话正在跑且本端未在跑 → 重订日志流
+        if (globalStatus && globalStatus.running
+        && globalStatus.sessionId === getCurrentSessionId()
+        && !isLocalRunActive()
+        && typeof openStream === 'function') {
+            openStream(globalStatus.sessionId);
+        }
     }
 });
 

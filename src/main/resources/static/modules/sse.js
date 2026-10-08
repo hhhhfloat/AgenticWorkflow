@@ -88,12 +88,23 @@ function abortRun() {
         desktopRunAbort = null;
     }
 }
+// @anchor: sse_isLocalRunActive
+// 本端是否正在通过 /run 跑任务（用于避免与 /stream 重复订阅）
+function isLocalRunActive() {
+    return desktopRunAbort !== null;
+}
 
 // @anchor: sse_handleSpecialEvent
 // 识别 usage/session 特殊事件，返回是否已被消费
 function handleSpecialEvent(data) {
-    // [结束] 只是标记，UI 状态交给 pollStatus 判定
-    if (data === '[结束]') return true;
+    if (data === '[结束]') {
+        if (typeof onTaskFinished === 'function') {
+            onTaskFinished(getCurrentSessionId()).catch(err => {
+                console.error('onTaskFinished 失败:', err);
+            });
+        }
+        return true;
+    }
 
     if (data.startsWith('{') && data.indexOf('"type":"usage"') !== -1) {
         try {
@@ -156,12 +167,24 @@ async function renderRunLogs(sessionId) {
     }
 }
 
-// @anchor: sse_onTaskFinished
-// 由 pollStatus 调用：任务结束时刷新 UI
+// sse.js
+let _lastFinishedSessionId = null;
+let _lastFinishedAt = 0;
+
 async function onTaskFinished(finishedSessionId) {
-    refreshSandbox();
+    const now = Date.now();
+    // 5 秒内同一会话只处理一次，避免 [结束] 与 pollStatus 双触发
+    if (_lastFinishedSessionId === finishedSessionId && now - _lastFinishedAt < 5000) {
+        return;
+    }
+    _lastFinishedSessionId = finishedSessionId;
+    _lastFinishedAt = now;
+
+    await Promise.all([
+        refreshSandbox(),
+        refreshSidebar()
+    ]);
     await loadSessionList();
-    // 仅当用户当前就在看结束的会话时，才重载视图（避免打断浏览其他会话）
     if (finishedSessionId && getCurrentSessionId() === finishedSessionId) {
         await loadSessionHistory(finishedSessionId);
     }
@@ -195,10 +218,13 @@ async function stopAgent() {
 // @anchor: sse_desktopStream
 // 桌面端只读日志流：订阅 /stream 观看正在运行任务的实时日志
 let desktopStreamAbort = null;
+let _currentStreamSessionId = null;
 
 async function openStream(sessionId) {
+    if (_currentStreamSessionId === sessionId) return;
     closeStream();
     if (!sessionId) return;
+    _currentStreamSessionId = sessionId;
     const myAbort = new AbortController();
     desktopStreamAbort = myAbort;
     try {
@@ -242,4 +268,5 @@ function closeStream() {
         desktopStreamAbort.abort();
         desktopStreamAbort = null;
     }
+    _currentStreamSessionId = null;
 }

@@ -37,7 +37,7 @@ async function switchController() {
                 setStoredSessionId(data.runningSessionId);
                 await loadSessionHistory(data.runningSessionId);
                 await loadSessionList();
-                if (typeof openStream === 'function') {
+                if (typeof openStream === 'function' && !isLocalRunActive()) {
                     openStream(data.runningSessionId);
                 }
             }

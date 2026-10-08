@@ -28,7 +28,7 @@ let heartbeatInterval = null;
 // ===== 常量配置 =====
 const MAX_HISTORY = 30;
 const STORAGE_KEY = 'promptHistory';
-const HEARTBEAT_INTERVAL_MS = 3000;
+const HEARTBEAT_INTERVAL_MS = 5000;
 const BASE_URL = '';
 
 // ===== 统一构建运行配置 =====

@@ -3,7 +3,12 @@
 
 // ===== SSE 事件处理 =====
 function handleEvent(data) {
-    if (data === '[结束]') return;
+    if (data === '[结束]') {
+        if (typeof onTaskFinished === 'function') {
+            onTaskFinished(currentSessionId).catch(e => console.error('onTaskFinished 失败:', e));
+        }
+        return;
+    }
 
     if (data.startsWith('{')) {
         try {
@@ -104,6 +109,10 @@ function abortRun() {
     }
 }
 
+function isLocalRunActive() {
+    return mobileRunAbort !== null;
+}
+
 // @anchor: mobileRun_renderRunLogs
 // 从 /session/logs 拉取会话最近一轮日志，追加为折叠块
 async function renderRunLogs(sessionId) {
@@ -185,7 +194,10 @@ async function heartbeat() {
             heartbeatFailCount = 0;
             disconnectedLogged = false;
         }
-        if (data.refresh) appendLog('[系统] 检测到沙箱目录变化');
+        if (data.refresh) {
+            appendLog('[系统] 检测到沙箱目录变化');
+            if (typeof renderMobileTree === 'function') renderMobileTree();
+        }
         if (typeof refreshController === 'function') refreshController();
     } catch (e) {
         heartbeatFailCount++;
@@ -199,7 +211,16 @@ async function heartbeat() {
 function startHeartbeat() {
     setInterval(heartbeat, HEARTBEAT_MS);
     document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') heartbeat();
+        if (document.visibilityState === 'visible') {
+            heartbeat();
+
+            if (globalStatus && globalStatus.running
+                && globalStatus.sessionId === currentSessionId
+                && !isLocalRunActive()
+                && typeof openStream === 'function') {
+                openStream(globalStatus.sessionId);
+            }
+        }
     });
 }
 
@@ -222,10 +243,13 @@ async function shutdownMainService() {
 
 // ===== 只读日志流 =====
 let streamAbort = null;
+let _currentStreamSessionId = null;
 
 async function openStream(sessionId) {
+    if (_currentStreamSessionId === sessionId) return;
     closeStream();
     if (!sessionId) return;
+    _currentStreamSessionId = sessionId;
     const myAbort = new AbortController();
     streamAbort = myAbort;
     try {
@@ -269,4 +293,5 @@ function closeStream() {
         streamAbort.abort();
         streamAbort = null;
     }
+    _currentStreamSessionId = null;
 }

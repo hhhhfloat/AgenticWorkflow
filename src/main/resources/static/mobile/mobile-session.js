@@ -145,6 +145,13 @@ async function switchToSession(sessionId) {
     await loadSessionHistory(sessionId);
     await loadSessionList();
     closeDrawer();
+
+    if (typeof openStream === 'function'
+    && !isLocalRunActive()
+    && globalStatus && globalStatus.running
+    && globalStatus.sessionId === sessionId) {
+        openStream(sessionId);
+    }
 }
 
 // ===== 新建会话 =====

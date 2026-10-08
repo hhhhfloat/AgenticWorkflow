@@ -80,21 +80,17 @@ public class HeartbeatHandler implements HttpHandler {
         String sbHash = computeHash("sandbox");
         String tpHash = computeHash("TestProjects");
         boolean needRefresh = false;
-
-        if (heartBeatCount++ % 4 == 0) {
-            if (sbHash != null && tpHash != null) {
-                if (!Objects.equals(sbHash, lastSandboxHash)
-                        || !Objects.equals(tpHash, lastTestProjectsHash)) {
-                    needRefresh = true;
-                    lastSandboxHash = sbHash;
-                    lastTestProjectsHash = tpHash;
-                }
-            } else {
-                if (sbHash != null) lastSandboxHash = sbHash;
-                if (tpHash != null) lastTestProjectsHash = tpHash;
+        if (sbHash != null && tpHash != null) {
+            if (!Objects.equals(sbHash, lastSandboxHash)
+                    || !Objects.equals(tpHash, lastTestProjectsHash)) {
+                needRefresh = true;
+                lastSandboxHash = sbHash;
+                lastTestProjectsHash = tpHash;
             }
+        } else {
+            if (sbHash != null) lastSandboxHash = sbHash;
+            if (tpHash != null) lastTestProjectsHash = tpHash;
         }
-        if (heartBeatCount == 1_000_000) heartBeatCount = 0;
         return needRefresh;
     }
 
@@ -103,13 +99,18 @@ public class HeartbeatHandler implements HttpHandler {
     private String computeHash(String dir) {
         Path target = Paths.get("./" + dir);
         if (!Files.exists(target) || !Files.isDirectory(target)) return null;
-        try (Stream<Path> stream = Files.list(target)) {
+        try (Stream<Path> stream = Files.walk(target, 8)) {
             StringBuilder sb = new StringBuilder();
-            stream.sorted(Comparator.comparing(p -> p.getFileName().toString()))
+            stream.filter(Files::isRegularFile)
+                    .filter(p -> {
+                        String n = p.getFileName().toString();
+                        return !n.startsWith(".");   // 跳过 .anchors.json 等索引
+                    })
+                    .sorted()
                     .forEach(p -> {
                         try {
-                            sb.append(p.getFileName().toString()).append("|");
-                            sb.append(Files.getLastModifiedTime(p).toMillis()).append(";");
+                            sb.append(target.relativize(p)).append("|")
+                                    .append(Files.getLastModifiedTime(p).toMillis()).append(";");
                         } catch (IOException ignored) {}
                     });
             return sb.length() == 0 ? "" : Integer.toHexString(sb.toString().hashCode());

@@ -69,9 +69,6 @@ function buildDirNode(path, displayName, opts) {
             } catch (e) { alert('创建失败：' + e.message); }
         }));
     } else if (isSandboxProject || isTestProject) {
-        label.appendChild(makeActionBtn('▶', async () => {
-            await runProjectFromTree(path);
-        }));
         const projectName = isSandboxProject ? parts[1] : parts[2];
         label.appendChild(makeActionBtn('🔄', async () => {
             const result = await callToolMobile('build_anchor_index', { project_path: projectName });

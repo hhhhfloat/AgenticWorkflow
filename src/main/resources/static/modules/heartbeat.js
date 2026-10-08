@@ -40,7 +40,7 @@ function sendHeartbeat() {
         .catch(() => {
         // ===== 断联检测 =====
         heartbeatFailCount++;
-        // 连续失败 3 次（约 9 秒）判定为断联
+        // 连续失败 3 次（约 15 秒）判定为断联
         if (heartbeatFailCount >= 3 && !isDisconnectedLogged) {
             isDisconnectedLogged = true;
             appendLog('[系统] 🔴 与服务器断联（连续心跳失败），任务仍在后台运行');

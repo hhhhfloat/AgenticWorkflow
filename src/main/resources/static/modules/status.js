@@ -70,13 +70,17 @@ async function pollStatus() {
     applyStatusToUI(data);
 
     if (wasRunning && !data.running) {
-        // 任务结束：刷新 UI（仅在查看该会话时重载视图）
         if (typeof onTaskFinished === 'function') {
             await onTaskFinished(prevSessionId);
         }
     }
-}
 
+    if (!wasRunning && data.running && data.sessionId === getCurrentSessionId()) {
+        if (!isLocalRunActive() && typeof openStream === 'function') {
+            openStream(data.sessionId);
+        }
+    }
+}
 // @anchor: status_startStatusPolling
 // 启动 3 秒一次的状态轮询
 function startStatusPolling() {

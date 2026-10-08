@@ -57,11 +57,11 @@ const refreshLocks = new Map();
 // 修复 refreshRoot：如果根节点原本是展开的，即使没有子目录展开，也保持展开并刷新内容
 // ============================================================
 async function refreshRoot(rootPath) {
-    if (refreshLock.get(rootPath)) {
+    if (refreshLocks.get(rootPath)) {
         console.log(`⏭️ 跳过并发刷新: ${rootPath}`);
         return;
     }
-    refreshLock.set(rootPath, true);
+    refreshLocks.set(rootPath, true);
 
     try {
         const sidebarContent = document.getElementById('sidebarContent');
