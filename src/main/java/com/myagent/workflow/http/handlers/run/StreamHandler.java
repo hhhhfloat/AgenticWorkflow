@@ -13,7 +13,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
-import java.util.function.Consumer;
 
 // @anchor: streamHandler_class
 // 日志流处理器：订阅会话实时日志，任务结束后自动关闭
@@ -61,29 +60,18 @@ public class StreamHandler implements HttpHandler {
 
         OutputStream out = exchange.getResponseBody();
 
-        // 消费者：从任务线程调用，写入 SSE 需要串行化
-        final Consumer<String> consumer = msg -> {
-            try {
-                synchronized (out) {
-                    out.write(("data: " + msg.replace("\n", "\\n") + "\n\n")
-                            .getBytes(StandardCharsets.UTF_8));
-                    out.flush();
-                }
-            } catch (IOException ignored) {
-                // 客户端断开
-            }
-        };
+        SseLogSink sink = new SseLogSink(out, out, sessionId, null);
 
         try {
             // 历史补发由前端通过 /session/logs 拉取，这里只订阅新日志
-            session.addLogConsumer(consumer);
+            session.addLogSink(sink);
             // 保活 + 结束检测
             // 初始等待：避免"订阅时任务尚未 markRunning"导致的秒退
             if (!session.isRunning()) {
                 Thread.sleep(5000);
                 if (!session.isRunning()) {
                     synchronized (out) {
-                        out.write("data: [stream-end]\n\n".getBytes(StandardCharsets.UTF_8));
+                        out.write("data: {\"type\":\"stream-end\"}\n\n".getBytes(StandardCharsets.UTF_8));
                         out.flush();
                     }
                     return;
@@ -99,7 +87,7 @@ public class StreamHandler implements HttpHandler {
                 Thread.sleep(CHECK_INTERVAL_MS);
                 if (!session.isRunning()) {
                     synchronized (out) {
-                        out.write("data: [stream-end]\n\n".getBytes(StandardCharsets.UTF_8));
+                        out.write("data: {\"type\":\"stream-end\"}\n\n".getBytes(StandardCharsets.UTF_8));
                         out.flush();
                     }
                     break;
@@ -107,7 +95,7 @@ public class StreamHandler implements HttpHandler {
                 long now = System.currentTimeMillis();
                 if (now - startedAt >= MAX_LIFETIME_MS) {
                     synchronized (out) {
-                        out.write("data: [stream-timeout]\n\n".getBytes(StandardCharsets.UTF_8));
+                        out.write("data: {\"type\":\"stream-timeout\"}\n\n".getBytes(StandardCharsets.UTF_8));
                         out.flush();
                     }
                     break;
@@ -125,7 +113,8 @@ public class StreamHandler implements HttpHandler {
         } catch (IOException ignored) {
             // 客户端断开
         } finally {
-            session.removeLogConsumer(consumer);
+            session.removeLogSink(sink);
+            sink.close();
             try { out.close(); } catch (IOException ignored) {}
         }
     }

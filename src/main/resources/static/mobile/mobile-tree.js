@@ -164,13 +164,30 @@ function buildFileNode(filePath, fileName) {
 }
 
 function handleTreeFileClick(path) {
-    if (path.endsWith('.html') || path.endsWith('.htm')) {
+    const ext = (path.split('.').pop() || '').toLowerCase();
+
+    if (ext === 'html' || ext === 'htm') {
         window.open('/' + path, '_blank');
-    } else if (path.endsWith('.md')) {
-        window.open('/md.html?path=' + encodeURIComponent(path), '_blank');
-    } else {
-        appendLog('[系统] 该文件类型暂不支持预览: ' + path);
+        return;
     }
+    if (ext === 'md') {
+        window.open('/md.html?path=' + encodeURIComponent(path), '_blank');
+        return;
+    }
+    const codeExts = ['java','js','mjs','cjs','ts','tsx','py','rb','go','rs',
+        'cpp','cc','cxx','hpp','h','c','cs','css','scss','less',
+        'json','yml','yaml','xml','svg','sh','bash','bat','cmd',
+        'properties','ini','toml','sql','kt','swift','php','txt','log'];
+    if (codeExts.includes(ext)) {
+        window.open('/code.html?path=' + encodeURIComponent(path), '_blank');
+        return;
+    }
+    const imageExts = ['png','jpg','jpeg','gif','webp','ico'];
+    if (imageExts.includes(ext)) {
+        window.open('/' + path, '_blank');
+        return;
+    }
+    appendLog('[系统] 该文件类型暂不支持预览: ' + path);
 }
 
 // 手机端调用后端工具（不依赖 toolApi.js）

@@ -7,16 +7,14 @@ import com.myagent.workflow.http.utils.HandlerUtils;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Stream;
 
 // @anchor: sessionLogsHandler_class
@@ -58,7 +56,8 @@ public class SessionLogsHandler implements HttpHandler {
                 if (tail < 1) tail = DEFAULT_TAIL;
                 if (tail > MAX_TAIL) tail = MAX_TAIL;
             }
-        } catch (NumberFormatException ignored) {}
+        } catch (NumberFormatException ignored) {
+        }
 
         Path sessionDir = ROOT_DIR.resolve(sessionId);
         if (!Files.exists(sessionDir) || !Files.isDirectory(sessionDir)) {
@@ -78,11 +77,17 @@ public class SessionLogsHandler implements HttpHandler {
             writeJson(exchange, 200, emptyResponse(sessionId));
             return;
         }
-
-        List<String> allLines = Files.readAllLines(latest, StandardCharsets.UTF_8);
-        int total = allLines.size();
-        int start = Math.max(0, total - tail);
-        List<String> lines = allLines.subList(start, total);
+        int total = 0;
+        Deque<String> ring = new ArrayDeque<>(tail + 1);
+        try (BufferedReader br = Files.newBufferedReader(latest, StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                total++;
+                ring.addLast(line);
+                if (ring.size() > tail) ring.removeFirst();
+            }
+        }
+        List<String> lines = new ArrayList<>(ring);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("sessionId", sessionId);

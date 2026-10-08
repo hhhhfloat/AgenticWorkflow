@@ -1,15 +1,33 @@
 // @anchor: log_intro
 // 日志辅助：判断文本是否 Markdown、HTML 转义
 
-// ===== 日志输出工具函数 =====
-function isMarkdown(text) {
-    return /(\|\s*[-:]+[\s|]+\||^#{1,6}\s|\n```|\n\s*[-*]\s|\n>\s|^---\s*$|\n---\s*$)/m.test(text);
-}
-
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// @anchor: log_sanitizeHtml
+// 简易 HTML 消毒：剥离 script/iframe 等标签与 on* 事件属性、javascript:/data: 协议
+function sanitizeHtml(html) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    tpl.content.querySelectorAll('script,iframe,object,embed,form,style,link,meta')
+        .forEach(el => el.remove());
+    tpl.content.querySelectorAll('*').forEach(el => {
+        for (const attr of [...el.attributes]) {
+            const name = attr.name.toLowerCase();
+            if (name.startsWith('on')) {
+                el.removeAttribute(attr.name);
+                continue;
+            }
+            if ((name === 'href' || name === 'src' || name === 'xlink:href') &&
+            /^\s*(javascript|data):/i.test(attr.value)) {
+                el.removeAttribute(attr.name);
+            }
+        }
+    });
+    return tpl.innerHTML;
 }
 
 function isScrolledToBottom(el) {
@@ -46,7 +64,7 @@ function appendLog(msg) {
                 cleanMsg = msg.substring(4);
             }
             cleanMsg = linkifySandboxPaths(cleanMsg);
-            renderedContent = marked.parse(cleanMsg, { gfm: true, breaks: true });
+            renderedContent = sanitizeHtml(marked.parse(cleanMsg, { gfm: true, breaks: true }));
         } catch (e) {
             renderedContent = escapeHtml(msg);
         }
@@ -97,7 +115,7 @@ function appendMessage(role, content) {
     if (role === 'user') {
         body.textContent = content;  // 用户消息通常不需要 Markdown
     } else {
-        body.innerHTML = marked.parse(content);
+        body.innerHTML = sanitizeHtml(marked.parse(content));
     }
 
     wrap.appendChild(body);

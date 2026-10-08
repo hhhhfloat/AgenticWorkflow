@@ -65,13 +65,18 @@ public class ExternalFileHandler implements HttpHandler {
             }
         }
 
-        String name = file.getName();
-        String contentType = "text/html";
-        if (name.endsWith(".css")) contentType = "text/css";
-        else if (name.endsWith(".js")) contentType = "application/javascript";
+        String name = file.getName().toLowerCase();
+        String contentType;
+        if (name.endsWith(".html") || name.endsWith(".htm")) contentType = "text/html; charset=utf-8";
+        else if (name.endsWith(".css")) contentType = "text/css; charset=utf-8";
+        else if (name.endsWith(".js")) contentType = "application/javascript; charset=utf-8";
         else if (name.endsWith(".png")) contentType = "image/png";
+        else if (name.endsWith(".jpg") || name.endsWith(".jpeg")) contentType = "image/jpeg";
+        else if (name.endsWith(".gif")) contentType = "image/gif";
+        else if (name.endsWith(".svg")) contentType = "image/svg+xml";
+        else if (name.endsWith(".ico")) contentType = "image/x-icon";
         else if (name.endsWith(".md")) contentType = "text/markdown; charset=utf-8";
-        else if (name.endsWith(".txt") || name.endsWith(".json") || name.endsWith(".yml") || name.endsWith(".yaml")) contentType = "text/plain; charset=utf-8";
+        else contentType = "text/plain; charset=utf-8";
 
         exchange.getResponseHeaders().set("Content-Type", contentType);
         exchange.sendResponseHeaders(200, file.length());

@@ -1,0 +1,34 @@
+<!-- @anchor: codePreview_intro -->
+<!-- 代码预览页：读取 path 参数，带语法高亮与锚点侧栏 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代码预览</title>
+    <link rel="stylesheet" href="highlight-theme.css">
+    <link rel="stylesheet" href="code.css">
+</head>
+<body>
+<div id="layout">
+    <main id="main">
+        <div id="bar">
+            <span id="pathLabel">加载中...</span>
+            <button id="copyBtn" title="复制原始代码">📋 复制</button>
+            <button id="tocToggleBtn" title="锚点">📑</button>
+            <button id="reloadBtn" title="重新加载">↻ 刷新</button>
+        </div>
+        <div id="codeBlock"><div class="empty">加载中...</div></div>
+    </main>
+    <aside id="anchorPanel">
+        <div id="anchorHeader">
+            <span>📑 锚点</span>
+            <button id="anchorCloseBtn" title="关闭">✕</button>
+        </div>
+        <div id="anchorList"></div>
+    </aside>
+</div>
+<script src="highlight.min.js"></script>
+<script src="code.js"></script>
+</body>
+</html>

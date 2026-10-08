@@ -12,7 +12,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Consumer;
 
 // @anchor: session_class
 // 会话类：聚合上下文管理器、元数据/状态、当前任务与 SSE 日志消费者
@@ -51,7 +50,7 @@ public class Session {
     private volatile ContextManager contextManager;   // 延迟注入
 
     // 支持多个消费者（运行端 + 拉取端同时订阅）
-    private final List<Consumer<String>> logConsumers = new CopyOnWriteArrayList<>();
+    private final List<LogSink> logSinks = new CopyOnWriteArrayList<>();
 
     // ===== 当前运行的任务（临时，任务结束后清空） =====
     private volatile Object runningAgent;             // 用 Object 避免循环依赖 core.Main
@@ -271,18 +270,18 @@ public class Session {
 
     // ==================== 日志转发 ====================
 
-    // @anchor: session_addLogConsumer
+    // @anchor: session_addLogSink
     // 追加一个日志消费者，供 /stream 与 /run 同时订阅
-    public void addLogConsumer(Consumer<String> consumer) {
-        if (consumer != null && !logConsumers.contains(consumer)) {
-            logConsumers.add(consumer);
+    public void addLogSink(LogSink sink) {
+        if (sink != null && !logSinks.contains(sink)) {
+            logSinks.add(sink);
         }
     }
 
-    // @anchor: session_removeLogConsumer
+    // @anchor: session_removeLogSink
     // 移除指定日志消费者，SSE 断开时调用
-    public void removeLogConsumer(Consumer<String> consumer) {
-        logConsumers.remove(consumer);
+    public void removeLogSink(LogSink sink) {
+        logSinks.remove(sink);
     }
 
     // @anchor: session_log
@@ -293,14 +292,8 @@ public class Session {
     public void log(String message) {
         // 服务端日志始终记录，便于排障
         logger.info(message);
-        // 分发给所有消费者
-        for (Consumer<String> c : logConsumers) {
-            try {
-                c.accept(message);
-            } catch (Exception ignored) {
-                // 单个消费者异常不影响其他消费者
-            }
-        }
+        // 非阻塞投递给所有消费者；失效的消费者自摘
+        logSinks.removeIf(sink -> !sink.offer(message));
     }
 
     // @anchor: session_restoreMeta

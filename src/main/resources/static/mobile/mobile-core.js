@@ -78,11 +78,42 @@ function updateScrollBottomBtn() {
     btn.hidden = isScrolledToBottom(outputEl);
 }
 
+// @anchor: mobileCore_sanitizeHtml
+// 简易 HTML 消毒：剥离 script/iframe 等标签与 on* 事件属性、javascript:/data: 协议
+function sanitizeHtml(html) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    tpl.content.querySelectorAll('script,iframe,object,embed,form,style,link,meta')
+        .forEach(el => el.remove());
+    tpl.content.querySelectorAll('*').forEach(el => {
+        for (const attr of [...el.attributes]) {
+            const name = attr.name.toLowerCase();
+            if (name.startsWith('on')) {
+                el.removeAttribute(attr.name);
+                continue;
+            }
+            if ((name === 'href' || name === 'src' || name === 'xlink:href') &&
+            /^\s*(javascript|data):/i.test(attr.value)) {
+                el.removeAttribute(attr.name);
+            }
+        }
+    });
+    return tpl.innerHTML;
+}
+
 function appendMessage(role, text) {
     const stick = isScrolledToBottom(outputEl);
     const div = document.createElement('div');
     div.className = 'msg ' + role;
-    div.textContent = text;
+    if (role === 'user') {
+        div.textContent = text;
+    } else {
+        try {
+            div.innerHTML = sanitizeHtml(marked.parse(text));
+        } catch (e) {
+            div.textContent = text;
+        }
+    }
     outputEl.appendChild(div);
     if (stick) outputEl.scrollTop = outputEl.scrollHeight;
     updateScrollBottomBtn();

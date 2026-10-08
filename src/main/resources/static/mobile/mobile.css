@@ -601,3 +601,7 @@ body {
 }
 .scroll-bottom-btn:active { filter: brightness(1.15); }
 .scroll-bottom-btn[hidden] { display: none; }
+.msg pre { overflow-x: auto; max-width: 100%; }
+.msg code { background: #161b22; padding: 1px 4px; border-radius: 3px; }
+.msg table { border-collapse: collapse; font-size: 12px; display: block; overflow-x: auto; }
+.msg table th, .msg table td { border: 1px solid #30363d; padding: 2px 6px; }

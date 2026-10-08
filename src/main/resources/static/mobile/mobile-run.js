@@ -2,28 +2,57 @@
 // 手机端运行：SSE 流、停止、心跳、usage、日志拉取
 
 // ===== SSE 事件处理 =====
-function handleEvent(data) {
-    if (data === '[结束]') {
-        if (typeof onTaskFinished === 'function') {
-            onTaskFinished(currentSessionId).catch(e => console.error('onTaskFinished 失败:', e));
-        }
-        return;
-    }
-
-    if (data.startsWith('{')) {
+function parseControlEvent(data) {
+        if (!data.startsWith('{')) return null;
         try {
-            const obj = JSON.parse(data);
-            if (obj.type === 'session') {
-                currentSessionId = obj.sessionId;
-                setStoredSessionId(obj.sessionId);
-                return;
-            }
-            if (obj.type === 'usage') { renderUsage(obj); return; }
-        } catch (e) { /* JSON 片段，忽略 */ }
-    }
+                const obj = JSON.parse(data);
+            if (obj && typeof obj.type === 'string') return obj;
+        } catch (e) {}
+    return null;
+}
 
-    if (data.startsWith('[完成]')) { appendMessage('done', data); return; }
-    if (data.startsWith('[错误]')) { appendMessage('error', data); return; }
+// 解析一段 SSE 原始帧，返回其中的 data 内容（原生多行 data 用 \n 拼接）
+function parseSseFrame(rawFrame) {
+    const dataLines = [];
+    for (const line of rawFrame.split('\n')) {
+        if (line.startsWith('data: ')) {
+            dataLines.push(line.substring(6));
+        } else if (line.startsWith('data:')) {
+            dataLines.push(line.substring(5));
+        }
+    }
+    if (dataLines.length === 0) return null;
+    return dataLines.join('\n');
+}
+
+function handleEvent(data) {
+    const obj = parseControlEvent(data);
+    if (obj) {
+        switch (obj.type) {
+            case 'session':
+                if (obj.sessionId) {
+                    currentSessionId = obj.sessionId;
+                    setStoredSessionId(obj.sessionId);
+                }
+                return;
+            case 'usage':
+                renderUsage(obj);
+                return;
+            case 'done':
+                appendMessage('done', '[完成] ' + (obj.summary || ''));
+                return;
+            case 'error':
+                appendMessage('error', '[错误] ' + (obj.message || ''));
+                return;
+            case 'end':
+                if (typeof onTaskFinished === 'function') {
+                    onTaskFinished(currentSessionId)
+                        .catch(e => console.error('onTaskFinished 失败:', e));
+                }
+                return;
+            // stream-end / stream-timeout 由 openStream 单独处理
+        }
+    }
     appendLog(data);
 }
 
@@ -83,9 +112,9 @@ async function runAgent() {
             const events = buffer.split('\n\n');
             buffer = events.pop();
             for (const ev of events) {
-                if (!ev.startsWith('data: ')) continue;
                 if (mobileRunAbort !== myAbort) return;
-                const data = ev.substring(6).trim().replace(/\\n/g, '\n');
+                const data = parseSseFrame(ev);
+                if (data === null) continue;
                 handleEvent(data);
             }
         }
@@ -244,48 +273,105 @@ async function shutdownMainService() {
 // ===== 只读日志流 =====
 let streamAbort = null;
 let _currentStreamSessionId = null;
+let _streamRetryTimer = null;
+let _streamRetryCount = 0;
 
 async function openStream(sessionId) {
-    if (_currentStreamSessionId === sessionId) return;
-    closeStream();
-    if (!sessionId) return;
+    if (_currentStreamSessionId === sessionId && streamAbort) return;
+    if (_currentStreamSessionId !== sessionId) _streamRetryCount = 0;
+
+    if (streamAbort) {
+        streamAbort.abort();
+        streamAbort = null;
+    }
+    if (_streamRetryTimer) {
+        clearTimeout(_streamRetryTimer);
+        _streamRetryTimer = null;
+    }
+
+    if (!sessionId) {
+        _currentStreamSessionId = null;
+        return;
+    }
     _currentStreamSessionId = sessionId;
+
     const myAbort = new AbortController();
     streamAbort = myAbort;
+    let streamEnded = false;
+
     try {
         const res = await fetch(BASE_URL + '/stream?sessionId=' + encodeURIComponent(sessionId), {
             signal: myAbort.signal
         });
         if (!res.ok) {
             appendLog('[系统] 日志流订阅失败: HTTP ' + res.status);
+            scheduleStreamRetry(sessionId);
             return;
         }
+        _streamRetryCount = 0;
+
         const reader = res.body.getReader();
         const decoder = new TextDecoder('utf-8');
         let buffer = '';
-        while (true) {
+        while (!streamEnded) {
             const { done, value } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
             const events = buffer.split('\n\n');
             buffer = events.pop();
             for (const ev of events) {
-                if (!ev.startsWith('data: ')) continue;
                 if (streamAbort !== myAbort) return;
-                const data = ev.substring(6).trim().replace(/\\n/g, '\n');
-                if (data === '[stream-end]' || data === '[stream-timeout]') {
-                    appendLog('[系统] 日志流已结束');
-                    closeStream();
-                    return;
+                const data = parseSseFrame(ev);
+                if (data === null) continue;
+                const obj = parseControlEvent(data);
+                if (obj && (obj.type === 'stream-end' || obj.type === 'stream-timeout')) {
+                    if (obj.type === 'stream-timeout') {
+                        appendLog('[系统] ⏱️ 日志流超时（任务可能仍在后台运行）');
+                    } else {
+                        appendLog('[系统] 日志流已结束');
+                    }
+                    streamEnded = true;
+                    break;
                 }
                 handleEvent(data);
             }
         }
     } catch (e) {
-        if (e.name !== 'AbortError') {
-            appendLog('[系统] 日志流中断: ' + e.message);
-        }
+        if (e.name === 'AbortError') return;
+        appendLog('[系统] 日志流中断: ' + e.message);
+    } finally {
+        if (streamAbort === myAbort) streamAbort = null;
     }
+
+    scheduleStreamRetry(sessionId);
+}
+
+function scheduleStreamRetry(sessionId) {
+    const needRetry = globalStatus
+    && globalStatus.running
+    && globalStatus.sessionId === sessionId
+    && !isLocalRunActive();
+
+    if (!needRetry) {
+        closeStream();
+        return;
+    }
+    if (_streamRetryCount >= 3) {
+        appendLog('[系统] 日志流多次中断，停止重连（任务仍在后台运行）');
+        closeStream();
+        return;
+    }
+    _streamRetryCount++;
+    const delay = 2000 * _streamRetryCount;
+    appendLog(`[系统] ${delay / 1000} 秒后重连日志流...`);
+    _streamRetryTimer = setTimeout(() => {
+        _streamRetryTimer = null;
+        if (globalStatus && globalStatus.running
+        && globalStatus.sessionId === sessionId
+        && !isLocalRunActive()) {
+            openStream(sessionId);
+        }
+    }, delay);
 }
 
 function closeStream() {
@@ -293,5 +379,10 @@ function closeStream() {
         streamAbort.abort();
         streamAbort = null;
     }
+    if (_streamRetryTimer) {
+        clearTimeout(_streamRetryTimer);
+        _streamRetryTimer = null;
+    }
     _currentStreamSessionId = null;
+    _streamRetryCount = 0;
 }

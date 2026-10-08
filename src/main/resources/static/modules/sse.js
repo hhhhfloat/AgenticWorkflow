@@ -63,10 +63,10 @@ async function runAgent(prompt, maxIterations) {
             const events = buffer.split('\n\n');
             buffer = events.pop();
             for (const event of events) {
-                if (!event.startsWith('data: ')) continue;
                 // abort 后立即停止输出，避免最后一批 buffer 写进别人的视图
                 if (desktopRunAbort !== myAbort) return;
-                const data = event.substring(6).trim().replace(/\\n/g, '\n');
+                const data = parseSseFrame(event);
+                if (data === null) continue;
                 if (handleSpecialEvent(data)) continue;
                 appendLog(data);
             }
@@ -94,43 +94,66 @@ function isLocalRunActive() {
     return desktopRunAbort !== null;
 }
 
-// @anchor: sse_handleSpecialEvent
-// 识别 usage/session 特殊事件，返回是否已被消费
-function handleSpecialEvent(data) {
-    if (data === '[结束]') {
-        if (typeof onTaskFinished === 'function') {
-            onTaskFinished(getCurrentSessionId()).catch(err => {
-                console.error('onTaskFinished 失败:', err);
-            });
-        }
-        return true;
-    }
+// @anchor: sse_parseControlEvent
+// 尝试把一行 data 解析为控制事件；解析失败返回 null
+function parseControlEvent(data) {
+    if (!data.startsWith('{')) return null;
+    try {
+        const obj = JSON.parse(data);
+        if (obj && typeof obj.type === 'string') return obj;
+    } catch (e) {}
+    return null;
+}
 
-    if (data.startsWith('{') && data.indexOf('"type":"usage"') !== -1) {
-        try {
-            const obj = JSON.parse(data);
-            if (obj.type === 'usage' && obj.sessionId) {
-                renderUsagePanel();
-                return true;
-            }
-        } catch (e) {}
+// @anchor: sse_parseFrame
+// 解析一段 SSE 原始帧，返回其中的 data 内容（原生多行 data 用 \n 拼接）
+// 无 data 行时返回 null
+function parseSseFrame(rawFrame) {
+    const dataLines = [];
+    for (const line of rawFrame.split('\n')) {
+        if (line.startsWith('data: ')) {
+            dataLines.push(line.substring(6));
+        } else if (line.startsWith('data:')) {
+            dataLines.push(line.substring(5));
+        }
     }
-    if (data.startsWith('{') && data.indexOf('"type":"session"') !== -1) {
-        try {
-            const obj = JSON.parse(data);
-            if (obj.type === 'session' && obj.sessionId) {
+    if (dataLines.length === 0) return null;
+    return dataLines.join('\n');
+}
+
+// @anchor: sse_handleSpecialEvent
+// 识别控制事件，返回是否已被消费
+function handleSpecialEvent(data) {
+    const obj = parseControlEvent(data);
+    if (!obj) return false;
+
+    switch (obj.type) {
+        case 'session':
+            if (obj.sessionId) {
                 const prevId = getCurrentSessionId();
                 setCurrentSessionId(obj.sessionId);
-                if (obj.isNew || !prevId) {
-                    loadSessionList();
-                } else {
-                    highlightCurrentSession();
-                }
-                return true;
+                if (obj.isNew || !prevId) loadSessionList();
+                else highlightCurrentSession();
             }
-        } catch (e) {}
+            return true;
+        case 'usage':
+            if (obj.sessionId) renderUsagePanel();
+            return true;
+        case 'done':
+            appendLog('[完成] ' + (obj.summary || ''));
+            return true;
+        case 'error':
+            appendLog('[错误] ' + (obj.message || ''));
+            return true;
+        case 'end':
+            if (typeof onTaskFinished === 'function') {
+                onTaskFinished(getCurrentSessionId())
+                    .catch(e => console.error('onTaskFinished 失败:', e));
+            }
+            return true;
+        default:
+            return false;   // 未知 type 交给普通日志路径
     }
-    return false;
 }
 
 // @anchor: sse_renderRunLogs
@@ -167,19 +190,7 @@ async function renderRunLogs(sessionId) {
     }
 }
 
-// sse.js
-let _lastFinishedSessionId = null;
-let _lastFinishedAt = 0;
-
 async function onTaskFinished(finishedSessionId) {
-    const now = Date.now();
-    // 5 秒内同一会话只处理一次，避免 [结束] 与 pollStatus 双触发
-    if (_lastFinishedSessionId === finishedSessionId && now - _lastFinishedAt < 5000) {
-        return;
-    }
-    _lastFinishedSessionId = finishedSessionId;
-    _lastFinishedAt = now;
-
     await Promise.all([
         refreshSandbox(),
         refreshSidebar()
@@ -219,48 +230,112 @@ async function stopAgent() {
 // 桌面端只读日志流：订阅 /stream 观看正在运行任务的实时日志
 let desktopStreamAbort = null;
 let _currentStreamSessionId = null;
+let _streamRetryTimer = null;
+let _streamRetryCount = 0;
 
 async function openStream(sessionId) {
-    if (_currentStreamSessionId === sessionId) return;
-    closeStream();
-    if (!sessionId) return;
+    // 已在订阅同一会话 → 直接返回（幂等）
+    if (_currentStreamSessionId === sessionId && desktopStreamAbort) return;
+    // 切换会话时重置重试计数
+    if (_currentStreamSessionId !== sessionId) _streamRetryCount = 0;
+
+    // abort 旧流但不重置计数
+    if (desktopStreamAbort) {
+        desktopStreamAbort.abort();
+        desktopStreamAbort = null;
+    }
+    if (_streamRetryTimer) {
+        clearTimeout(_streamRetryTimer);
+        _streamRetryTimer = null;
+    }
+
+    if (!sessionId) {
+        _currentStreamSessionId = null;
+        return;
+    }
     _currentStreamSessionId = sessionId;
+
     const myAbort = new AbortController();
     desktopStreamAbort = myAbort;
+    let streamEnded = false;
+
     try {
         const res = await fetch(BASE_URL + '/stream?sessionId=' + encodeURIComponent(sessionId), {
             signal: myAbort.signal
         });
         if (!res.ok) {
             appendLog('[系统] 日志流订阅失败: HTTP ' + res.status);
+            scheduleStreamRetry(sessionId);
             return;
         }
+        _streamRetryCount = 0;   // 连接成功 → 重置
+
         const reader = res.body.getReader();
         const decoder = new TextDecoder('utf-8');
         let buffer = '';
-        while (true) {
+        while (!streamEnded) {
             const { done, value } = await reader.read();
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
             const events = buffer.split('\n\n');
             buffer = events.pop();
             for (const ev of events) {
-                if (!ev.startsWith('data: ')) continue;
-                if (desktopStreamAbort !== myAbort) return;
-                const data = ev.substring(6).trim().replace(/\\n/g, '\n');
-                if (data === '[stream-end]' || data === '[stream-timeout]') {
-                    appendLog('[系统] 日志流已结束');
-                    closeStream();
-                    return;
+                if (desktopStreamAbort !== myAbort) return;   // 主动 abort
+                const data = parseSseFrame(ev);
+                if (data === null) continue;
+                const obj = parseControlEvent(data);
+                if (obj && (obj.type === 'stream-end' || obj.type === 'stream-timeout')) {
+                    if (obj.type === 'stream-timeout') {
+                        appendLog('[系统] ⏱️ 日志流超时（任务可能仍在后台运行）');
+                    } else {
+                        appendLog('[系统] 日志流已结束');
+                    }
+                    streamEnded = true;
+                    break;
                 }
+                if (handleSpecialEvent(data)) continue;
                 appendLog(data);
             }
         }
     } catch (e) {
-        if (e.name !== 'AbortError') {
-            appendLog('[系统] 日志流中断: ' + e.message);
-        }
+        if (e.name === 'AbortError') return;   // 主动 abort，不重连
+        appendLog('[系统] 日志流中断: ' + e.message);
+    } finally {
+        if (desktopStreamAbort === myAbort) desktopStreamAbort = null;
     }
+
+    // 流结束（正常或异常）→ 决策是否重连
+    scheduleStreamRetry(sessionId);
+}
+
+// @anchor: sse_scheduleStreamRetry
+// 流断开后按需重连：任务仍在跑 + 是当前会话 + 本端未跑 /run，则递增退避重试，最多 3 次
+function scheduleStreamRetry(sessionId) {
+    const needRetry = globalStatus
+    && globalStatus.running
+    && globalStatus.sessionId === sessionId
+    && !isLocalRunActive();
+
+    if (!needRetry) {
+        closeStream();
+        return;
+    }
+    if (_streamRetryCount >= 3) {
+        appendLog('[系统] 日志流多次中断，停止重连（任务仍在后台运行）');
+        closeStream();
+        return;
+    }
+    _streamRetryCount++;
+    const delay = 2000 * _streamRetryCount;
+    appendLog(`[系统] ${delay / 1000} 秒后重连日志流...`);
+    _streamRetryTimer = setTimeout(() => {
+        _streamRetryTimer = null;
+        if (globalStatus && globalStatus.running
+        && globalStatus.sessionId === sessionId
+        && !isLocalRunActive()) {
+            openStream(sessionId);
+        }
+    }, delay);
 }
 
 function closeStream() {
@@ -268,5 +343,10 @@ function closeStream() {
         desktopStreamAbort.abort();
         desktopStreamAbort = null;
     }
+    if (_streamRetryTimer) {
+        clearTimeout(_streamRetryTimer);
+        _streamRetryTimer = null;
+    }
     _currentStreamSessionId = null;
+    _streamRetryCount = 0;
 }

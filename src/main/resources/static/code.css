@@ -1,0 +1,194 @@
+* { box-sizing: border-box; }
+html, body {
+    margin: 0;
+    height: 100%;
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    background: #1a1a1a;
+    color: #ddd;
+}
+#layout {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+#main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
+}
+#bar {
+    background: #222;
+    padding: 10px 16px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    border-bottom: 1px solid #333;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+#pathLabel {
+    flex: 1;
+    color: #9cdcfe;
+    font-family: monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#reloadBtn, #copyBtn {
+    background: #4a8aff; color: #fff; border: none;
+    padding: 6px 14px; border-radius: 4px; cursor: pointer;
+    font-size: 13px;
+}
+#reloadBtn:hover, #copyBtn:hover { background: #5a9aff; }
+
+#codeBlock {
+    flex: 1;
+    overflow: auto;
+    margin: 0;
+    background: #1a1a1a;
+}
+.code-container {
+    display: inline-block;
+    min-width: 100%;
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 8px 0;
+}
+.code-line {
+    display: flex;
+    align-items: flex-start;
+    padding-right: 16px;
+}
+.code-line:hover { background: #232323; }
+.line-number {
+    color: #555;
+    text-align: right;
+    padding: 0 12px 0 16px;
+    user-select: none;
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+}
+.line-content {
+    white-space: pre;
+    flex: 1;
+    min-width: 0;
+}
+.code-line.flash {
+    background: #2a3a4a;
+    transition: background 0.6s;
+}
+
+#anchorPanel {
+    width: 320px;
+    background: #1e1e1e;
+    border-left: 1px solid #333;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+#anchorHeader {
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #9cdcfe;
+    border-bottom: 1px solid #333;
+    flex-shrink: 0;
+}
+#anchorList {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 0;
+}
+.anchor-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+}
+.anchor-item:hover {
+    background: #252525;
+    border-left-color: #4a8aff;
+}
+.anchor-id {
+    font-family: monospace;
+    font-size: 12px;
+    color: #58a6ff;
+    margin-bottom: 3px;
+    word-break: break-all;
+}
+.anchor-desc {
+    font-size: 12px;
+    color: #8b949e;
+    line-height: 1.5;
+    word-break: break-word;
+}
+.anchor-empty {
+    color: #666;
+    font-style: italic;
+    padding: 16px;
+    font-size: 13px;
+    text-align: center;
+}
+.empty {
+    color: #888;
+    text-align: center;
+    padding: 40px 0;
+}
+.error { color: #f88; }
+
+/* ===== 移动端：锚点面板全屏覆盖 ===== */
+#tocToggleBtn { display: none; }
+#anchorCloseBtn { display: none; }
+
+@media (max-width: 768px) {
+    #tocToggleBtn { display: inline-block; }
+    #anchorCloseBtn { display: inline-block; }
+
+    /* 移动端锚点面板变成全屏覆盖层 */
+    #anchorPanel {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+        z-index: 100;
+        border-left: none;
+        box-shadow: -4px 0 16px rgba(0,0,0,0.5);
+    }
+    #anchorPanel.show { transform: translateX(0); }
+
+    /* 头部按钮变成触屏友好的样式 */
+    #anchorHeader {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 16px;
+        font-size: 15px;
+    }
+    #anchorCloseBtn {
+        background: transparent;
+        color: #9cdcfe;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px 12px;
+    }
+
+    /* 移动端锚点条目点击区域更大 */
+    .anchor-item { padding: 12px 20px; }
+    .anchor-id { font-size: 13px; }
+    .anchor-desc { font-size: 13px; }
+
+    /* 代码字体在手机上稍微小一点 */
+    .code-container { font-size: 12px; }
+    .line-number { padding: 0 8px 0 12px; }
+    .code-line { padding-right: 8px; }
+
+    /* 顶栏按钮在手机上紧凑一些 */
+    #reloadBtn, #copyBtn, #tocToggleBtn { padding: 6px 10px; }
+}

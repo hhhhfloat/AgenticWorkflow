@@ -173,11 +173,12 @@ function renderEntries(container, parentPath, entries, cache, targetPaths, expan
 // ===== 文件点击 =====
 
 // @anchor: treeRender_handleFileClick
-// 处理文件点击：html 新窗口打开；md 跳转预览页
+// 处理文件点击：html 新窗口打开；md 跳转预览页；代码文件跳转高亮预览；图片直接打开
 function handleFileClick(filePath) {
     appendLog(`[系统] 点击文件: ${filePath}`);
 
-    if (filePath.endsWith('.html') || filePath.endsWith('.htm')) {
+    const ext = (filePath.split('.').pop() || '').toLowerCase();
+    if (ext === 'html' || ext === 'htm') {
         if (filePath.startsWith('TestProjects/') || filePath.startsWith('sandbox/')) {
             const url = '/' + filePath;
             appendLog(`[系统] 在浏览器中打开: ${url}`);
@@ -185,9 +186,26 @@ function handleFileClick(filePath) {
         } else {
             appendLog('[系统] 无法预览此文件');
         }
-    } else if (filePath.endsWith('.md')) {
-        window.open('/md.html?path=' + encodeURIComponent(filePath), '_blank');
+        return;
     }
+    if(ext == 'md'){
+        window.open('/md.html?path=' + encodeURIComponent(filePath), '_blank');
+        return;
+    }
+    const codeExts = ['java','js','mjs','cjs','ts','tsx','py','rb','go','rs',
+        'cpp','cc','cxx','hpp','h','c','cs','css','scss','less',
+        'json','yml','yaml','xml','svg','sh','bash','bat','cmd',
+        'properties','ini','toml','sql','kt','swift','php','txt','log'];
+    if (codeExts.includes(ext)) {
+        window.open('/code.html?path=' + encodeURIComponent(filePath), '_blank');
+        return;
+    }
+    const imageExts = ['png','jpg','jpeg','gif','webp','ico'];
+    if (imageExts.includes(ext)) {
+        window.open('/' + filePath, '_blank');
+        return;
+    }
+    appendLog('[系统] 该文件类型暂不支持预览: ' + filePath);
 }
 
 // ===== 辅助 =====

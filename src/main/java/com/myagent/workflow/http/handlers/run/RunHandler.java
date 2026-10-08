@@ -25,7 +25,6 @@ import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.function.Consumer;
 
 // @anchor: runHandler_class
 // 运行处理器：解析请求、获取/创建会话、并发控制并以 SSE 推送执行日志
@@ -140,7 +139,7 @@ public class RunHandler implements HttpHandler {
         Thread pingThread = null;
         LogFileWriter logWriter = null;
         OutputStream out = null;
-        Consumer<String> logConsumer = null;
+        SseLogSink logSink = null;
         final Object outLock = new Object();
 
         try {
@@ -162,24 +161,9 @@ public class RunHandler implements HttpHandler {
             // ===== 8. 追加历史记录 =====
             appendHistory(userRequest);
 
-            final LogFileWriter finalLogWriter = logWriter;
             final OutputStream finalOut = out;
-
-            logConsumer = msg -> {
-                synchronized (outLock) {
-                    try {
-                        sendEvent(finalOut, msg);
-                    } catch (IOException ignored) {
-                    }
-                    if (finalLogWriter != null) {
-                        try {
-                            finalLogWriter.write(msg);
-                        } catch (IOException ignored) {
-                        }
-                    }
-                }
-            };
-            final Consumer<String> finalLogConsumer = logConsumer;
+            logSink = new SseLogSink(finalOut, outLock, session.getSessionId(), logWriter);
+            final LogFileWriter finalLogWriter = logWriter;
 
             // ===== 9. 保活 ping 线程 =====
             final OutputStream pingOut = out;
@@ -201,11 +185,12 @@ public class RunHandler implements HttpHandler {
             pingThread = pThread;
 
             // ===== 10. 首条事件：告知前端 sessionId =====
-            sendEvent(out, "{\"type\":\"session\",\"sessionId\":\"" + session.getSessionId()
-                    + "\",\"isNew\":" + isNewSession + "}");
-
+            synchronized (outLock) {
+                sendEvent(out, "{\"type\":\"session\",\"sessionId\":\"" + session.getSessionId()
+                        + "\",\"isNew\":" + isNewSession + "}");
+            }
             // ===== 11. 绑定日志消费者 =====
-            session.addLogConsumer(finalLogConsumer);
+            session.addLogSink(logSink);
 
             // ===== 12. 创建 Agent 并启动线程 =====
             Main agent = new Main(session);
@@ -213,6 +198,7 @@ public class RunHandler implements HttpHandler {
 
             pThread.start();
 
+            SseLogSink finalLogSink = logSink;
             new Thread(() -> {
                 String result = null;
                 Throwable error = null;
@@ -239,38 +225,35 @@ public class RunHandler implements HttpHandler {
                                     total.promptTokens(), total.cachedTokens(), total.completionTokens(),
                                     total.apiCalls(), total.cost()
                             );
-                            synchronized (outLock) {
-                                sendEvent(finalOut, usageJson);
-                            }
+                            finalLogSink.sendControl(usageJson);
                         } catch (Exception ignored) {
                         }
                     }
 
                     // 结束事件
-                    try {
-                        synchronized (outLock) {
-                            if (error != null) {
-                                String msg = error.getMessage() != null
-                                        ? error.getMessage()
-                                        : error.getClass().getSimpleName();
-                                sendEvent(finalOut, "[错误] " + msg);
-                            } else {
-                                sendEvent(finalOut, "[完成] " + result);
-                            }
-                            sendEvent(finalOut, "[结束]");
-                        }
-                    } catch (IOException ignored) {
+                    if (error != null) {
+                        String msg = error.getMessage() != null
+                                ? error.getMessage()
+                                : error.getClass().getSimpleName();
+                        finalLogSink.sendControl(jsonEvent("error", Map.of("message", msg)));
+                    } else {
+                        finalLogSink.sendControl(jsonEvent("done", Map.of("summary", result == null ? "" : result)));
                     }
+                    finalLogSink.sendControl("{\"type\":\"end\"}");
                 } finally {
                     // 清理：无论成功失败都必须执行
                     pThread.interrupt();
-                    session.removeLogConsumer(finalLogConsumer);
+                    finalLogSink.flush(3000);
+                    session.removeLogSink(finalLogSink);
+                    finalLogSink.close();
+                    if(finalLogWriter != null){
+                        try{
+                            finalLogWriter.close();
+                        }catch(IOException ignored){}
+                    }
                     sessionManager.releaseRunningPermit();
                     sessionManager.save(session);
 
-                    if (finalLogWriter != null) {
-                        try { finalLogWriter.close(); } catch (IOException ignored) {}
-                    }
                     try { finalOut.close(); } catch (IOException ignored) {}
                 }
             }, "AgentRunner-" + session.getSessionId()).start();
@@ -282,13 +265,21 @@ public class RunHandler implements HttpHandler {
             // SSE 建立过程中任何一步失败：回滚，但 finally 负责释放许可
             System.err.println("⚠️ /run 建立 SSE 失败: " + t.getMessage());
             if (pingThread != null) pingThread.interrupt();
-            if (logConsumer != null) session.removeLogConsumer(logConsumer);
+            if (logSink != null) {
+                session.removeLogSink(logSink);
+                logSink.close();
+            }
             if (out != null) {
                 try {
-                    synchronized (outLock) {
-                        sendEvent(out, "[错误] " + (t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName()));
+                    if (logSink != null) {
+                        logSink.sendControl(jsonEvent("error",
+                                Map.of("message", t.getMessage() != null
+                                        ? t.getMessage()
+                                        : t.getClass().getSimpleName())));
+                        logSink.flush(1000);
                     }
-                } catch (IOException ignored) {}
+                } catch (Exception ignored) {
+                }
             }
             if (logWriter != null) {
                 try { logWriter.close(); } catch (IOException ignored) {}
@@ -312,9 +303,28 @@ public class RunHandler implements HttpHandler {
      * SSE 事件发送。所有换行转为 \n 转义，保证单行 data。
      */
     private void sendEvent(OutputStream out, String data) throws IOException {
-        String event = "data: " + data.replace("\n", "\\n") + "\n\n";
+        String normalized = data.replace("\r\n", "\n").replace("\r", "\n");
+        StringBuilder sb = new StringBuilder();
+        for (String line : normalized.split("\n", -1)) {
+            sb.append("data: ").append(line).append('\n');
+        }
+        sb.append('\n');
+        String event = sb.toString();
         out.write(event.getBytes(StandardCharsets.UTF_8));
         out.flush();
+    }
+
+    // @anchor: runHandler_jsonEvent
+    // 构造控制事件的 JSON 串；序列化失败时降级为最小结构
+    private String jsonEvent(String type, Map<String, Object> fields) {
+        Map<String, Object> obj = new LinkedHashMap<>();
+        obj.put("type", type);
+        if (fields != null) obj.putAll(fields);
+        try {
+            return mapper.writeValueAsString(obj);
+        } catch (IOException e) {
+            return "{\"type\":\"" + type + "\"}";
+        }
     }
 
     // @anchor: runHandler_appendHistory
