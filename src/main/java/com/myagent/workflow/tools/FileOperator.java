@@ -214,12 +214,11 @@ public class FileOperator {
 // 判断文件/目录是否应被忽略
     private boolean shouldIgnore(Path p) {
         String name = p.getFileName().toString();
-        // 忽略以点开头的目录（Unix 隐藏目录），但保留 .gitignore 这样的文件
-        if (Files.isDirectory(p) && name.startsWith(".")) return true;
-        // 忽略常见 IDE 和版本控制目录
-        return name.equals(".idea") || name.equals(".vscode") ||
-                name.equals(".git") || name.equals("node_modules") ||
-                name.equals("target") || name.equals("__pycache__") ||
-                name.equals(".DS_Store");
+        if(Files.isDirectory(p)){
+            // 目录：点开头一律忽略（含 .git / .idea 等），以及 ProjectLayout 的排除集
+            return ProjectLayout.isHiddenBasename(name) || ProjectLayout.isExcludedDirName(name);
+        }
+        // 文件：只忽略元数据文件（含 .DS_Store），保留 .gitignore 等用户可见隐藏文件
+        return ProjectLayout.isExcludedFile(name);
     }
 }

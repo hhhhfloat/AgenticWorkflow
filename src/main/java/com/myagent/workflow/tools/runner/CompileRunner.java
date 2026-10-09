@@ -109,6 +109,7 @@ public class CompileRunner {
                 result.contains("失败") ||
                 result.contains("超时") ||
                 result.contains("未找到") ||
+                result.contains("不存在") ||
                 result.contains("exception");
     }
 
@@ -116,11 +117,28 @@ public class CompileRunner {
     // 把最近一次成功运行的入口信息写入 .agent_entry.json
     private void writeEntryFile(Path projectDir, String filename, String mode) {
         try {
+            // 目标必须真实存在，避免为悬空文件写注册表
+            Path target;
+            try {
+                target = PathUtils.safeResolve(filename);
+            } catch (IOException e) {
+                logger.warn("⚠️ 目标路径不安全，跳过注册表写入: {}", filename);
+                return;
+            }
+            if (!Files.exists(target)) {
+                logger.warn("⚠️ 目标文件不存在，跳过注册表写入: {}", filename);
+                return;
+            }
+            // 统一存为相对沙箱根的路径，避免 sandbox/ 前缀导致 /runProject 解析错误
+            Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
+            String relPath = sandboxRoot.relativize(target.toAbsolutePath().normalize())
+                    .toString().replace('\\', '/');
+
             Path entryFile = projectDir.resolve(".agent_entry.json");
             logger.info("📝 正在写入注册表: " + entryFile);
 
             Map<String, String> meta = new LinkedHashMap<>();
-            meta.put("filename", filename);
+            meta.put("filename", relPath);
             meta.put("mode", mode);
             String json = new ObjectMapper().writeValueAsString(meta);
             Files.writeString(entryFile, json, StandardCharsets.UTF_8,

@@ -9,15 +9,15 @@ import com.myagent.workflow.model.MethodDefinition;
 import com.myagent.workflow.parser.StructureParserRegistry;
 import com.myagent.workflow.tools.FileOperator;
 import com.myagent.workflow.tools.PathUtils;
+import com.myagent.workflow.tools.ProjectLayout;
 import com.myagent.workflow.tools.search.SearchFileFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 
 /**
@@ -36,6 +36,7 @@ import java.util.*;
 class AnchorIndex {
     private static final Logger logger = LoggerFactory.getLogger(AnchorIndex.class);
     private final ObjectMapper objectMapper;
+    private final AnchorIndexCache cache;
     private boolean migrationAttempted = false;
     private static final String PROJECT_INDEX_NAME = ".project_index.json";
 
@@ -43,8 +44,9 @@ class AnchorIndex {
 
     // @anchor: anchorIndex_constructor
 // 构造：注入 ObjectMapper
-    AnchorIndex(ObjectMapper objectMapper) {
+    AnchorIndex(ObjectMapper objectMapper, AnchorIndexCache cache) {
         this.objectMapper = objectMapper;
+        this.cache = cache;
     }
 
     // ===== 索引路径 =====
@@ -100,6 +102,7 @@ class AnchorIndex {
                 }
                 String json = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(projectAnchors);
                 FileOperator.writeAtomic(newIndex, json);
+                cache.invalidate(newIndex);
 
                 int anchorCount = projectAnchors.values().stream().mapToInt(List::size).sum();
                 migratedProjects++;
@@ -135,38 +138,47 @@ class AnchorIndex {
 
             Map<String, List<Map<String, Object>>> projectAnchors = new LinkedHashMap<>();
 
-            try(var stream = Files.walk(projectDir)){
-                stream.filter(Files::isRegularFile)
-                        .forEach(file -> {
-                            String name = file.getFileName().toString();
-                            if (name.equals(AgentConfig.getAnchorIndexName())) return;
-                            if (name.equals(".anchor_index.json")) return;
-                            if (name.equals(".agent_entry.json")) return;
-                            if (name.startsWith(".")) return;
+            // O2: 用剪枝遍历，跳过 .git / target / node_modules 等大目录
+            List<Path> files = SearchFileFilter.collectFiles(
+                    projectDir,
+                    SearchFileFilter.DEFAULT_EXCLUDED_DIRS,
+                    List.of());   // 文件级排除交给下方循环（点开头 + 具体索引名）
 
-                            try {
-                                Path relPath = projectDir.relativize(file);
-                                if (SearchFileFilter.isExcludedDir(relPath, SearchFileFilter.DEFAULT_EXCLUDED_DIRS))
-                                    return;
-                                String rel = projectDir.relativize(file).toString().replace('\\', '/');
-                                List<Map<String, Object>> anchors = AnchorScanner.scan(file);
-                                if (!anchors.isEmpty()) projectAnchors.put(rel, anchors);
-                            } catch (IOException ignored) {
-                            }
-                        });
+            for (Path file : files) {
+                String name = file.getFileName().toString();
+                // 统一口径：隐藏名（含索引文件）+ 显式排除文件
+                if (ProjectLayout.isHiddenBasename(name)) continue;
+                if (ProjectLayout.isExcludedFile(name)) continue;
+                try {
+                    String rel = projectDir.relativize(file).toString().replace('\\', '/');
+                    List<Map<String, Object>> anchors = AnchorScanner.scan(file);
+                    if (!anchors.isEmpty()) projectAnchors.put(rel, anchors);
+                } catch (IOException e) {
+                    logger.warn("扫描失败，跳过该文件: {} - {}",
+                            projectDir.relativize(file), e.getMessage());
+                }
             }
-
             // 写 .anchors.json（精简版：id + line + preview）
             Path indexFile = getIndexPath(projectPath);
             if (indexFile == null) {
                 return "❌ 项目路径无效: " + projectPath;
             }
 
-            FileOperator.writeAtomic(indexFile,
-                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(AnchorScanner.leanize(projectAnchors)));
+            // O8：先在内存中构造两份 JSON，序列化失败不会留下部分写入
+            String anchorsJson = objectMapper.writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(AnchorScanner.leanize(projectAnchors));
+            String projectIndexJson = buildProjectIndexJson(projectPath, projectAnchors);
 
-            // 写 .project_index.json（精简版：id + line + desc）
-            writeProjectIndex(projectPath, projectAnchors);
+            // 先写 .anchors.json；失败则中止，两份都是旧状态
+            FileOperator.writeAtomic(indexFile, anchorsJson);
+            cache.invalidate(indexFile);
+
+            // 再写 .project_index.json；失败时 .anchors.json 已是新版本，
+            // 但 isProjectFresh 会因 .project_index.json 的旧 mtime 判定为 stale，
+            // 下一次任务收尾自动重建 —— 不会永久分叉
+            Path projIdxFile = PathUtils.safeResolve(projectPath).resolve(PROJECT_INDEX_NAME);
+            FileOperator.writeAtomic(projIdxFile, projectIndexJson);
+            cache.invalidate(projIdxFile);
 
             int totalFiles = projectAnchors.size();
             int totalAnchors = projectAnchors.values().stream().mapToInt(List::size).sum();
@@ -209,22 +221,19 @@ class AnchorIndex {
     /**
      * 将锚点结果（含 desc）写入 .project_index.json。
      */
-    // @anchor: anchorIndex_writeProjectIndex
-    // 把锚点结果（含描述）写入 .project_index.json
-    private void writeProjectIndex(String projectPath, Map<String, List<Map<String, Object>>> projectAnchors) throws IOException {
+    // @anchor: anchorIndex_buildProjectIndexJson
+    // O8：只构造 .project_index.json 的 JSON 字符串，不写盘
+    private String buildProjectIndexJson(String projectPath,
+                             Map<String, List<Map<String, Object>>> projectAnchors) throws IOException {
         Path projectDir = PathUtils.safeResolve(projectPath);
         Map<String, List<Map<String, Object>>> index = new LinkedHashMap<>();
-
         for (Map.Entry<String, List<Map<String, Object>>> e : projectAnchors.entrySet()) {
             String relPath = e.getKey();
             Path filePath = projectDir.resolve(relPath);
             List<Map<String, Object>> entries = buildIndexEntries(filePath, e.getValue());
             if (!entries.isEmpty()) index.put(relPath, entries);
         }
-
-        Path indexFile = projectDir.resolve(PROJECT_INDEX_NAME);
-        FileOperator.writeAtomic(indexFile,
-                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(index));
+        return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(index);
     }
 
     // @anchor: anchorIndex_refreshAnchorsFile
@@ -240,11 +249,8 @@ class AnchorIndex {
             if (anchorsFile == null || !Files.exists(anchorsFile)) {
                 return rebuild(projectPath);
             }
-
-            String content = Files.readString(anchorsFile, StandardCharsets.UTF_8);
-            Map<String, List<Map<String, Object>>> projectAnchors =
-                    objectMapper.readValue(content, new TypeReference<>() {});
-
+            // 复制一份可变 Map，不污染缓存持有的对象
+            Map<String, List<Map<String, Object>>> projectAnchors = new LinkedHashMap<>(cache.load(anchorsFile));
 
             Path file = projectDir.resolve(fileRelPath);
             List<Map<String, Object>> anchors;
@@ -253,7 +259,10 @@ class AnchorIndex {
             } else {
                 // 排除目录里的文件不进索引（与 rebuild / refreshAnchorsFile 保持同一口径）
                 Path rel = projectDir.relativize(file);
-                if (SearchFileFilter.isExcludedDir(rel, SearchFileFilter.DEFAULT_EXCLUDED_DIRS)) {
+                String basename = file.getFileName().toString();
+                if (SearchFileFilter.isExcludedDir(rel, SearchFileFilter.DEFAULT_EXCLUDED_DIRS)
+                        || ProjectLayout.isHiddenBasename(basename)
+                        || ProjectLayout.isExcludedFile(basename)) {
                     anchors = List.of();
                 } else {
                     anchors = AnchorScanner.scan(file);
@@ -267,6 +276,7 @@ class AnchorIndex {
             }
             FileOperator.writeAtomic(anchorsFile,
                     objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(AnchorScanner.leanize(projectAnchors)));
+            cache.invalidate(anchorsFile);
             return "✅ 已刷新位置 " + fileRelPath + "（" + anchors.size() + " 个锚点）";
 
         } catch (IOException e) {
@@ -275,59 +285,135 @@ class AnchorIndex {
         }
     }
 
-    // @anchor: anchorIndex_refreshProjectIndexFile
+    // @anchor: anchorIndex_refreshProjectIndexFiles
     /**
-     * 只刷新 .project_index.json 里该文件的条目（desc + symbol）。
-     * 供 flushDirty 一轮结束统一调用，代价是 AST 解析，较慢。
+     * 批量更新一个项目的多个文件条目（O5）：
+     * 一次读、多次改、一次写 .project_index.json，替代逐文件 refreshProjectIndexFile。
      */
-    String refreshProjectIndexFile(String projectPath, String fileRelPath) {
+    String refreshProjectIndexFiles(String projectPath, Set<String> fileRelPaths) {
         try {
             Path projectDir = PathUtils.safeResolve(projectPath);
+            Path indexFile = projectDir.resolve(PROJECT_INDEX_NAME);
 
-            Path file = projectDir.resolve(fileRelPath);
-            List<Map<String, Object>> anchors;
-            if(!Files.exists(file) || !Files.isRegularFile(file)){
-                anchors = List.of();
-            } else {
-                // 与 refreshAnchorsFile / rebuild 保持同一排除口径
-                Path rel = projectDir.relativize(file);
-                if (SearchFileFilter.isExcludedDir(rel, SearchFileFilter.DEFAULT_EXCLUDED_DIRS)) {
+            Map<String, List<Map<String, Object>>> index = new LinkedHashMap<>();
+            if (Files.exists(indexFile)) {
+                index = new LinkedHashMap<>(cache.load(indexFile));
+            }
+
+            for (String fileRelPath : fileRelPaths) {
+                Path file = projectDir.resolve(fileRelPath);
+                List<Map<String, Object>> anchors;
+                if (!Files.exists(file) || !Files.isRegularFile(file)) {
                     anchors = List.of();
                 } else {
-                    anchors = AnchorScanner.scan(file);
+                    Path rel = projectDir.relativize(file);
+                    String basename = file.getFileName().toString();
+                    if (SearchFileFilter.isExcludedDir(rel, SearchFileFilter.DEFAULT_EXCLUDED_DIRS)
+                            || ProjectLayout.isHiddenBasename(basename)
+                            || ProjectLayout.isExcludedFile(basename)) {
+                        anchors = List.of();
+                    } else {
+                        try {
+                                anchors = AnchorScanner.scan(file);
+                            } catch (IOException e) {
+                            // O7：扫描失败时保留索引中的旧条目，不中止其他文件的刷新
+                            logger.warn("刷新描述失败，保留旧条目: {} - {}",
+                                    fileRelPath, e.getMessage());
+                            continue;
+                        }
+                    }
+                }
+
+                if (anchors.isEmpty()) {
+                    index.remove(fileRelPath);
+                } else {
+                    List<Map<String, Object>> entries = buildIndexEntries(file, anchors);
+                    if (entries.isEmpty()) index.remove(fileRelPath);
+                    else index.put(fileRelPath, entries);
                 }
             }
-            updateProjectIndexForFile(projectDir, fileRelPath, anchors);
 
-            return "✅ 已刷新描述 " + fileRelPath;
-
+            FileOperator.writeAtomic(indexFile,
+                    objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(index));
+            cache.invalidate(indexFile);
+            return "✅ 已刷新 " + fileRelPaths.size() + " 个文件的描述";
         } catch (IOException e) {
-            logger.error("刷新项目索引失败", e);
-            return "❌ 刷新项目索引失败: " + e.getMessage();
+            logger.error("批量刷新项目索引失败", e);
+            return "❌ 批量刷新项目索引失败: " + e.getMessage();
         }
     }
 
-    // @anchor: anchorIndex_updateProjectIndexForFile
-// 更新 .project_index.json 中单个文件的条目（无锚点时移除）
-    private void updateProjectIndexForFile(Path projectDir, String fileRelPath,
-                                           List<Map<String, Object>> anchors) throws IOException {
-        Path indexFile = projectDir.resolve(PROJECT_INDEX_NAME);
-        Map<String, List<Map<String, Object>>> index = new LinkedHashMap<>();
-        if (Files.exists(indexFile)) {
-            index = objectMapper.readValue(Files.readString(indexFile, StandardCharsets.UTF_8),
-                    new TypeReference<>() {});
-        }
+    // @anchor: anchorIndex_isProjectFresh
+    /**
+     * O1：判断项目索引是否新鲜。
+     * 判定基准：min(.anchors.json mtime, .project_index.json mtime) >= 源文件/子目录最大 mtime。
+     * 取 min 而非只看 .anchors.json，是为了覆盖"Agent 写文件后 .anchors.json 已更新、
+     * 但 .project_index.json 尚未被 flushDirty 刷新"的中间态。
+     * projectDir 自身的 mtime 不计入源侧（它会被索引文件写入污染）。
+     */
+    boolean isProjectFresh(String projectPath) {
+        try {
+            Path projectDir = PathUtils.safeResolve(projectPath);
+            if (!Files.isDirectory(projectDir)) return true;
 
-        if (anchors.isEmpty()) {
-            index.remove(fileRelPath);
-        } else {
-            List<Map<String, Object>> entries = buildIndexEntries(projectDir.resolve(fileRelPath), anchors);
-            if (entries.isEmpty()) index.remove(fileRelPath);
-            else index.put(fileRelPath, entries);
-        }
+            Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
+            Path projIdxFile = projectDir.resolve(PROJECT_INDEX_NAME);
+            if (!Files.exists(anchorsFile) || !Files.exists(projIdxFile)) return false;
 
-        FileOperator.writeAtomic(indexFile,
-                objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(index));
+            long anchorsMtime = Files.getLastModifiedTime(anchorsFile).toMillis();
+            long projIdxMtime = Files.getLastModifiedTime(projIdxFile).toMillis();
+            // 取 min 作为基准：两份索引都必须晚于源侧最大 mtime，否则判 stale。
+            // 注意：不判 "anchorsMtime != projIdxMtime 则 stale"。
+            // Agent 每轮写文件后，refreshAnchorsFile 只更新 .anchors.json，
+            // 轮末 flushDirty 才更新 .project_index.json；两次原子写 mtime 必然不同。
+            // 若以此判 stale，将导致每轮收尾都全量重建，抵消 O1 的性能优化。
+            // 分叉（第二次写失败）场景由 "srcMax > min" 兜底：只要本轮有文件被写，
+            // 源文件 mtime 就会超过旧的 .project_index.json，判 stale → 自愈。
+            long indexMtime = Math.min(anchorsMtime, projIdxMtime);
+
+            long srcMax = computeSourceMaxMtime(projectDir);
+            return srcMax <= indexMtime;
+        } catch (IOException e) {
+            logger.warn("freshness 检查失败: {} - {}", projectPath, e.getMessage());
+            return false;
+        }
+    }
+
+    // @anchor: anchorIndex_computeSourceMaxMtime
+    // 剪枝遍历项目，取源文件与子目录（不含 projectDir 自身）的最大 mtime
+    private long computeSourceMaxMtime(Path projectDir) throws IOException {
+        final long[] max = { 0L };
+        Files.walkFileTree(projectDir, new SimpleFileVisitor<>() {
+            @Override
+            public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                if (!dir.equals(projectDir)) {
+                    String name = dir.getFileName().toString();
+                    if (SearchFileFilter.DEFAULT_EXCLUDED_DIRS.contains(name)) {
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    max[0] = Math.max(max[0], attrs.lastModifiedTime().toMillis());
+                }
+                return FileVisitResult.CONTINUE;
+            }
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) {
+                if (attrs.isRegularFile()) {
+                    String name = file.getFileName().toString();
+                    if (!name.equals(AgentConfig.getAnchorIndexName())
+                            && !name.equals(PROJECT_INDEX_NAME)
+                            && !SearchFileFilter.DEFAULT_EXCLUDED_FILES.contains(name)
+                            && !name.startsWith(".")) {
+                        max[0] = Math.max(max[0], attrs.lastModifiedTime().toMillis());
+                    }
+                }
+                return FileVisitResult.CONTINUE;
+            }
+            @Override
+            public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        return max[0];
     }
 
     /**

@@ -21,9 +21,11 @@ import java.util.*;
 class AnchorQuery {
     private static final Logger logger = LoggerFactory.getLogger(AnchorQuery.class);
     private final ObjectMapper objectMapper;
+    private final AnchorIndexCache cache;
 
-    AnchorQuery(ObjectMapper objectMapper) {
+    AnchorQuery(ObjectMapper objectMapper, AnchorIndexCache cache) {
         this.objectMapper = objectMapper;
+        this.cache = cache;
     }
 
     private Path getIndexPath(String projectPath) {
@@ -41,11 +43,7 @@ class AnchorQuery {
             Path indexFile = getIndexPath(projectPath);
             if (indexFile == null || !Files.exists(indexFile)) return null;
 
-            String content = Files.readString(indexFile);
-            Map<String, List<Map<String, Object>>> projectAnchors =
-                    objectMapper.readValue(content, new TypeReference<>() {
-                    });
-
+            Map<String, List<Map<String, Object>>> projectAnchors = cache.load(indexFile);
             for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
                 String filePath = fileEntry.getKey();
                 for (Map<String, Object> anchor : fileEntry.getValue()) {
@@ -68,26 +66,6 @@ class AnchorQuery {
         }
     }
 
-    // @anchor: anchorQuery_findGlobally
-    AnchorLocation findGlobally(String anchorId) {
-        try {
-            Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
-            try (var stream = Files.list(sandboxRoot)) {
-                for (Path projectDir : (Iterable<Path>) stream::iterator) {
-                    if (!Files.isDirectory(projectDir)) continue;
-                    String projectName = projectDir.getFileName().toString();
-                    if (projectName.startsWith(".")) continue;
-                    AnchorLocation loc = find(projectName, anchorId);
-                    if (loc != null) return loc;
-                }
-            }
-            return null;
-        } catch (IOException e) {
-            logger.error("全局查找锚点失败", e);
-            return null;
-        }
-    }
-
     // @anchor: anchorQuery_findAllInProject
     List<AnchorLocation> findAllInProject(String projectPath, String anchorId) {
         List<AnchorLocation> results = new ArrayList<>();
@@ -95,11 +73,7 @@ class AnchorQuery {
             Path indexFile = getIndexPath(projectPath);
             if (indexFile == null || !Files.exists(indexFile)) return results;
 
-            String content = Files.readString(indexFile);
-            Map<String, List<Map<String, Object>>> projectAnchors =
-                    objectMapper.readValue(content, new TypeReference<>() {
-                    });
-
+            Map<String, List<Map<String, Object>>> projectAnchors = cache.load(indexFile);
             for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
                 String filePath = fileEntry.getKey();
                 for (Map<String, Object> anchor : fileEntry.getValue()) {
@@ -159,11 +133,7 @@ class AnchorQuery {
                     Path indexFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
                     if (!Files.exists(indexFile)) continue;
                     try {
-                        String content = Files.readString(indexFile);
-                        Map<String, List<Map<String, Object>>> projectAnchors =
-                                objectMapper.readValue(content, new TypeReference<>() {
-                                });
-
+                        Map<String, List<Map<String, Object>>> projectAnchors = cache.load(indexFile);
                         for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
                             String filePath = fileEntry.getKey();
                             String fullRel = projectName + "/" + filePath;

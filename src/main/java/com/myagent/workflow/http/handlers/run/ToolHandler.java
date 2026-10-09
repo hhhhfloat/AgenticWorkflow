@@ -32,11 +32,11 @@ public class ToolHandler implements HttpHandler {
     private final ObjectMapper objectMapper;
 
     // @anchor: toolHandler_constructor
-    // 构造：从全局配置创建独立 ToolExecutor（不绑定 Session）
+    // 构造：从全局配置创建独立 ToolExecutor。用 manualRun 模式，前端按钮是用户主动操作，应跳过 workProject 限定（PathPolicy 只保留沙箱边界校验）
     public ToolHandler() {
         AgentConfig config = HttpServerMain.getGlobalConfig();
         this.objectMapper = new ObjectMapper();
-        this.toolExecutor = new ToolExecutor(config, objectMapper);
+        this.toolExecutor = ToolExecutor.forManualRun(config, objectMapper);
         this.toolExecutor.setLogConsumer(msg -> System.out.println("[前端工具] " + msg));
     }
 

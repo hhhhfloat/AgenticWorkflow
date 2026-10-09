@@ -64,7 +64,19 @@ public class ProjectMetaHandler implements HttpHandler {
             try {
                 String content = Files.readString(metaFile, StandardCharsets.UTF_8);
                 // 验证 JSON 有效性
-                mapper.readTree(content);
+                var node = mapper.readTree(content);
+                String entryName = node.path("filename").asText("");
+                if (entryName.isBlank()) {
+                    writeJson(exchange, 200, "{\"exists\":false}");
+                    return;
+                }
+                // filename 是相对沙箱根的路径
+                Path sandboxRoot = Paths.get("sandbox").toAbsolutePath().normalize();
+                Path target = sandboxRoot.resolve(entryName).normalize();
+                if (!target.startsWith(sandboxRoot) || !Files.exists(target)) {
+                    writeJson(exchange, 200, "{\"exists\":false}");
+                    return;
+                }
                 writeJson(exchange, 200, content);
             } catch (Exception e) {
                 writeJson(exchange, 500, "{\"error\":\"读取注册表失败: " + e.getMessage() + "\"}");

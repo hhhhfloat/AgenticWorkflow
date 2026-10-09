@@ -202,6 +202,8 @@ public class ToolExecutor {
                     if (!Files.exists(anchorsFile)) continue;
 
                     try {
+                        // O1：索引仍新鲜（无外部改动）则跳过重建
+                        if (anchorMgr.isProjectFresh(name)) continue;
                         anchorMgr.rebuildProjectIndex(name);
                     } catch (Exception e) {
                         logger.warn("刷新项目索引失败: {} -> {}", name, e.getMessage());

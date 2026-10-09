@@ -36,9 +36,10 @@ public class AnchorManager {
     // @anchor: anchorManager_constructor
 // 构造：创建内部 AnchorIndex
     public AnchorManager(ObjectMapper objectMapper, String workProject) {
-        this.anchorIndex = new AnchorIndex(objectMapper);
-        this.anchorQuery = new AnchorQuery(objectMapper);
-        this.anchorFormatter = new AnchorFormatter(objectMapper);
+        AnchorIndexCache cache = new AnchorIndexCache(objectMapper);
+        this.anchorIndex = new AnchorIndex(objectMapper, cache);
+        this.anchorQuery = new AnchorQuery(objectMapper, cache);
+        this.anchorFormatter = new AnchorFormatter(objectMapper, cache);
         this.workProject = workProject;
     }
 
@@ -240,22 +241,39 @@ public class AnchorManager {
         dirtyFiles.computeIfAbsent(projectPath, k -> new LinkedHashSet<>()).add(fileRelPath);
     }
 
+    // @anchor: anchorManager_splitSandboxPath
+    /**
+     * 把沙箱相对路径统一归一化为 (projectPath, fileRelPath)。
+     * 兼容形态：
+     *   "sandbox/foo/bar.java" → ["foo", "bar.java"]
+     *   "foo/bar.java"         → ["foo", "bar.java"]
+     *   "./foo/bar.java"       → ["foo", "bar.java"]
+     *   "\\foo\\bar.java"      → ["foo", "bar.java"]
+     * 无法推导时（无 /、剥完为空）返回 null。
+     */
+    private static String[] splitSandboxPath(String filename) {
+        if (filename == null || filename.isBlank()) return null;
+        String n = filename.replace('\\', '/').trim();
+        while (n.startsWith("./")) n = n.substring(2);
+        if (n.startsWith("sandbox/")) {
+            n = n.substring("sandbox/".length());
+        }
+        if (n.isBlank()) return null;
+        int slash = n.indexOf('/');
+        if (slash <= 0) return null;
+        return new String[]{ n.substring(0, slash), n.substring(slash + 1) };
+    }
+
     // @anchor: anchorManager_markDirtyByFilename
     /**
      * 从沙箱相对路径推导 (projectPath, fileRelPath)，标记为脏文件。
-     * 只在项目含 .anchors.json 时标记。
+     * 项目目录不存在时静默跳过；索引缺失由 flushDirty 兜底触发全量重建。
      */
     public void markDirtyByFilename(String filename) {
-        if (filename == null || filename.isBlank()) return;
-
-        String normalized = filename.replace('\\', '/');
-        if(normalized.startsWith("./")) normalized = normalized.substring(2);
-        int slash = normalized.indexOf('/');
-        if (slash <= 0) return;
-
-        String projectPath = normalized.substring(0, slash);
-        String fileRelPath = normalized.substring(slash + 1);
-
+        String[] parts = splitSandboxPath(filename);
+        if (parts == null) return;
+        String projectPath = parts[0];
+        String fileRelPath = parts[1];
         try {
             Path projectDir = PathUtils.safeResolve(projectPath);
             if (!Files.isDirectory(projectDir)) return;   // 项目目录不存在，跳过
@@ -275,20 +293,19 @@ public class AnchorManager {
         Set<String> fullRebuiltProjects = new HashSet<>();
         for (Map.Entry<String, Set<String>> e : dirtyFiles.entrySet()) {
             String project = e.getKey();
-            for (String file : e.getValue()) {
-                try {
-                    Path projectDir = PathUtils.safeResolve(project);
-                    Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
-                    if (!Files.exists(anchorsFile)) {
-                        if (fullRebuiltProjects.contains(project)) continue;
-                        anchorIndex.rebuild(project);
-                        fullRebuiltProjects.add(project);
-                    } else {
-                        anchorIndex.refreshProjectIndexFile(project, file);
-                    }
-                } catch (Exception ex) {
-                    logger.warn("刷新脏文件失败: {}/{} - {}", project, file, ex.getMessage());
+            try {
+                Path projectDir = PathUtils.safeResolve(project);
+                Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
+                if (!Files.exists(anchorsFile)) {
+                    if (fullRebuiltProjects.contains(project)) continue;
+                    anchorIndex.rebuild(project);
+                    fullRebuiltProjects.add(project);
+                } else {
+                    // O5：整个项目一次读、多次改、一次写
+                    anchorIndex.refreshProjectIndexFiles(project, e.getValue());
                 }
+            } catch (Exception ex) {
+                logger.warn("批量刷新脏文件失败: {} - {}", project, ex.getMessage());
             }
         }
         dirtyFiles.clear();
@@ -394,20 +411,20 @@ public class AnchorManager {
     // 从沙箱相对路径推导 (project, file) 并转发给 describeAnchors。
     // 用于 get_file_structure 在 .md 分支上的转发。
     public String describeAnchorsByPath(String filename) {
-        String normalized = filename.replace('\\', '/');
-        if (normalized.startsWith("sandbox/")) {
-            normalized = normalized.substring("sandbox/".length());
-        }
-        int slash = normalized.indexOf('/');
-        if (slash <= 0) return "❌ 无法推导项目: " + filename;
-
-        String project = normalized.substring(0, slash);
-        String file = normalized.substring(slash + 1);
-
+        String[] parts = splitSandboxPath(filename);
+        if (parts == null) return "❌ 无法推导项目: " + filename;
+        String project = parts[0];
+        String file = parts[1];
         String result = describeAnchors(project, file);
         if (result.startsWith("📌") && result.contains("中没有找到文件")) {
             return "📄 " + file + " 是纯文本文件，无代码结构，且未标注任何锚点。";
         }
         return result;
+    }
+
+    // @anchor: anchorManager_isProjectFresh
+    // 转发 AnchorIndex 的 freshness 判定
+    public boolean isProjectFresh(String projectPath) {
+        return anchorIndex.isProjectFresh(projectPath);
     }
 }

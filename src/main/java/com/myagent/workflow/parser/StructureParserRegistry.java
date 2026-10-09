@@ -5,7 +5,7 @@ package com.myagent.workflow.parser;
 import com.myagent.workflow.parser.lang.*;
 
 import java.nio.file.Path;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -17,7 +17,7 @@ import java.util.Map;
 public final class StructureParserRegistry {
 
     private static final StructureParserRegistry INSTANCE = new StructureParserRegistry();
-    private final Map<String, StructureParser> registry = new HashMap<>();
+    private final Map<String, StructureParser> registry = new LinkedHashMap<>();
     private StructureParser defaultParser;
 
     // @anchor: structureParserRegistry_constructor
@@ -64,7 +64,7 @@ public final class StructureParserRegistry {
     }
 
     // @anchor: structureParserRegistry_getParser
-    // 按文件名后缀匹配解析器，未命中时返回默认解析器
+    // 按扩展名精确匹配解析器，未命中时返回默认解析器
     /**
      * 根据文件获取对应的解析器
      * @param file 文件路径
@@ -72,10 +72,11 @@ public final class StructureParserRegistry {
      */
     public StructureParser getParser(Path file) {
         String fileName = file.getFileName().toString().toLowerCase();
-        for (Map.Entry<String, StructureParser> entry : registry.entrySet()) {
-            if (fileName.endsWith(entry.getKey())) {
-                return entry.getValue();
-            }
+        int dotIdx = fileName.lastIndexOf('.');
+        // 只当点号存在于中间（file.ext）或末尾前有内容时才查表；`file.` 这种以点结尾的视作无扩展名
+        if (dotIdx > 0 && dotIdx < fileName.length() - 1) {
+            StructureParser parser = registry.get(fileName.substring(dotIdx));
+            if (parser != null) return parser;
         }
         return defaultParser;
     }

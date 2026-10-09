@@ -21,12 +21,14 @@ class AnchorFormatter {
     private static final String PROJECT_INDEX_NAME = ".project_index.json";
 
     private final ObjectMapper objectMapper;
+    private final AnchorIndexCache cache;
     // @anchor: anchorFormatter_maxDisplayed
-// 单文件锚点列表的展示上限；超出时保留首锚点 + 最后 (N-1) 条
+    // 单文件锚点列表的展示上限；超出时保留首锚点 + 最后 (N-1) 条
     private static final int MAX_DISPLAYED_ANCHORS = 30;
 
-    AnchorFormatter(ObjectMapper objectMapper) {
+    AnchorFormatter(ObjectMapper objectMapper, AnchorIndexCache cache) {
         this.objectMapper = objectMapper;
+        this.cache = cache;
     }
 
     // @anchor: anchorFormatter_describe
@@ -45,11 +47,7 @@ class AnchorFormatter {
                 return "📌 项目 " + projectPath + " 尚无项目索引。请先运行 build_anchor_index。";
             }
 
-            String content = Files.readString(indexFile, StandardCharsets.UTF_8);
-            Map<String, List<Map<String, Object>>> projectAnchors =
-                    objectMapper.readValue(content, new TypeReference<>() {
-                    });
-
+            Map<String, List<Map<String, Object>>> projectAnchors = cache.load(indexFile);
             StringBuilder sb = new StringBuilder();
             for (String raw : filePath.split("[,;]")) {
                 String hint = raw.trim();

@@ -199,8 +199,11 @@ async function callToolMobile(tool, args) {
             body: JSON.stringify({ tool, args: args || {} })
         });
         const data = await res.json();
-        if (data.status === 'success') return data.result;
-        appendLog(`[工具] ❌ ${tool} 失败: ${data.message || res.status}`);
+        if (data.status === 'success' && typeof data.result === 'string'
+            && !data.result.startsWith('❌')) {
+            return data.result;
+        }
+        appendLog(`[工具] ❌ ${tool} 失败: ${data.result || data.message || res.status}`);
         return null;
     } catch (e) {
         appendLog(`[工具] ❌ ${tool} 请求失败: ${e.message}`);

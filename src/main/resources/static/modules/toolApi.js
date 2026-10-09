@@ -11,11 +11,11 @@ async function callTool(tool, args) {
             body: JSON.stringify({tool, args: args || {}})
         });
         const data = await res.json();
-        if (data.status === 'success') {
+        if (data.status === 'success' && typeof data.result === 'string' && !data.result.startsWith('❌')) {
             appendLog(`[工具] ✅ ${tool} 完成`);
             return data.result;
         }
-        appendLog(`[工具] ❌ ${tool} 失败: ${data.message}`);
+        appendLog(`[工具] ❌ ${tool} 失败: ${data.result || data.message}`);
         return null;
     } catch (err) {
         appendLog(`[工具] ❌ ${tool} 请求失败: ${err.message}`);
