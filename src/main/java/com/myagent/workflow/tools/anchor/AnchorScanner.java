@@ -33,6 +33,9 @@ public final class AnchorScanner {
                     "^\\s*/\\*\\s*@anchor:\\s*(\\w+)\\s*\\*/|" +
                     "^\\s*<!--\\s*@anchor:\\s*(\\w+)\\s*-->|" +
                     "^\\s*#\\s*@anchor:\\s*(\\w+)");
+    // @anchor: anchorScanner_anchorIdOnly
+    // 宽松匹配：只要求 "@anchor: id"，用于在 XML 注释块内定位锚点
+    static final Pattern ANCHOR_ID_ONLY = Pattern.compile("@anchor:\\s*(\\w+)");
 
     // @anchor: anchorScanner_scan
     // 扫描文件，提取全部 @anchor 的 id/line/preview/desc
@@ -46,78 +49,109 @@ public final class AnchorScanner {
         List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
         List<Map<String, Object>> anchors = new ArrayList<>();
         Set<String> localSeen = new HashSet<>();
-        for (int i = 0; i < lines.size(); i++) {
-
+        int i = 0;
+        while (i < lines.size()) {
             String line = lines.get(i);
-            String candidate = line;
 
-            // 兼容跨行 XML 注释：`<!--` 开头但当前行没有 `-->`
-            if (line.contains("<!--") && !line.contains("-->")) {
-                StringBuilder buf = new StringBuilder(line);
-                int j = i + 1;
-                while (j < lines.size() && !lines.get(j).contains("-->")) {
-                    buf.append(' ').append(lines.get(j).trim());
-                    j++;
-                }
-                if (j < lines.size()) {
-                    buf.append(' ').append(lines.get(j).trim());
-                    candidate = buf.toString();
+            // 1) 单行严格匹配：// @anchor: foo、/* @anchor: foo */、<!-- @anchor: foo -->、# @anchor: foo
+            Matcher m = ANCHOR_PATTERN.matcher(line);
+            if (m.find()) {
+                String id = pickGroup(m);
+                if (id != null) {
+                    addAnchorEntry(anchors, localSeen, id, i, line, extractDesc(lines, i));
+                    i++;
+                    continue;
                 }
             }
 
-            Matcher matcher = ANCHOR_PATTERN.matcher(candidate);
-            if (!matcher.find()) continue;
-            String id = null;
-            for (int j = 1; j <= matcher.groupCount(); j++) {
-                String c = matcher.group(j);
-                if (c != null) { id = c; break; }
+            // 2) XML/HTML 跨行注释块：`<!--` 开始、同一行无 `-->`
+            int openAt = line.indexOf("<!--");
+            if (openAt >= 0 && line.indexOf("-->", openAt + 4) < 0) {
+                int endIdx = i + 1;
+                while (endIdx < lines.size() && !lines.get(endIdx).contains("-->")) {
+                    endIdx++;
+                }
+                if (endIdx < lines.size()) {
+                    // 块内找第一个 @anchor；行号取锚点实际所在行
+                    for (int k = i; k <= endIdx; k++) {
+                        Matcher am = ANCHOR_ID_ONLY.matcher(lines.get(k));
+                        if (am.find()) {
+                            String id = am.group(1);
+                            String desc = extractXmlBlockDesc(lines, k, endIdx);
+                            addAnchorEntry(anchors, localSeen, id, k, lines.get(k), desc);
+                            break;   // 一个块只取第一个锚点
+                        }
+                    }
+                    i = endIdx + 1;
+                    continue;
+                }
             }
-            if (id == null) continue;
-            String finalId = id;
-            int suffix = 2;
-            while (localSeen.contains(finalId)) finalId = id + "_" + suffix++;
-            localSeen.add(finalId);
 
-            Map<String, Object> anchor = new LinkedHashMap<>();
-            anchor.put("id", finalId);
-            anchor.put("line", i + 1);
-            anchor.put("preview", lines.get(i).trim());
-            anchor.put("desc", extractDesc(lines, i));
-            anchors.add(anchor);
+            i++;
         }
         return anchors;
+    }
+
+    // @anchor: anchorScanner_pickGroup
+// 从 ANCHOR_PATTERN 的多捕获组里挑出第一个非空匹配（不同注释形态落在不同组）
+    static String pickGroup(Matcher matcher) {
+        for (int j = 1; j <= matcher.groupCount(); j++) {
+            String c = matcher.group(j);
+            if (c != null) return c;
+        }
+        return null;
+    }
+
+    // @anchor: anchorScanner_addAnchorEntry
+// 统一构造锚点条目：id 重名追加 _2/_3，行号写 1-based
+    static void addAnchorEntry(List<Map<String, Object>> anchors, Set<String> localSeen,
+                               String id, int lineIdx, String lineContent, String desc) {
+        String finalId = id;
+        int suffix = 2;
+        while (localSeen.contains(finalId)) finalId = id + "_" + suffix++;
+        localSeen.add(finalId);
+
+        Map<String, Object> anchor = new LinkedHashMap<>();
+        anchor.put("id", finalId);
+        anchor.put("line", lineIdx + 1);
+        anchor.put("preview", lineContent.trim());
+        anchor.put("desc", desc == null ? "" : desc);
+        anchors.add(anchor);
+    }
+
+    // @anchor: anchorScanner_extractXmlBlockDesc
+// 从 XML/HTML 跨行注释块提取描述：锚点行 @anchor: id 之后 + 后续行直到 -->
+    static String extractXmlBlockDesc(List<String> lines, int anchorLineIdx, int endIdx) {
+        StringBuilder sb = new StringBuilder();
+        for (int j = anchorLineIdx; j <= endIdx && j < lines.size(); j++) {
+            String l = lines.get(j);
+
+            // 首行：截掉 @anchor: id 之前的内容和 id 本身
+            if (j == anchorLineIdx) {
+                int idx = l.indexOf("@anchor:");
+                if (idx >= 0) {
+                    int p = idx + "@anchor:".length();
+                    while (p < l.length() && Character.isWhitespace(l.charAt(p))) p++;
+                    while (p < l.length()
+                            && (Character.isLetterOrDigit(l.charAt(p)) || l.charAt(p) == '_')) {
+                        p++;
+                    }
+                    l = l.substring(p);
+                }
+            }
+
+            // 去掉注释标记
+            l = l.replace("<!--", "").replace("-->", "").trim();
+            if (l.isEmpty()) continue;
+            if (!sb.isEmpty()) sb.append(' ');
+            sb.append(l);
+        }
+        return sb.toString();
     }
 
     // @anchor: anchorScanner_extractDesc
     // 从锚点下一行紧邻注释提取描述
     static String extractDesc(List<String> lines, int anchorLineIdx) {
-
-        String anchorLine = lines.get(anchorLineIdx);
-
-        // 跨行 XML 注释：锚点行有 `<!--` 但没有 `-->`
-        if (anchorLine.contains("<!--") && !anchorLine.contains("-->")) {
-            // 先看锚点行 `@anchor: xxx` 之后的尾部（可能有简短描述）
-            int tagEnd = anchorLine.indexOf("@anchor:");
-            if (tagEnd >= 0) {
-                int idEnd = anchorLine.indexOf(' ', tagEnd + 8);
-                if (idEnd < 0) idEnd = anchorLine.length();
-                String tail = anchorLine.substring(idEnd).trim();
-                if (!tail.isEmpty()) return tail;
-            }
-            // 再往下拼描述，直到 `-->`
-            StringBuilder sb = new StringBuilder();
-            for (int j = anchorLineIdx + 1; j < lines.size(); j++) {
-                String l = lines.get(j).trim();
-                boolean hasClose = l.contains("-->");
-                if (hasClose) l = l.replace("-->", "").trim();
-                if (!l.isEmpty()) {
-                    if (!sb.isEmpty()) sb.append(' ');
-                    sb.append(l);
-                }
-                if (hasClose) break;
-            }
-            return sb.toString();
-        }
         int next = anchorLineIdx + 1;
         if (next >= lines.size()) return "";
 
