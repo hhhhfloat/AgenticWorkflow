@@ -34,10 +34,14 @@ public record AgentConfig(
     // 系统级常量：沙箱目录、API 地址、模型名、锚点索引文件名等
     private static final String ARCHIVE_VERSION = "v5_0";
     private static final String SANDBOX_DIR     = "./sandbox";
+    private static final String SESSIONS_DIR    = "./sessions";
     private static final String API_URL         = "https://api.deepseek.com/chat/completions";
     // DeepSeek官网更新v4.1-flash模型后的调用名
     private static final String MODEL_FLASH     = "deepseek-flash";
     private static final String ANCHOR_INDEX_NAME = ".anchors.json";
+    // deepseek-flash 上下文窗口 1M tokens，取 80% 作为压缩触发上限
+    private static final long   CONTEXT_WINDOW     = 800_000L;
+
 
     // ===== 配置文件定位 =====
     private static final String CONFIG_FILE_NAME = "agent-config.properties";
@@ -57,9 +61,11 @@ public record AgentConfig(
     public static String getModelFlash()          { return MODEL_FLASH; }
     public static int    getDefaultMaxIterations(){ return DEFAULT_MAX_ITERATIONS; }
     public static String getSandboxDir()          { return SANDBOX_DIR; }
+    public static String getSessionsDir()         { return SESSIONS_DIR; }
     public static String getApiUrl()              { return API_URL; }
     public static String getArchiveVersion()      { return ARCHIVE_VERSION; }
     public static String getAnchorIndexName()     { return ANCHOR_INDEX_NAME; }
+    public static long   getContextWindow()       { return CONTEXT_WINDOW; }
 
     // ========== 工厂方法 ==========
 

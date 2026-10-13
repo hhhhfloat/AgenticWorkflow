@@ -60,6 +60,18 @@
     <div id="main">
         <div id="mainHeader">
             <h2>Agentic 工作台</h2>
+            <div id="contextWidget" class="context-widget" title="点击查看上下文详情">
+                <svg id="contextPie" width="22" height="22" viewBox="0 0 22 22">
+                    <circle cx="11" cy="11" r="8" fill="none"
+                         stroke="rgba(255,255,255,0.15)" stroke-width="2.5"/>
+                    <circle id="contextPieArc" cx="11" cy="11" r="8" fill="none"
+                         stroke="#4caf50" stroke-width="2.5"
+                         stroke-dasharray="0 50.3" stroke-dashoffset="0"
+                         transform="rotate(-90 11 11)"/>
+                </svg>
+                <span class="context-text">上下文占用</span>
+                <span id="contextPercentLabel" class="context-percent-label">--</span>
+            </div>
             <button id="switchControllerBtn" class="switch-controller-btn">⇄ 切到手机端</button>
         </div>
 
@@ -183,6 +195,23 @@
                 </div>
             </div>
         </div>
+        <!-- ===== 上下文详情弹层 ===== -->
+        <!-- @anchor: index_contextPopover -->
+        <!-- 上下文详情弹层：显示占用详情与压缩按钮 -->
+        <div id="contextPopover" class="context-popover" style="display:none;">
+            <div class="context-popover-header">
+                <span>📦 上下文详情</span>
+                <button id="contextPopoverClose" class="context-popover-close">✕</button>
+            </div>
+            <div class="context-popover-body">
+                <div id="contextDetail" class="context-detail">加载中…</div>
+                <div class="context-bar-wrap">
+                    <div id="contextBar" class="context-bar"></div>
+                </div>
+                <div id="contextNumbers" class="context-numbers">-- / --</div>
+                <button id="compactBtn" class="compact-btn">🗜️ 压缩上下文</button>
+            </div>
+        </div>
 
     </div>
 </div>
@@ -207,6 +236,7 @@
 <script src="modules/quickPrompts.js"></script>
 <script src="modules/sessionState.js"></script>
 <script src="modules/usageStore.js"></script>
+<script src="modules/contextSize.js"></script>
 <script src="modules/sessionList.js"></script>
 <!-- 心跳机制 -->
 <script src="modules/heartbeat.js"></script>

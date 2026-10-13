@@ -49,6 +49,11 @@ public class SessionManager {
         this.storage = new SessionStorage();
     }
 
+    // @anchor: sessionManager_archiveBase
+    // 转发到 SessionStorage.archiveBase
+    public String archiveBase(String sessionId, List<Map<String, Object>> base) throws IOException {
+        return storage.archiveBase(sessionId, base);
+    }
     // ==================== 创建 ====================
 
     // @anchor: sessionManager_create

@@ -37,7 +37,7 @@ public class SessionStorage {
 
     // @anchor: sessionStorage_constants
     // sessions 根目录与各类持久化文件名常量
-    private static final Path SESSIONS_DIR = Paths.get("./sessions");
+    private static final Path SESSIONS_DIR = Paths.get(AgentConfig.getSessionsDir());
     private static final String INDEX_FILE = "index.json";
     private static final String META_FILE = "meta.json";
     private static final String BASE_FILE = "immutable_base.jsonl";
@@ -102,6 +102,30 @@ public class SessionStorage {
 
         // 3. 更新索引
         updateIndex(session.getMeta());
+    }
+    // @anchor: sessionStorage_archiveBase
+    // 把当前基础区快照归档到 history-base/ 目录，文件名带时间戳
+    /**
+     * 归档基础区快照。压缩前调用，保留压缩前的完整历史。
+     *
+     * @param sessionId 会话 ID
+     * @param base      基础区消息列表
+     * @return 归档文件的相对路径（如 "history-base/base-20260113_142530.jsonl"）
+     */
+    public String archiveBase(String sessionId, List<Map<String, Object>> base) throws IOException {
+        if (base == null || base.isEmpty()) {
+            throw new IOException("基础区为空，无需归档");
+        }
+        Path archiveDir = SESSIONS_DIR.resolve(sessionId).resolve("history-base");
+        Files.createDirectories(archiveDir);
+
+        String ts = java.time.LocalDateTime.now()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+        String fileName = "base-" + ts + ".jsonl";
+        Path archiveFile = archiveDir.resolve(fileName);
+
+        writeJsonl(archiveFile, base);
+        return "history-base/" + fileName;
     }
 
     // ==================== 加载 ====================

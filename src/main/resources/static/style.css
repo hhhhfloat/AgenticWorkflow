@@ -1027,3 +1027,110 @@ html, body {
 }
 .scroll-bottom-btn:hover { opacity: 1; }
 .scroll-bottom-btn[hidden] { display: none; }
+
+/* ===== 上下文指示器（暗色主题） ===== */
+.context-widget {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+}
+.context-widget:hover {
+    background: rgba(255, 255, 255, 0.06);   /* 若页面已有 hover 底色，换成同一值 */
+}
+.context-text {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.65);        /* 次要文字色，换成页面的次要文字色 */
+}
+.context-percent-label {
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #4caf50;
+    min-width: 34px;
+    text-align: right;
+}
+
+/* ===== 上下文弹层（暗色主题） ===== */
+.context-popover {
+    position: absolute;
+    top: 52px;
+    right: 16px;
+    width: 300px;
+    background: #252525;                     /* 换成页面的卡片/弹窗底色 */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    padding: 14px;
+    color: #e0e0e0;
+}
+.context-popover-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #e0e0e0;
+}
+.context-popover-close {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 0;
+    line-height: 1;
+}
+.context-popover-close:hover {
+    color: #e0e0e0;
+}
+.context-detail {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 8px;
+}
+.context-bar-wrap {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+.context-bar {
+    height: 100%;
+    background: #4caf50;
+    transition: width 0.3s, background 0.3s;
+}
+.context-numbers {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    margin-bottom: 12px;
+}
+.compact-btn {
+    width: 100%;
+    padding: 9px;
+    background: #1976d2;                     /* 换成页面的主色 */
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s;
+}
+.compact-btn:hover:not(:disabled) {
+    background: #1565c0;
+}
+.compact-btn:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.4);
+    cursor: default;
+}

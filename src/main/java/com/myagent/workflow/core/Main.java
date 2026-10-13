@@ -390,6 +390,7 @@ public class Main {
         if (usage == null) return;
 
         long prompt = usage.get("prompt_tokens").asLong(0);
+        contextManager.setLastPromptTokens(prompt);
         long completion = usage.get("completion_tokens").asLong(0);
         long cached = 0;
         if (usage.has("prompt_tokens_details")) {

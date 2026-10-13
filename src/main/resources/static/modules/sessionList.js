@@ -182,6 +182,7 @@ async function switchToSession(sessionId, workProject) {
     highlightCurrentSession();
     renderUsagePanel();
     updateProjectSelector(workProject);
+    refreshContextIndicator();
 
     if (typeof openStream === 'function'
     && !isLocalRunActive()

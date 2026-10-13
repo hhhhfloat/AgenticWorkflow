@@ -109,7 +109,10 @@ public class HttpServerMain {
         globalConfig = ConfigEditor.buildDefault();
 
         // 3. 确保运行时目录存在
-        for (String dir : new String[]{"./sandbox", "./TestProjects", "./HistoryOutput", "./temp", "./sessions"}) {
+        for (String dir : new String[]{
+                AgentConfig.getSandboxDir(),
+                "./TestProjects", "./HistoryOutput", "./temp",
+                AgentConfig.getSessionsDir()}) {
             Path p = Paths.get(dir);
             if (!Files.exists(p)) {
                 Files.createDirectories(p);
@@ -173,6 +176,9 @@ public class HttpServerMain {
         reg(server, "/session/history", new SessionHistoryHandler(), false);
         reg(server, "/session/usage", new SessionUsageHandler(), false);
         reg(server, "/session/logs",    new SessionLogsHandler(), false);
+        reg(server, "/session/context", new ContextHandler(), false);
+        // —— 会话管理：压缩；写：保护 ——
+        reg(server, "/session/compact", new CompactHandler(), true);
 
         // ── 任务执行 ──
         reg(server, "/run", new RunHandler(), true);

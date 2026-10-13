@@ -79,6 +79,9 @@ document.addEventListener('visibilitychange', function() {
     if (!document.hidden) {
         console.log('🔄 页面回到前台，立即发送心跳续命...');
         sendHeartbeat();
+        if (typeof refreshContextIndicator === 'function') {
+            refreshContextIndicator();
+        }
         // 当前会话正在跑且本端未在跑 → 重订日志流
         if (globalStatus && globalStatus.running
         && globalStatus.sessionId === getCurrentSessionId()
@@ -161,6 +164,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     startHeartbeat();
     startStatusPolling();
+    bindContextControls();
+    refreshContextIndicator();
 });
 
 // ===== 回到底部按钮 =====

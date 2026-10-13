@@ -25,6 +25,7 @@ import java.util.function.Consumer;
  * - 多轮对话：appendUserMessage 不重置上下文，mergeSummaryToBase 合并任务产出
  * - 序列化：提供快照/恢复方法，供 SessionStorage 落盘使用
  * - 清理冗余：移除未使用的 pendingPhaseSummary / pendingNextPlan
+ * - 上下文压缩：新增 applyCompaction（LLM 摘要 + 保留最近 N 对）与 lastPromptTokens 记录
  */
 // @anchor: contextManager_class
 // 上下文管理器：维护 API 请求消息列表、用量统计与历史落盘
@@ -40,6 +41,30 @@ public class ContextManager {
 
     private final HistoryRecorder historyRecorder;
     private final UsageTracker usageTracker = new UsageTracker();
+
+    // ===== 最近一次 API 调用的 prompt_tokens（上下文窗口大小的精确值） =====
+    private volatile long lastPromptTokens = 0;
+
+    // ===== 压缩指令（拼接在 immutableBase 之后作为 user 消息发给模型） =====
+    private static final String COMPACT_INSTRUCTION = """
+    把上述对话历史压缩成一段结构化摘要，供后续任务作为记忆使用。
+    严格按以下结构输出，不要添加任何结构之外的文字、说明或收尾语：
+
+    <history>
+    TOTAL_GOAL: 整个会话的最终目标，一两句话
+    USER_CONSTRAINTS: 用户明确提出的、跨轮次必须遵守的约束。每条一行，按主题分组。若没有，填「无」
+    COMPLETED: 已完成的关键任务。按时间顺序综合精简总结（做了什么，结果如何）
+    PENDING: 未完成事项，按优先级排序。若全部完成，填「无」
+    KEY_FILES: 关键文件及其作用，逗号分隔，只列重点
+    </history>
+
+    注意：
+    - **不需要展现技术细节**，这些内容已经在项目的文档中有解释。
+    - TOTAL_GOAL 保留自会话开始以来的总目标，不能只写最近一轮
+    - USER_CONSTRAINTS 是累积的：如果历史摘要中已存在约束，合并进来，不要丢失
+    - COMPLETED 按时间顺序，先总结更早的，再详述最近的
+    - 2000 字以内
+    """;
 
     // ==================== 构造 ====================
 
@@ -132,6 +157,50 @@ public class ContextManager {
         }
     }
 
+    // @anchor: contextManager_applyCompaction
+    // 用 LLM 生成的摘要替换基础区历史，保留 SystemPrompt 与最近 N 对 (user, summary)
+    /**
+      * 应用压缩结果。
+      * <p>
+      * 结构变化（以 keepRecentPairs=2 为例）：
+      * <pre>
+      * 压缩前：[system][user][summary][user][summary][user][summary]...
+      * 压缩后：[system][历史摘要][user][summary][user][summary]
+      * </pre>
+      * SystemPrompt 永远保留在第 0 位；最近 keepRecentPairs 对消息原样保留。
+      *
+      * @param summary         LLM 生成的压缩摘要
+      * @param keepRecentPairs 保留最近多少对 (user, summary)，建议 2
+      */
+            public void applyCompaction(String summary, int keepRecentPairs) {
+                if (summary == null || summary.isBlank()) {
+                        log("⚠️ [系统] 压缩摘要为空，跳过");
+                        return;
+                    }
+                if (immutableBase.size() <= 2) {
+                        log("⚠️ [系统] 基础区消息太少，无需压缩");
+                        return;
+                    }
+
+                        int beforeCount = immutableBase.size();
+
+                        // 保留 SystemPrompt
+                                Map<String, Object> sysPrompt = immutableBase.get(0);
+
+                        // 保留最近 keepRecentPairs 对，但不越过 SystemPrompt
+                                int keepCount = Math.min(keepRecentPairs * 2, immutableBase.size() - 1);
+                List<Map<String, Object>> recent = new ArrayList<>(
+                                immutableBase.subList(immutableBase.size() - keepCount, immutableBase.size())
+                                );
+
+                        immutableBase.clear();
+                immutableBase.add(sysPrompt);
+                immutableBase.add(Map.of("role", "system", "content", "【历史摘要】\n" + summary));
+                immutableBase.addAll(recent);
+
+                        log("📦 [系统] 基础区已压缩：" + beforeCount + " 条 → " + immutableBase.size()
+                                        + " 条（保留最近 " + keepRecentPairs + " 对）");
+            }
 
     // ==================== 构建 ====================
 
@@ -192,6 +261,14 @@ public class ContextManager {
     public int getBaseMessageCount() {
         return immutableBase.size();
     }
+    // @anchor: contextManager_lastPromptTokens
+    // 最近一次 API 调用的 prompt_tokens（由 Main.recordUsage 写入）
+    public long getLastPromptTokens() { return lastPromptTokens; }
+    public void setLastPromptTokens(long tokens) { this.lastPromptTokens = tokens; }
+
+    // @anchor: contextManager_compactInstruction
+    // 压缩指令文本，供 CompactHandler 拼接压缩请求使用
+    public String getCompactInstruction() { return COMPACT_INSTRUCTION; }
 
     // ==================== 历史记录 ====================
 

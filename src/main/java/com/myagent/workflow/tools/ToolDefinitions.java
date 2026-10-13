@@ -44,7 +44,7 @@ public final class ToolDefinitions {
 // 工具：write_file 写入/覆盖文件
         tools.add(defineTool(
                 "write_file",
-                "将源代码（Java/TML/CSS/JS/Python/C++）写入沙箱目录下的指定文件。如果文件已存在则覆盖。",
+                "将源代码（Java/HTML/CSS/JS/Python/C++）写入沙箱目录下的指定文件。如果文件已存在则覆盖。",
                 defineParams()
                         .prop("filename", "string", "文件名，例如 Tool.java （必须包含 .java 后缀）")
                         .prop("code", "string", "完整的 Java 源代码（包括 package 声明）")
