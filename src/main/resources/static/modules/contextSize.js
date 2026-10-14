@@ -112,7 +112,11 @@ function updatePopoverDetail(data, ratio, numbersText, pct, color) {
     if (numbers) {
         numbers.textContent = numbersText + ' · ' + pct;
     }
-    if (compactBtn) compactBtn.disabled = false;
+    if (compactBtn) {
+        compactBtn.disabled = !!data.running;
+        compactBtn.title = data.running ? '任务运行中，无法压缩' : '';
+        compactBtn.textContent = data.running ? '⏳ 任务运行中' : '🗜️ 压缩上下文';
+    }
 }
 
 /**
