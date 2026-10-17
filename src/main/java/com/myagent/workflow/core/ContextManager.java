@@ -73,10 +73,10 @@ public class ContextManager {
     /**
      * 推荐的新构造签名。
      */
-    public ContextManager(ObjectMapper objectMapper, Consumer<String> logConsumer) {
+    public ContextManager(ObjectMapper objectMapper, Consumer<String> logConsumer, String sessionId) {
         this.objectMapper = objectMapper;
         this.logConsumer = logConsumer;
-        this.historyRecorder = new HistoryRecorder(objectMapper, logConsumer);   // ← 新增
+        this.historyRecorder = new HistoryRecorder(objectMapper, logConsumer, sessionId);
     }
 
     // ==================== 生命周期 ====================
@@ -284,6 +284,20 @@ public class ContextManager {
 
     public void compressRawLog() {
         historyRecorder.compress();
+    }
+
+    // @anchor: contextManager_recovery
+    // recovery 文件相关方法转发（供 ResumeHandler / HasRecoveryHandler 使用）
+    public boolean hasRecovery() {
+        return historyRecorder.hasRecovery();
+    }
+
+    public java.nio.file.Path getRecoveryPath() {
+        return historyRecorder.getRecoveryPath();
+    }
+
+    public void clearRecovery() {
+        historyRecorder.clearRecovery();
     }
 
     // @anchor: contextManager_recordUsage

@@ -34,7 +34,7 @@ public class FileOperator {
             Files.createDirectories(filePath.getParent());
             writeAtomic(filePath,code);
             return "✅ " + filename;
-        } catch (IOException e) {
+        } catch (Exception e) {
             logger.error("写入文件失败", e);
             return "写入文件失败: " + e.getMessage();
         }
@@ -211,7 +211,7 @@ public class FileOperator {
      * 判断是否应忽略该路径（隐藏目录/IDE元数据目录/版本控制目录）
      */
     // @anchor: fileOperator_shouldIgnore
-// 判断文件/目录是否应被忽略
+    // 判断文件/目录是否应被忽略
     private boolean shouldIgnore(Path p) {
         String name = p.getFileName().toString();
         if(Files.isDirectory(p)){

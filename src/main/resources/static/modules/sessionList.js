@@ -190,6 +190,9 @@ async function switchToSession(sessionId, workProject) {
     && globalStatus.sessionId === sessionId) {
         openStream(sessionId);
     }
+    if(typeof refreshRecoveryWidget === 'function'){
+        refreshRecoveryWidget();
+    }
 }
 
 /**

@@ -7,6 +7,8 @@ let desktopRunAbort = null;
 // @anchor: sse_runAgent
 // 运行 Agent：POST /run 建立 SSE 流并逐条渲染输出
 async function runAgent(prompt, maxIterations) {
+    // 新任务开始，清掉上次的恢复提示
+    if (typeof hideRecoveryWidget === 'function') hideRecoveryWidget();
     if (!isDraftSession()) {
         await loadSessionHistory(getCurrentSessionId());
     } else {
@@ -138,16 +140,41 @@ function handleSpecialEvent(data) {
             return true;
         case 'usage':
             if (obj.sessionId) renderUsagePanel();
+            if (typeof refreshContextIndicator === 'function') refreshContextIndicator();
+            return true;
+        case 'context':
+            // 每轮迭代推送的实时上下文大小；直接复用 renderContextIndicator，不再发 HTTP
+            if (obj.sessionId && obj.sessionId === getCurrentSessionId()
+            && typeof renderContextIndicator === 'function') {
+                renderContextIndicator({
+                    running: true,
+                    tokens: obj.tokens,
+                    bytes: null,
+                    modelWindow: obj.modelWindow || 800000
+                });
+            }
             return true;
         case 'done':
             appendLog('[完成] ' + (obj.summary || ''));
             return true;
         case 'error':
             appendLog('[错误] ' + (obj.message || ''));
+            if (typeof savePendingError === 'function') {
+                savePendingError({
+                    sessionId: obj.sessionId || getCurrentSessionId(),
+                    message: obj.message || '任务异常中断',
+                    timestamp: Date.now()
+                });
+            }
             return true;
         case 'end':
             if (typeof onTaskFinished === 'function') {
                 onTaskFinished(getCurrentSessionId())
+                    .then(() => {
+                    if (typeof refreshRecoveryWidget === 'function') {
+                        refreshRecoveryWidget();
+                    }
+                })
                     .catch(e => console.error('onTaskFinished 失败:', e));
             }
             return true;
@@ -191,6 +218,7 @@ async function renderRunLogs(sessionId) {
 }
 
 async function onTaskFinished(finishedSessionId) {
+    if (typeof refreshContextIndicator === 'function') refreshContextIndicator();
     await Promise.all([
         refreshSandbox(),
         refreshSidebar()

@@ -32,7 +32,6 @@ import java.util.concurrent.TimeUnit;
 // @anchor: main_class
 // Agent 编排器：一个实例服务一个 Session，负责多轮 API 调用与工具分发
 public class Main {
-
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     // ===== 绑定的会话 =====
@@ -96,7 +95,8 @@ public class Main {
         if (session.getContextManager() == null) {
             ContextManager cm = new ContextManager(
                     objectMapper,
-                    session::log
+                    session::log,
+                    session.getSessionId()
             );
             session.attachContextManager(cm);
         }
@@ -163,15 +163,25 @@ public class Main {
     // ==================== 运行入口 ====================
 
     // @anchor: main_run
-    // 执行一次任务：准备消息→多轮请求→分发工具→合并摘要并刷新索引
-    /**
-     * 在绑定的 Session 中运行一次任务。
-     * <p>
-     * 若 Session 上下文为空，视为首轮（init）；
-     * 否则视为多轮对话（appendUserMessage）。
-     * 任务结束后，摘要合并到 immutableBase，工作区清空。
-     */
+// 执行一次新任务：准备用户消息 → 主循环 → finally 清理
     public String run(String userRequest, int maxIterations) throws IOException {
+        return runInternal(true, userRequest, maxIterations);
+    }
+
+    // @anchor: main_runResume
+    // 恢复执行：跳过 prepareUserMessage，volatileWorking 已从 recovery 恢复
+    public String runResume(int maxIterations) throws IOException {
+        return runInternal(false, null, maxIterations);
+    }
+    // @anchor: main_runDefault
+    // 便捷重载：使用默认最大迭代次数运行
+    public String run(String userRequest) throws IOException {
+        return run(userRequest, AgentConfig.getDefaultMaxIterations());
+    }
+
+    // @anchor: main_runInternal
+    // 统一执行入口：isNew=true 走新任务流程，false 走恢复流程
+    private String runInternal(boolean isNew, String userRequest, int maxIterations) throws IOException {
         this.runningThread = Thread.currentThread();
 
         long startPrompt = 0, startCached = 0, startCompletion = 0;
@@ -180,8 +190,6 @@ public class Main {
 
         String finalContent = null;
         try {
-
-            // 移进 try：保证与 finally 里的 markIdle 严格配对
             session.markRunning(this);
             session.touch();
 
@@ -191,13 +199,14 @@ public class Main {
             startCalls = contextManager.getApiCallCount();
             startPrice = contextManager.getTotalPrice();
 
-            // 1. 准备用户消息（内部处理首轮/后续分支，并同步 meta）
-            session.prepareUserMessage(userRequest, SystemPrompt.get(session.getWorkProject()));
+            // 新任务才准备用户消息；恢复任务的工作区已由 ResumeHandler 注入
+            if (isNew) {
+                session.prepareUserMessage(userRequest, SystemPrompt.get(session.getWorkProject()));
+            }
 
-            // 2. 工具定义
             List<Map<String, Object>> tools = ToolDefinitions.build();
 
-            // 3. 主循环
+            // ===== 主循环 =====
             for (int iteration = 0; iteration < maxIterations; iteration++) {
                 checkStop();
                 session.log("--- 第 " + (iteration + 1) + " 次迭代 ---");
@@ -217,10 +226,8 @@ public class Main {
                 JsonNode messageNode = choices.get(0).get("message");
                 Map<String, Object> assistantMsg = objectMapper.convertValue(messageNode, Map.class);
 
-                // 记录 usage
                 recordUsage(root, iteration);
 
-                // 无 tool_calls → 任务完成
                 if (!messageNode.has("tool_calls") || messageNode.get("tool_calls").size() == 0) {
                     finalContent = messageNode.has("content")
                             ? messageNode.get("content").asText()
@@ -231,7 +238,6 @@ public class Main {
                     break;
                 }
 
-                // 处理 tool_calls
                 ArrayNode toolCalls = (ArrayNode) messageNode.get("tool_calls");
                 List<Map<String, Object>> currentRound = new ArrayList<>();
                 currentRound.add(assistantMsg);
@@ -245,11 +251,17 @@ public class Main {
                     session.log("🤖 调用工具 [" + functionName + "] 参数: "
                             + ToolLogFormatter.formatArgs(argumentsJson));
 
-                    Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
-                    checkStop();
-                    String result = toolExecutor.dispatch(functionName, args);
-                    if (result == null) {
-                        result = "（工具返回 null）";
+                    String result;
+                    try {
+                        Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
+                        result = toolExecutor.dispatch(functionName, args);
+                        if (result == null) result = "（工具返回 null）";
+                    } catch (Exception e) {
+                        result = "【工具执行失败】" + e.getClass().getSimpleName()
+                                + ": " + e.getMessage() + "\n请调整参数或换一种方式重试。";
+                        session.log("⚠️ 工具 [" + functionName + "] 异常:\n"
+                                + ToolLogFormatter.formatStackTrace(e));
+                        logger.error("工具异常: {}", functionName, e);
                     }
 
                     Map<String, Object> toolMsg = new HashMap<>();
@@ -261,9 +273,7 @@ public class Main {
                     session.log("工具 [" + functionName + "] 结果: "
                             + ToolLogFormatter.formatResult(functionName, result));
                 }
-                // 一轮工具执行完毕，统一刷新锚点索引
                 toolExecutor.flushDirtyAnchors();
-
                 contextManager.appendToWorking(currentRound);
             }
 
@@ -274,7 +284,7 @@ public class Main {
             return finalContent;
 
         } finally {
-            // ===== best-effort 阶段：任何一步失败不影响清理 =====
+            // ===== best-effort 阶段 =====
 
             try {
                 this.lastTaskUsage = new TaskUsage(
@@ -292,7 +302,7 @@ public class Main {
                 if (finalContent != null) {
                     contextManager.mergeSummaryToBase(buildTaskSummary(finalContent));
                 } else {
-                    // 任务被用户停止或异常中断：清空残留工作区，避免污染下一次任务
+                    // 异常中断：清空工作区；recovery 文件已在每轮 flush 时保留
                     contextManager.clearVolatileWorking();
                 }
             } catch (Exception e) {
@@ -312,22 +322,24 @@ public class Main {
                 logger.warn("落盘原始日志失败", e);
             }
 
+            // 成功完成时清除 recovery；异常中断时保留供后续恢复
+            if (finalContent != null) {
+                try {
+                    contextManager.clearRecovery();
+                } catch (Exception e) {
+                    logger.warn("清除 recovery 失败", e);
+                }
+            }
+
             try {
                 contextManager.printStats();
             } catch (Exception e) {
                 logger.warn("打印统计失败", e);
             }
 
-            // ===== 关键清理：必须执行 =====
             session.markIdle();
             this.runningThread = null;
         }
-    }
-
-    // @anchor: main_runDefault
-    // 便捷重载：使用默认最大迭代次数运行
-    public String run(String userRequest) throws IOException {
-        return run(userRequest, AgentConfig.getDefaultMaxIterations());
     }
 
     // @anchor: main_buildTaskSummary
@@ -378,6 +390,8 @@ public class Main {
         }
 
         contextManager.appendRawLog("response", responseBody);
+        // 每轮成功后立即落盘：更新 recovery（覆盖写）+ 追加到全量 temp 日志
+        contextManager.flushRawLog();
         return objectMapper.readTree(responseBody);
     }
 
@@ -389,9 +403,11 @@ public class Main {
         JsonNode usage = root.get("usage");
         if (usage == null) return;
 
-        long prompt = usage.get("prompt_tokens").asLong(0);
+        JsonNode promptNode = usage.get("prompt_tokens");
+        long prompt = promptNode != null ? promptNode.asLong(0) : 0;
         contextManager.setLastPromptTokens(prompt);
-        long completion = usage.get("completion_tokens").asLong(0);
+        JsonNode completionNode = usage.get("completion_tokens");
+        long completion = completionNode != null ? completionNode.asLong(0) : 0;
         long cached = 0;
         if (usage.has("prompt_tokens_details")) {
             JsonNode details = usage.get("prompt_tokens_details");

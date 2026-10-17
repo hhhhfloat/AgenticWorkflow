@@ -72,6 +72,14 @@
                 <span class="context-text">上下文占用</span>
                 <span id="contextPercentLabel" class="context-percent-label">--</span>
             </div>
+            <div id="recoveryWidget" class="recovery-widget" style="display:none;"
+                  title="上次任务异常中断">
+                <svg width="20" height="20" viewBox="0 0 20 20">
+                    <circle cx="10" cy="10" r="9" fill="#f44336"/>
+                    <rect x="9" y="4.5" width="2" height="7" rx="1" fill="#fff"/>
+                    <circle cx="10" cy="14.5" r="1.2" fill="#fff"/>
+                </svg>
+            </div>
             <button id="switchControllerBtn" class="switch-controller-btn">⇄ 切到手机端</button>
         </div>
 
@@ -212,7 +220,20 @@
                 <button id="compactBtn" class="compact-btn">🗜️ 压缩上下文</button>
             </div>
         </div>
-
+        <!-- ===== 恢复提示弹层 ===== -->
+        <!-- @anchor: index_recoveryPopover -->
+        <!-- 恢复弹层：显示错误信息与继续/忽略按钮 -->
+        <div id="recoveryPopover" class="recovery-popover" style="display:none;">
+            <div class="recovery-popover-header">
+                <span>⚠️ 任务异常中断</span>
+                <button id="recoveryPopoverClose" class="context-popover-close">✕</button>
+            </div>
+            <div class="recovery-popover-body">
+                <div id="recoveryErrorMsg" class="recovery-error-msg"></div>
+                <button id="recoveryResumeBtn" class="recovery-resume-btn">继续上次任务</button>
+                <button id="recoveryDismissBtn" class="recovery-dismiss-btn">忽略</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -255,6 +276,7 @@
 <script src="modules/sessionCreate.js"></script>
 <!-- SSE 流式请求 -->
 <script src="modules/sse.js"></script>
+<script src="modules/recovery.js"></script>
 <!-- 配置管理 -->
 <script src="modules/settings.js"></script>  <!-- ✅ 新增 -->
 <!-- 控制权切换 -->

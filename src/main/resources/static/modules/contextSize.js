@@ -152,6 +152,9 @@ function bindContextControls() {
     if (widget && popover) {
         widget.addEventListener('click', (e) => {
             e.stopPropagation();
+            // 关闭恢复弹层（避免重叠）
+            const recPopover = document.getElementById('recoveryPopover');
+            if (recPopover) recPopover.style.display = 'none';
             const visible = popover.style.display === 'block';
             popover.style.display = visible ? 'none' : 'block';
             if (!visible) refreshContextIndicator();

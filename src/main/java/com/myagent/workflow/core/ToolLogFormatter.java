@@ -112,4 +112,10 @@ public final class ToolLogFormatter {
         if (s.length() <= limit) return s;
         return s.substring(0, limit) + "...[共 " + s.length() + " 字符]";
     }
+
+    public static String formatStackTrace(Throwable t) {
+        java.io.StringWriter sw = new java.io.StringWriter();
+        t.printStackTrace(new java.io.PrintWriter(sw));
+        return sw.toString();
+    }
 }

@@ -150,6 +150,8 @@ public class CompactHandler implements HttpHandler {
         }
 
         cm.applyCompaction(summary, keepRecentPairs);
+        // 压缩后 immutableBase 变了，旧 recovery 跟它不再匹配，必须清掉
+        cm.clearRecovery();
         sessionManager.save(session);
 
         int afterCount = cm.getBaseMessageCount();

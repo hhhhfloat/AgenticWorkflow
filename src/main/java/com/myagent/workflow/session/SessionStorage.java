@@ -151,8 +151,9 @@ public class SessionStorage {
 
         // 3. 创建 ContextManager 并挂载
         ContextManager cm = new ContextManager(
-                new ObjectMapper(),
-                session::log
+            new ObjectMapper(),
+            session::log,
+            meta.sessionId()
         );
         session.attachContextManager(cm);
 

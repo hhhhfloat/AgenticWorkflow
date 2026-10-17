@@ -166,6 +166,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     startStatusPolling();
     bindContextControls();
     refreshContextIndicator();
+    if (typeof bindRecoveryControls === 'function') bindRecoveryControls();
+    if (typeof refreshRecoveryWidget === 'function') refreshRecoveryWidget();
 });
 
 // ===== 回到底部按钮 =====

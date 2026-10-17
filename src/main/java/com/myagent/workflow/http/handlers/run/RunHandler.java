@@ -196,9 +196,19 @@ public class RunHandler implements HttpHandler {
             Main agent = new Main(session);
             final int finalMaxIterations = maxIterations;
 
+            // 注册每轮迭代回调：推送实时上下文大小（用于前端圆饼实时更新）
+            SseLogSink finalLogSink = logSink;
+            final String sid = session.getSessionId();
+            final long modelWindow = AgentConfig.getContextWindow();
+            agent.setIterationListener((iteration, promptTokens, cachedTokens, completionTokens, cost) -> {
+                String contextJson = String.format(
+                    "{\"type\":\"context\",\"sessionId\":\"%s\",\"tokens\":%d,\"modelWindow\":%d,\"iteration\":%d}",
+                    sid, promptTokens, modelWindow, iteration);
+                finalLogSink.sendControl(contextJson);
+            });
+
             pThread.start();
 
-            SseLogSink finalLogSink = logSink;
             new Thread(() -> {
                 String result = null;
                 Throwable error = null;
@@ -235,7 +245,8 @@ public class RunHandler implements HttpHandler {
                         String msg = error.getMessage() != null
                                 ? error.getMessage()
                                 : error.getClass().getSimpleName();
-                        finalLogSink.sendControl(jsonEvent("error", Map.of("message", msg)));
+                        finalLogSink.sendControl(jsonEvent("error",
+                                Map.of("message", msg, "sessionId", session.getSessionId())));
                     } else {
                         finalLogSink.sendControl(jsonEvent("done", Map.of("summary", result == null ? "" : result)));
                     }

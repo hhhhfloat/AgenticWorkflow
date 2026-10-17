@@ -3,6 +3,7 @@
 package com.myagent.workflow.core;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.myagent.workflow.core.config.AgentConfig;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -34,9 +35,15 @@ public class HistoryRecorder {
     private final ObjectMapper objectMapper;
     private Consumer<String> logConsumer;
 
-    /** 本次会话的文件前缀，用于 raw 文件命名 */
+    /**
+     * 本次会话的文件前缀，用于 raw 文件命名
+     */
     private final String fileBase;
     private final Path tempDir;
+    // 会话级 recovery 文件（覆盖写，只保留最后一对 request/response）
+    private final Path recoveryFile;
+    // 全量归档目录（任务成功时压缩到此）
+    private final Path historyOutputDir;
 
     // 当前周期的原始日志缓存（覆盖写，只保留最新一份）
     private String pendingRawRequest = null;
@@ -44,7 +51,7 @@ public class HistoryRecorder {
 
     // @anchor: historyRecorder_constructor
     // 创建实例并准备 temp 目录与文件前缀
-    public HistoryRecorder(ObjectMapper objectMapper, Consumer<String> logConsumer) {
+    public HistoryRecorder(ObjectMapper objectMapper, Consumer<String> logConsumer, String sessionId) {
         this.objectMapper = objectMapper;
         this.logConsumer = logConsumer;
 
@@ -52,11 +59,15 @@ public class HistoryRecorder {
         String uuid = UUID.randomUUID().toString().substring(0, 6);
         this.fileBase = timestamp + "_" + uuid;
         this.tempDir = Paths.get("./temp");
+        this.recoveryFile = Paths.get(AgentConfig.getSessionsDir())
+                .resolve(sessionId).resolve("recovery_raw.jsonl");
+        this.historyOutputDir = Paths.get("./HistoryOutput").resolve(sessionId);
 
         try {
             if (!Files.exists(tempDir)) {
                 Files.createDirectories(tempDir);
             }
+            Files.createDirectories(recoveryFile.getParent());
         } catch (IOException e) {
             System.err.println("⚠️ temp 目录创建失败: " + e.getMessage());
         }
@@ -95,10 +106,12 @@ public class HistoryRecorder {
                         now, pendingRawResponse
                 ));
             }
-
+            // 1. 追加到全量日志（temp，累积）
             Files.writeString(rawFile, sb.toString(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-
+            // 2. 覆盖写 recovery（只保留最后一对）
+            Files.writeString(recoveryFile, sb.toString(), StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             pendingRawRequest = null;
             pendingRawResponse = null;
         } catch (IOException e) {
@@ -118,8 +131,8 @@ public class HistoryRecorder {
             String gzName = rawName.endsWith(".jsonl")
                     ? rawName.substring(0, rawName.length() - ".jsonl".length()) + "_" + ts + ".jsonl.gz"
                     : rawName + "_" + ts + ".gz";
-            Path gzFile = rawFile.getParent().resolve(gzName);
-
+            Files.createDirectories(historyOutputDir);
+            Path gzFile = historyOutputDir.resolve(gzName);
             try (InputStream in = Files.newInputStream(rawFile);
                  OutputStream out = new GZIPOutputStream(Files.newOutputStream(gzFile))) {
                 byte[] buffer = new byte[8192];
@@ -154,5 +167,23 @@ public class HistoryRecorder {
 
     public void setLogConsumer(Consumer<String> consumer) {
         this.logConsumer = consumer;
+    }
+
+    // @anchor: historyRecorder_recovery
+    // recovery 文件的存在检查、路径查询与清除
+    public boolean hasRecovery() {
+        return Files.exists(recoveryFile) && recoveryFile.toFile().length() > 0;
+    }
+
+    public Path getRecoveryPath() {
+        return recoveryFile;
+    }
+
+    public void clearRecovery() {
+        try {
+            Files.deleteIfExists(recoveryFile);
+        } catch (IOException e) {
+            System.err.println("⚠️ 清除 recovery 文件失败: " + e.getMessage());
+        }
     }
 }

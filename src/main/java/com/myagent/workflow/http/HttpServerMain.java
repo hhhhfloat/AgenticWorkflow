@@ -177,6 +177,8 @@ public class HttpServerMain {
         reg(server, "/session/usage", new SessionUsageHandler(), false);
         reg(server, "/session/logs",    new SessionLogsHandler(), false);
         reg(server, "/session/context", new ContextHandler(), false);
+        reg(server, "/session/hasRecovery", new HasRecoveryHandler(), false);
+        reg(server, "/session/resume", new ResumeHandler(), true);
         // —— 会话管理：压缩；写：保护 ——
         reg(server, "/session/compact", new CompactHandler(), true);
 

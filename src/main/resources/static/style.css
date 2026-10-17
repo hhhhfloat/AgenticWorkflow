@@ -1134,3 +1134,99 @@ html, body {
     color: rgba(255, 255, 255, 0.4);
     cursor: default;
 }
+/* ===== 恢复弹层 ===== */
+.recovery-popover {
+    position: absolute;
+    top: 52px;
+    right: 16px;
+    width: 320px;
+    background: #252525;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    padding: 14px;
+    color: #e0e0e0;
+}
+.recovery-popover-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: 600;
+    margin-bottom: 12px;
+    font-size: 14px;
+    color: #ff8a80;
+}
+.recovery-error-msg {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.72);
+    background: rgba(0, 0, 0, 0.25);
+    padding: 8px 10px;
+    border-radius: 4px;
+    max-height: 160px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 12px;
+    font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+    line-height: 1.5;
+}
+.recovery-resume-btn {
+    width: 100%;
+    padding: 9px;
+    background: #1976d2;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s;
+    margin-bottom: 6px;
+}
+.recovery-resume-btn:hover:not(:disabled) {
+    background: #1565c0;
+}
+.recovery-resume-btn:disabled {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.4);
+    cursor: default;
+}
+.recovery-dismiss-btn {
+    width: 100%;
+    padding: 6px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.5);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: color 0.15s, background 0.15s;
+}
+.recovery-dismiss-btn:hover {
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.03);
+}
+/* ===== 顶栏红色感叹号按钮 ===== */
+.recovery-widget {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+    animation: recovery-pulse 2s ease-in-out infinite;
+}
+.recovery-widget:hover {
+    background: rgba(244, 67, 54, 0.12);
+    transform: scale(1.08);
+}
+.recovery-widget:active {
+    transform: scale(0.96);
+}
+@keyframes recovery-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.65; }
+}

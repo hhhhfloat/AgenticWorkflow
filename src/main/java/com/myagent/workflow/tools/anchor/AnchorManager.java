@@ -278,6 +278,7 @@ public class AnchorManager {
             Path projectDir = PathUtils.safeResolve(projectPath);
             if (!Files.isDirectory(projectDir)) return;   // 项目目录不存在，跳过
         } catch (IOException e) {
+            logger.warn("标记脏文件失败（跳过）: {} - {}", projectPath, e.getMessage());
             return;
         }
 
