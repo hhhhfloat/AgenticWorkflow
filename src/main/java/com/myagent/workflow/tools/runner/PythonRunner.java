@@ -85,15 +85,17 @@ public class PythonRunner {
             Process p = pb.start();
             ProcessRegistry.register(p);
 
-            // 异步 drain stdout：GUI 程序可能持续打印，同步读会阻塞
+            // 异步 drain stdout：GUI 程序可能持续打印，同步读会阻塞。
+            // F5：用 InputStreamReader 处理多字节字符跨块边界，输出上限复用 ProcessRunner.appendCapped
             StringBuilder guiOut = new StringBuilder();
             Thread drainer = new Thread(() -> {
-                try (var is = p.getInputStream()) {
-                    byte[] buf = new byte[1024];
+                try (var is = new java.io.InputStreamReader(p.getInputStream(), PROCESS_CHARSET)) {
+                    char[] buf = new char[1024];
                     int len;
                     while ((len = is.read(buf)) != -1) {
+                        String chunk = new String(buf, 0, len);
                         synchronized (guiOut) {
-                            guiOut.append(new String(buf, 0, len, PROCESS_CHARSET));
+                            ProcessRunner.appendCapped(guiOut, chunk);
                         }
                     }
                 } catch (IOException ignored) {}

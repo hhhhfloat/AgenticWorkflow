@@ -196,9 +196,9 @@ public class ProcessRunner {
 
     // @anchor: processRunner_appendCapped
     // C3：输出上限保护，超过 MAX_OUTPUT_CHARS 后丢弃尾部
-    private static final int MAX_OUTPUT_CHARS = 1_000_000;
+    static final int MAX_OUTPUT_CHARS = 1_000_000;
 
-    private static void appendCapped(StringBuilder output, String chunk) {
+    static void appendCapped(StringBuilder output, String chunk) {
         if (output.length() >= MAX_OUTPUT_CHARS) return;
         int remaining = MAX_OUTPUT_CHARS - output.length();
         if (chunk.length() <= remaining) {
