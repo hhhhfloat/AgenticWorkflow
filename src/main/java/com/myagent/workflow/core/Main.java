@@ -243,26 +243,40 @@ public class Main {
                 List<Map<String, Object>> currentRound = new ArrayList<>();
                 currentRound.add(assistantMsg);
 
+                // 单轮去重：同一轮响应里 name + arguments 完全相同的 tool_call 只执行一次。
+                // 模型异常时可能在单次响应里重复输出相同调用，导致工具被无意义地执行多次。
+                // 仍然为每个 tool_call_id 返回 tool message，保持协议兼容。
+                Map<String, String> roundCache = new HashMap<>();
+
                 for (JsonNode tc : toolCalls) {
                     checkStop();
                     String toolCallId = tc.get("id").asText();
                     String functionName = tc.get("function").get("name").asText();
                     String argumentsJson = tc.get("function").get("arguments").asText();
 
-                    session.log("🤖 调用工具 [" + functionName + "] 参数: "
-                            + ToolLogFormatter.formatArgs(argumentsJson));
+                    // 用 \u0000 分隔避免不同 name/args 拼出相同 key
+                    String dedupKey = functionName + "\u0000" + argumentsJson;
 
                     String result;
-                    try {
-                        Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
-                        result = toolExecutor.dispatch(functionName, args);
-                        if (result == null) result = "（工具返回 null）";
-                    } catch (Exception e) {
-                        result = "【工具执行失败】" + e.getClass().getSimpleName()
-                                + ": " + e.getMessage() + "\n请调整参数或换一种方式重试。";
-                        session.log("⚠️ 工具 [" + functionName + "] 异常:\n"
-                                + ToolLogFormatter.formatStackTrace(e));
-                        logger.error("工具异常: {}", functionName, e);
+                    if (roundCache.containsKey(dedupKey)) {
+                        result = roundCache.get(dedupKey);
+                        session.log("⚠️ 本轮重复工具调用，跳过执行 [" + functionName + "] 参数: "
+                                + ToolLogFormatter.formatArgs(argumentsJson));
+                    } else {
+                        session.log("🤖 调用工具 [" + functionName + "] 参数: "
+                                + ToolLogFormatter.formatArgs(argumentsJson));
+                        try {
+                            Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
+                            result = toolExecutor.dispatch(functionName, args);
+                            if (result == null) result = "（工具返回 null）";
+                        } catch (Exception e) {
+                            result = "【工具执行失败】" + e.getClass().getSimpleName()
+                                    + ": " + e.getMessage() + "\n请调整参数或换一种方式重试。";
+                            session.log("⚠️ 工具 [" + functionName + "] 异常:\n"
+                                    + ToolLogFormatter.formatStackTrace(e));
+                            logger.error("工具异常: {}", functionName, e);
+                        }
+                        roundCache.put(dedupKey, result);
                     }
 
                     Map<String, Object> toolMsg = new HashMap<>();
