@@ -61,7 +61,7 @@ function appendLog(msg) {
         try {
             let cleanMsg = msg;
             if (msg.startsWith('[完成] ')) {
-                cleanMsg = msg.substring(4);
+                cleanMsg = msg.slice(5);
             }
             cleanMsg = linkifySandboxPaths(cleanMsg);
             renderedContent = sanitizeHtml(marked.parse(cleanMsg, { gfm: true, breaks: true }));

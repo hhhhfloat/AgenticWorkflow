@@ -41,7 +41,11 @@ import java.util.Map;
  * 响应：SSE 流
  * - 第一条事件：{"type":"session","sessionId":"xxx"}（告知前端本次会话 ID）
  * - 后续事件：日志（data: xxx\n\n）
- * - 结束事件：[结束]
+ * - 控制事件：单行 JSON data: {"type":"..."}，由前端单独识别
+ + - {"type":"context","tokens":N,"modelWindow":N,"iteration":N}  每轮迭代
+ + - {"type":"usage",...}                                          用量统计
+ + - {"type":"done","summary":"..."} / {"type":"error","message":"..."}  结束
+ + - {"type":"end"}                                                流结束
  * <p>
  * 并发模型：
  * - 同一会话不允许并发运行（session.isRunning 检查）

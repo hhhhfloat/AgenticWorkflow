@@ -259,7 +259,7 @@ public class HttpServerMain {
                             System.out.println("⚠️ 会话 " + session.getSessionId()
                                     + " 超过硬超时 " + (TASK_HARD_TIMEOUT_MS / 60000)
                                     + " 分钟，强制停止任务");
-                            session.log("[系统] ⏱️ 任务超过 " + (TASK_HARD_TIMEOUT_MS / 60000));
+                            session.log("[系统] ⏱️ 任务超过 " + (TASK_HARD_TIMEOUT_MS / 60000) + " 分钟，正在强制停止");
                             session.stopTask();
                             continue;
                         }

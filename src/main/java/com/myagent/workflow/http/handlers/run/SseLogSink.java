@@ -71,7 +71,9 @@ public class SseLogSink implements LogSink {
 
     // @anchor: sseLogSink_sendControl
     // 投递一条控制事件（usage/done/error/end）。走同一队列，保证顺序。
-    // 队列持续满时短暂等待，避免控制事件被静默丢弃。
+    // 队列持续满时最多等待 5s；超时则丢弃并打印错误日志（非静默丢弃，
+    // 但调用方无法从返回值区分“投递成功”与“超时丢弃”）。
+    // 返回 false 仅表示 sink 已关闭或等待被中断。
     public boolean sendControl(String data) {
         if (!alive.get()) return false;
         if (data == null) return true;
