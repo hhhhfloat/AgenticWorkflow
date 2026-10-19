@@ -51,12 +51,16 @@ public class AnchorManager {
 
 
     // @anchor: anchorManager_buildIndex
-// 重建锚点索引
+    // 重建锚点索引（显式沙箱校验：拦绝对路径与 ".."，错误信息比底层 IOException 清晰）
     public String buildAnchorIndex(String projectPath) {
         if (projectPath == null || projectPath.isBlank()) return "❌ 缺少参数 project_path";
+        try {
+            PathUtils.safeResolve(projectPath);
+        } catch (IOException e) {
+            return "❌ 非法的项目路径: " + projectPath + "（" + e.getMessage() + "）";
+        }
         return anchorIndex.rebuild(projectPath);
     }
-
     // ===== 文件内容操作 =====
 
     // @anchor: anchorManager_insertAtAnchor
@@ -72,9 +76,8 @@ public class AnchorManager {
         AnchorLocation loc = resolveAnchor(anchorId, file);
         if (loc == null) return buildResolveError(anchorId, file);
 
-        if (workProject != null && !workProject.equals(loc.projectPath)) {
-            return "❌ 只能修改工作项目 [" + workProject + "]，当前锚点属于: " + loc.projectPath;
-        }
+        String permErr = checkWritePermission(loc);
+        if (permErr != null) return permErr;
 
         // UPDATE.md 特殊约束：末尾锚点只能在其之前插入
         if ("after".equals(position)
@@ -117,8 +120,14 @@ public class AnchorManager {
         AnchorLocation startLoc = resolveAnchor(startAnchor, file);
         if (startLoc == null) return buildResolveError(startAnchor, file);
 
-        if (workProject != null && !workProject.equals(startLoc.projectPath)) {
-            return "❌ 只能修改工作项目 [" + workProject + "]，当前锚点属于: " + startLoc.projectPath;
+        String permErr = checkWritePermission(startLoc);
+        if (permErr != null) return permErr;
+
+        // UPDATE.md 只追加：禁止删除其中间内容（与 SystemPrompt 的约定一致）
+        if (startLoc.filePath != null
+                        && startLoc.filePath.toLowerCase().endsWith("update.md")) {
+            return "❌ UPDATE.md 只允许追加，不允许删除内容。\n"
+                    + "  如需修正记录，请用 insert_at_anchor 在末尾锚点之前插入新记录。";
         }
 
         AnchorLocation endLoc = resolveAnchor(endAnchor, file);
@@ -427,5 +436,33 @@ public class AnchorManager {
     // 转发 AnchorIndex 的 freshness 判定
     public boolean isProjectFresh(String projectPath) {
         return anchorIndex.isProjectFresh(projectPath);
+    }
+
+    // @anchor: anchorManager_checkWritePermission
+    /**
+     * 校验目标锚点所属项目是否可写。
+     * 沙箱边界已由 .anchors.json 的扫描范围保证，这里只做工作项目一致性校验：
+     * <ul>
+     *   <li>tmp/ 公共临时区始终可写；</li>
+     *   <li>未绑定工作项目：除 tmp/ 外一律拒绝（与 PathPolicy 对 write_file 的策略一致）；</li>
+     *   <li>已绑定工作项目：目标必须与 workProject 一致。</li>
+     * </ul>
+     */
+    private String checkWritePermission(AnchorLocation loc) {
+        if (loc == null || loc.projectPath == null || loc.projectPath.isBlank()) {
+            return "❌ 无法解析锚点所属项目";
+        }
+        String project = loc.projectPath;
+        if ("tmp".equals(project) || project.startsWith("tmp/")) {
+            return null;
+        }
+        if (workProject == null) {
+            return "❌ 当前会话未绑定工作项目，只能修改 tmp/ 临时区。\n"
+                    + "  请在会话中选择或新建一个项目，再执行写操作。";
+        }
+        if (!workProject.equals(project)) {
+            return "❌ 只能修改工作项目 [" + workProject + "]，当前锚点属于: " + project;
+        }
+        return null;
     }
 }

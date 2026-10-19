@@ -172,35 +172,35 @@ public class ContextManager {
       * @param summary         LLM 生成的压缩摘要
       * @param keepRecentPairs 保留最近多少对 (user, summary)，建议 2
       */
-            public void applyCompaction(String summary, int keepRecentPairs) {
-                if (summary == null || summary.isBlank()) {
-                        log("⚠️ [系统] 压缩摘要为空，跳过");
-                        return;
-                    }
-                if (immutableBase.size() <= 2) {
-                        log("⚠️ [系统] 基础区消息太少，无需压缩");
-                        return;
-                    }
+    public void applyCompaction(String summary, int keepRecentPairs) {
+        if (summary == null || summary.isBlank()) {
+            log("⚠️ [系统] 压缩摘要为空，跳过");
+            return;
+        }
+        if (immutableBase.size() <= 2) {
+            log("⚠️ [系统] 基础区消息太少，无需压缩");
+            return;
+        }
 
-                        int beforeCount = immutableBase.size();
+        int beforeCount = immutableBase.size();
 
-                        // 保留 SystemPrompt
-                                Map<String, Object> sysPrompt = immutableBase.get(0);
+        // 保留 SystemPrompt
+        Map<String, Object> sysPrompt = immutableBase.get(0);
 
-                        // 保留最近 keepRecentPairs 对，但不越过 SystemPrompt
-                                int keepCount = Math.min(keepRecentPairs * 2, immutableBase.size() - 1);
-                List<Map<String, Object>> recent = new ArrayList<>(
-                                immutableBase.subList(immutableBase.size() - keepCount, immutableBase.size())
-                                );
+        // 保留最近 keepRecentPairs 对，但不越过 SystemPrompt
+        int keepCount = Math.min(keepRecentPairs * 2, immutableBase.size() - 1);
+        List<Map<String, Object>> recent = new ArrayList<>(
+                immutableBase.subList(immutableBase.size() - keepCount, immutableBase.size())
+        );
 
-                        immutableBase.clear();
-                immutableBase.add(sysPrompt);
-                immutableBase.add(Map.of("role", "system", "content", "【历史摘要】\n" + summary));
-                immutableBase.addAll(recent);
+        immutableBase.clear();
+        immutableBase.add(sysPrompt);
+        immutableBase.add(Map.of("role", "system", "content", "【历史摘要】\n" + summary));
+        immutableBase.addAll(recent);
 
-                        log("📦 [系统] 基础区已压缩：" + beforeCount + " 条 → " + immutableBase.size()
-                                        + " 条（保留最近 " + keepRecentPairs + " 对）");
-            }
+        log("📦 [系统] 基础区已压缩：" + beforeCount + " 条 → " + immutableBase.size()
+                + " 条（保留最近 " + keepRecentPairs + " 对）");
+    }
 
     // ==================== 构建 ====================
 

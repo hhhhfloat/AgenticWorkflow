@@ -33,7 +33,8 @@ public class PathPolicy {
             Map.entry("find_references",    List.of("path")),
             Map.entry("find_callers",       List.of("path")),
             Map.entry("find_callees",       List.of("path")),
-            Map.entry("describe_anchors",   List.of("project_path", "file"))
+            Map.entry("describe_anchors",   List.of("project_path", "file")),
+            Map.entry("build_anchor_index", List.of("project_path"))
     );
 
     private final String workProject;
@@ -74,23 +75,9 @@ public class PathPolicy {
         // 手动模式（/runProject）：用户主动操作，不限制工作项目
         if (manualMode) return null;
 
-        // 未绑定工作项目：只允许写 tmp/
+        // 未绑定工作项目，无限制
         if (workProject == null) {
-            String filename = args.getString("filename");
-            if (filename == null || filename.isBlank()) {
-                if ("build_anchor_index".equals(toolName)) {
-                    return "❌ 当前会话未绑定工作项目，无法重建锚点索引。请先选择项目后重试。";
-                }
-                return null;
-            }
-            String normalized = normalize(filename);
-            for (String extra : EXTRA_WRITE_PATHS) {
-                if (normalized.equals(extra) || normalized.startsWith(extra + "/")) {
-                    return null;
-                }
-            }
-            return "❌ 当前会话未绑定工作项目，只能写入 tmp/ 临时区。\n"
-                    + "  请在会话中选择或新建一个项目，再执行写操作。";
+            return null;
         }
 
         // build_anchor_index：project_path 精确等于 workProject

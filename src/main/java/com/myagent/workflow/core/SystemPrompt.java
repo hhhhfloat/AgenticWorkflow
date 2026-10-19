@@ -68,7 +68,7 @@ public final class SystemPrompt {
         3. **UPDATE.md**：除首次创建外只追加，要读取只能通过 describe_anchors 获取锚点信息，再 read_between_anchors，不能 read_file 读取全文。写入用 insert_at_anchor 在末尾锚点（describe_anchors 会标注 `[末尾锚点]`）之前插入新记录，必须显式指定 position='before'；对末尾锚点使用 position='after' 会被后端直接拒绝。
 
         ## 工具使用提示
-        - 锚点操作可在同一轮工具调用中按合适的顺序一次性进行。系统会按顺序执行，且每个单工具执行后都会刷新锚点索引，因此连续操作不影响
+        - 涉及多步锚点操作时，规划后一次性调用多个，系统会按顺序执行，系统已经保障连续操作不会发生定位漂移。
         - 代码块精确替换：delete_between_anchors（保留锚点） + insert_at_anchor
         - **理解项目的精读建议**
           - 通过目录以及PROJECT.md了解重点部位
