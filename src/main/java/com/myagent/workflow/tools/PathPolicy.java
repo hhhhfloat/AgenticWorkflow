@@ -83,8 +83,13 @@ public class PathPolicy {
         // build_anchor_index：project_path 精确等于 workProject
         if ("build_anchor_index".equals(toolName)) {
             String pp = args.getString("project_path");
+            // tmp/ 任意情况可写（与 EXTRA_WRITE_PATHS 口径一致）；
+            // tmp/ 下的锚点也要能被索引，否则绑定项目时 tmp/ 里写的锚点查不到
+            if (pp != null && ("tmp".equals(pp) || pp.startsWith("tmp/"))) {
+                return null;
+            }
             if (pp == null || !pp.equals(workProject)) {
-                return "❌ 只能操作工作项目 [" + workProject + "]，当前: " + pp;
+                return "❌ 只能操作工作项目 [" + workProject + "] 或 tmp/ 临时区，当前: " + pp;
             }
             return null;
         }

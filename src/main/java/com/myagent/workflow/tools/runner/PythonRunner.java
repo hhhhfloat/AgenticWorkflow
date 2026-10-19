@@ -40,6 +40,9 @@ public class PythonRunner {
                 config.pythonInterpreter(), filePath.toString());
         pb.directory(filePath.getParent().toFile());
         pb.redirectErrorStream(true);
+        // Python 3.7+：PYTHONUTF8=1 强制 UTF-8 模式；PYTHONIOENCODING 兜底 stdin/stdout/stderr
+        pb.environment().put("PYTHONIOENCODING", "utf-8");
+        pb.environment().put("PYTHONUTF8", "1");
 
         if (isGui) {
             return runGuiProcess(pb);

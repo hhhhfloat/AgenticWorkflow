@@ -58,6 +58,10 @@ public class Session {
     private volatile long lastHeartbeatTime;
     private volatile long runningStartedAt;           // 任务开始时间（硬超时用）
 
+    // ===== 延迟关闭：close() 超时时注册，由任务线程 finally 触发 =====
+    private volatile boolean closeRequested = false;
+    private volatile Runnable closeCallback = null;
+
     // ==================== 构造 ====================
 
     // @anchor: session_constructorFull
@@ -211,6 +215,37 @@ public class Session {
         return runningStartedAt;
     }
 
+    // @anchor: session_closeRequested
+    /**
+    * 注册"任务结束后自动移除"回调。由 SessionManager.close() 在 stopTask 超时时调用。
+    * 回调在任务线程的 finally 里通过 fireCloseIfRequested() 触发。
+    */
+    public void markCloseRequested(Runnable callback) {
+    this.closeRequested = true;
+    this.closeCallback = callback;
+    }
+
+    public boolean isCloseRequested() {
+    return closeRequested;
+    }
+
+    /**
+    * 任务线程 finally 调用：如果 closeRequested，执行回调。
+    * 幂等：重复调用只执行一次；回调抛异常不向外传播。
+    */
+    public void fireCloseIfRequested() {
+    if (!closeRequested) return;
+    Runnable cb = closeCallback;
+    // 先清标志再执行回调，避免回调内部再次调用本方法造成递归
+            closeRequested = false;
+    closeCallback = null;
+    if (cb != null) {
+            try { cb.run(); } catch (Exception e) {
+                    logger.warn("close 回调执行失败", e);
+                }
+        }
+    }
+
     // @anchor: session_forceIdle
     // 强制将会话置为 IDLE，不依赖 runningAgent 是否存在；用于清理卡死会话
     public synchronized void forceIdle() {
@@ -348,4 +383,3 @@ public class Session {
         return meta.workProject();
     }
 }
-

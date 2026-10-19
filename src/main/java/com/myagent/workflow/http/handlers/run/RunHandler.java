@@ -139,208 +139,57 @@ public class RunHandler implements HttpHandler {
         // 用于把“许可释放责任”从本方法转交给 AgentRunner 线程
         boolean permitTransferredToRunner = false;
 
-        // 在 try 外声明，供 catch 与 finally 访问
-        Thread pingThread = null;
+        // ===== 6. 建立 SSE 并执行 =====
+        SseTaskSession sse = null;
         LogFileWriter logWriter = null;
-        OutputStream out = null;
-        SseLogSink logSink = null;
-        final Object outLock = new Object();
 
         try {
-            // ===== 6. 建立 SSE 连接 =====
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "*");
-            exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
-            exchange.getResponseHeaders().set("Cache-Control", "no-cache");
-            exchange.getResponseHeaders().set("Connection", "keep-alive");
-            exchange.sendResponseHeaders(200, 0);
-            out = exchange.getResponseBody();
-
-            // ===== 7. 准备日志文件 =====
+            // 准备日志文件
             try {
                 logWriter = new LogFileWriter(session.getSessionId(), userRequest);
             } catch (IOException e) {
                 System.err.println("⚠️ 无法创建日志文件: " + e.getMessage());
             }
 
-            // ===== 8. 追加历史记录 =====
+            // 追加历史记录
             appendHistory(userRequest);
 
-            final OutputStream finalOut = out;
-            logSink = new SseLogSink(finalOut, outLock, session.getSessionId(), logWriter);
-            final LogFileWriter finalLogWriter = logWriter;
+            // 建立 SSE + 首条 session 事件
+            sse = new SseTaskSession(exchange, session, logWriter, "Run");
+            sse.sendSessionEvent(isNewSession);
 
-            // ===== 9. 保活 ping 线程 =====
-            final OutputStream pingOut = out;
-            Thread pThread = new Thread(() -> {
-                try {
-                    while (!Thread.currentThread().isInterrupted()) {
-                        Thread.sleep(15_000);
-                        synchronized (outLock) {
-                            pingOut.write(": ping\n\n".getBytes(StandardCharsets.UTF_8));
-                            pingOut.flush();
-                        }
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } catch (IOException ignored) {
-                }
-            }, "RunPing-" + session.getSessionId());
-            pThread.setDaemon(true);
-            pingThread = pThread;
-
-            // ===== 10. 首条事件：告知前端 sessionId =====
-            synchronized (outLock) {
-                sendEvent(out, "{\"type\":\"session\",\"sessionId\":\"" + session.getSessionId()
-                        + "\",\"isNew\":" + isNewSession + "}");
-            }
-            // ===== 11. 绑定日志消费者 =====
-            session.addLogSink(logSink);
-
-            // ===== 12. 创建 Agent 并启动线程 =====
-            Main agent = new Main(session);
-            final int finalMaxIterations = maxIterations;
-
-            // 注册每轮迭代回调：推送实时上下文大小（用于前端圆饼实时更新）
-            SseLogSink finalLogSink = logSink;
+            // 启动 Agent
             final String sid = session.getSessionId();
             final long modelWindow = AgentConfig.getContextWindow();
-            agent.setIterationListener((iteration, promptTokens, cachedTokens, completionTokens, cost) -> {
-                String contextJson = String.format(
-                    "{\"type\":\"context\",\"sessionId\":\"%s\",\"tokens\":%d,\"modelWindow\":%d,\"iteration\":%d}",
-                    sid, promptTokens, modelWindow, iteration);
-                finalLogSink.sendControl(contextJson);
-            });
+            final String finalUserRequest = userRequest;
+            final SseTaskSession finalSse = sse;
 
-            pThread.start();
-
-            new Thread(() -> {
-                String result = null;
-                Throwable error = null;
-                try {
-                    result = agent.run(userRequest, finalMaxIterations);
-                } catch (Throwable t) {
-                    error = t;
-                }
-
-                try {
-                    // usage 落库
-                    Main.TaskUsage usage = agent.getLastTaskUsage();
-                    if (usage != null) {
-                        try {
-                            SessionUsage delta = new SessionUsage(
-                                    usage.promptTokens(), usage.cachedTokens(), usage.completionTokens(),
-                                    usage.apiCalls(), usage.cost());
-                            SessionUsage total = sessionManager.appendUsage(session.getSessionId(), delta);
-
-                            String usageJson = String.format(
-                                    "{\"type\":\"usage\",\"sessionId\":\"%s\",\"promptTokens\":%d,\"cachedTokens\":%d," +
-                                            "\"completionTokens\":%d,\"apiCalls\":%d,\"cost\":%.6f}",
-                                    session.getSessionId(),
-                                    total.promptTokens(), total.cachedTokens(), total.completionTokens(),
-                                    total.apiCalls(), total.cost()
-                            );
-                            finalLogSink.sendControl(usageJson);
-                        } catch (Exception ignored) {
-                        }
-                    }
-
-                    // 结束事件
-                    if (error != null) {
-                        String msg = error.getMessage() != null
-                                ? error.getMessage()
-                                : error.getClass().getSimpleName();
-                        finalLogSink.sendControl(jsonEvent("error",
-                                Map.of("message", msg, "sessionId", session.getSessionId())));
-                    } else {
-                        finalLogSink.sendControl(jsonEvent("done", Map.of("summary", result == null ? "" : result)));
-                    }
-                    finalLogSink.sendControl("{\"type\":\"end\"}");
-                } finally {
-                    // 清理：无论成功失败都必须执行
-                    pThread.interrupt();
-                    finalLogSink.flush(3000);
-                    session.removeLogSink(finalLogSink);
-                    finalLogSink.close();
-                    if(finalLogWriter != null){
-                        try{
-                            finalLogWriter.close();
-                        }catch(IOException ignored){}
-                    }
-                    sessionManager.releaseRunningPermit();
-                    sessionManager.save(session);
-
-                    try { finalOut.close(); } catch (IOException ignored) {}
-                }
-            }, "AgentRunner-" + session.getSessionId()).start();
-
-            // 许可释放责任已转交给 AgentRunner 线程
-            permitTransferredToRunner = true;
+            sse.start(
+                    (agent, maxIter) -> agent.run(finalUserRequest, maxIter),
+                    (agent) -> agent.setIterationListener((iteration, promptTokens, cachedTokens, completionTokens, cost) -> {
+                        String contextJson = String.format(
+                                "{\"type\":\"context\",\"sessionId\":\"%s\",\"tokens\":%d,\"modelWindow\":%d,\"iteration\":%d}",
+                                sid, promptTokens, modelWindow, iteration);
+                        finalSse.sendControl(contextJson);
+                    }),
+                    maxIterations
+            );
 
         } catch (Throwable t) {
-            // SSE 建立过程中任何一步失败：回滚，但 finally 负责释放许可
             System.err.println("⚠️ /run 建立 SSE 失败: " + t.getMessage());
-            if (pingThread != null) pingThread.interrupt();
-            if (logSink != null) {
-                session.removeLogSink(logSink);
-                logSink.close();
-            }
-            if (out != null) {
-                try {
-                    if (logSink != null) {
-                        logSink.sendControl(jsonEvent("error",
-                                Map.of("message", t.getMessage() != null
-                                        ? t.getMessage()
-                                        : t.getClass().getSimpleName())));
-                        logSink.flush(1000);
-                    }
-                } catch (Exception ignored) {
-                }
-            }
-            if (logWriter != null) {
+            if (sse != null) {
+                sse.abort(true, t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
+            } else if (logWriter != null) {
                 try { logWriter.close(); } catch (IOException ignored) {}
             }
-            if (out != null) {
-                try { out.close(); } catch (IOException ignored) {}
-            }
         } finally {
-            // 关键：只有许可未转交给 AgentRunner 时才在这里释放
-            if (!permitTransferredToRunner) {
+            if (sse == null || !sse.isPermitTransferred()) {
                 sessionManager.releaseRunningPermit();
             }
         }
     }
 
     // ==================== 辅助方法 ====================
-
-    // @anchor: runHandler_sendEvent
-    // 以 SSE 单行 data 形式发送一条事件（换行转义）
-    /**
-     * SSE 事件发送。所有换行转为 \n 转义，保证单行 data。
-     */
-    private void sendEvent(OutputStream out, String data) throws IOException {
-        String normalized = data.replace("\r\n", "\n").replace("\r", "\n");
-        StringBuilder sb = new StringBuilder();
-        for (String line : normalized.split("\n", -1)) {
-            sb.append("data: ").append(line).append('\n');
-        }
-        sb.append('\n');
-        String event = sb.toString();
-        out.write(event.getBytes(StandardCharsets.UTF_8));
-        out.flush();
-    }
-
-    // @anchor: runHandler_jsonEvent
-    // 构造控制事件的 JSON 串；序列化失败时降级为最小结构
-    private String jsonEvent(String type, Map<String, Object> fields) {
-        Map<String, Object> obj = new LinkedHashMap<>();
-        obj.put("type", type);
-        if (fields != null) obj.putAll(fields);
-        try {
-            return mapper.writeValueAsString(obj);
-        } catch (IOException e) {
-            return "{\"type\":\"" + type + "\"}";
-        }
-    }
 
     // @anchor: runHandler_appendHistory
     // 把用户请求追加到全局历史文件 history.jsonl

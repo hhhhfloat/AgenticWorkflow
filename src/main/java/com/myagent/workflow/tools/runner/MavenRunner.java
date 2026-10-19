@@ -34,7 +34,7 @@ public class MavenRunner {
     }
 
     // @anchor: mavenRunner_compileMaven
-    // 编译并运行 Maven 项目
+// 编译并运行 Maven 项目
     public String compileMaven(Path filePath, boolean run) throws IOException {
         Path projectDir = filePath.toAbsolutePath().normalize();
         if (!Files.isDirectory(projectDir)) {
@@ -47,32 +47,28 @@ public class MavenRunner {
         }
 
         try {
-            // 编译阶段
+            // 编译阶段（A7：走 ProcessRunner，异步 drain 输出）
             ProcessBuilder compilePb = new ProcessBuilder(config.mavenCommand(), "clean", "compile");
             compilePb.environment().put("JAVA_HOME", config.javaHome());
+            // Maven 自身的 [INFO] 输出在 Windows 上默认 GBK，加 MAVEN_OPTS 让 Maven JVM 用 UTF-8
+            // （与 ProcessRunner 的 InputStreamReader(UTF_8) 对齐）
+            appendEnv(compilePb, "MAVEN_OPTS",
+                    "-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8");
             compilePb.directory(projectDir.toFile());
-            compilePb.redirectErrorStream(true);
 
-            Process compileProc = compilePb.start();
-            boolean finished = compileProc.waitFor(60, TimeUnit.SECONDS);
-
-            if (!finished) {
-                ProcessRunner.killTree(compileProc);
-                String timeoutOutput = new String(compileProc.getInputStream().readAllBytes(), PROCESS_CHARSET);
-                return "⏱️ Maven 编译超时（超过60秒）。\n输出:\n" + timeoutOutput;
+            ProcessRunner.ProcessResult compileResult = processRunner.executeProcess(compilePb, 60, false);
+            String compileOutput = compileResult.output();
+            if (compileResult.timedOut()) {
+                return "⏱️ Maven 编译超时（超过60秒）。\n输出:\n" + compileOutput;
             }
-
-            String compileOutput = new String(compileProc.getInputStream().readAllBytes(), PROCESS_CHARSET);
-            int compileExit = compileProc.exitValue();
-            if (compileExit != 0) {
-                return "❌ Maven 编译失败 (退出码 " + compileExit + "):\n" + compileOutput;
+            if (compileResult.exitCode() != 0) {
+                return "❌ Maven 编译失败 (退出码 " + compileResult.exitCode() + "):\n" + compileOutput;
             }
 
             if (!run) {
                 return "✅ Maven 编译成功（未运行）！\n输出:\n" + compileOutput;
             }
 
-            // 运行阶段
             String pomContent = Files.readString(pomFile);
             boolean isJavaFX = pomContent.contains("javafx-maven-plugin");
 
@@ -98,6 +94,8 @@ public class MavenRunner {
         runPb.directory(projectDir.toFile());
         runPb.redirectErrorStream(true);
         runPb.environment().put("JAVA_HOME", config.javaHome());
+        appendEnv(runPb, "MAVEN_OPTS",
+                "-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -Dfile.encoding=UTF-8");
 
         Process runProc = runPb.start();
         ProcessRegistry.register(runProc);
@@ -126,7 +124,11 @@ public class MavenRunner {
 
         Path classpath = projectDir.resolve("target/classes");
         ProcessBuilder runPb = new ProcessBuilder(
-                "java", "-cp", classpath.toString(), mainClass);
+                "java",
+                "-Dstdout.encoding=UTF-8",
+                "-Dstderr.encoding=UTF-8",
+                "-Dfile.encoding=UTF-8",
+                "-cp", classpath.toString(), mainClass);
         runPb.directory(projectDir.toFile());
         runPb.redirectErrorStream(true);
         runPb.environment().put("JAVA_HOME", config.javaHome());
@@ -142,7 +144,7 @@ public class MavenRunner {
             return "⏱️ 运行超时（超过30秒），已强制终止。\n编译输出:\n" + compileOutput + "\n运行输出:\n" + result.output();
         }
         if (result.exitCode() != 0) {
-            return "✅ Maven 编译成功！但运行失败 (退出码 " + result.exitCode() + "):\n" +
+            return "❌ Maven 编译成功但运行失败 (退出码 " + result.exitCode() + "):\n" +
                     "编译输出:\n" + compileOutput + "\n运行输出:\n" + result.output();
         }
         return "✅ Maven 编译运行成功！\n编译输出:\n" + compileOutput + "\n运行输出:\n" + result.output();
@@ -225,6 +227,16 @@ public class MavenRunner {
                     });
         } catch (Exception e) {
             logger.warn("清理遗留 JavaFX 进程失败: {}", e.getMessage());
+        }
+    }
+    // @anchor: mavenRunner_appendEnv
+    // 往环境变量追加值（已存在则空格分隔，避免覆盖用户原有设置）
+    private static void appendEnv(ProcessBuilder pb, String key, String value) {
+        String existing = pb.environment().get(key);
+        if (existing == null || existing.isBlank()) {
+            pb.environment().put(key, value);
+        } else if (!existing.contains(value)) {
+            pb.environment().put(key, existing + " " + value);
         }
     }
 }

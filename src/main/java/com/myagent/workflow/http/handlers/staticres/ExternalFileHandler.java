@@ -78,6 +78,17 @@ public class ExternalFileHandler implements HttpHandler {
         else if (name.endsWith(".md")) contentType = "text/markdown; charset=utf-8";
         else contentType = "text/plain; charset=utf-8";
 
+        // HTML / SVG 是主动内容，同源直出会形成存储型 XSS，可转发写路由
+        // - sandbox（unique origin）：隔离 localStorage / cookie / IndexedDB
+        // - connect-src 'none'：禁止 fetch / XHR / WebSocket，阻断调 /run 等端点
+        // - nosniff：禁止浏览器 MIME 嗅探
+        // 静态 HTML 页面（html-calculator 等）不依赖同源存储和网络请求，不受影响
+        if (contentType.startsWith("text/html") || contentType.startsWith("image/svg+xml")) {
+            exchange.getResponseHeaders().set("Content-Security-Policy",
+                    "sandbox allow-scripts allow-forms allow-popups allow-modals; connect-src 'none'");
+            exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        }
+
         exchange.getResponseHeaders().set("Content-Type", contentType);
         exchange.sendResponseHeaders(200, file.length());
         try (FileInputStream fis = new FileInputStream(file);

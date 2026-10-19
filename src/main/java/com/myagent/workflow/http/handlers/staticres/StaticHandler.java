@@ -34,8 +34,6 @@ public class StaticHandler implements HttpHandler {
         String normalized = path.replace('\\', '/');
         if ("/".equals(normalized) || normalized.endsWith("/")) normalized += "index.html";
 
-        System.out.println("[StaticHandler] path=" + path + " -> normalized=" + normalized);
-
         // 拒绝任何 ".." 段
         for (String seg : normalized.split("/")) {
             if ("..".equals(seg)) {

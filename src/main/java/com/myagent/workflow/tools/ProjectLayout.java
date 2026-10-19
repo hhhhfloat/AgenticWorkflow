@@ -2,6 +2,7 @@
 // 项目布局约定：排除目录/文件/隐藏名的单一真源，供索引、搜索、目录展示共用
 package com.myagent.workflow.tools;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 
@@ -9,7 +10,8 @@ import java.util.Set;
 // 项目布局工具类：统一"什么该被跳过"的判定口径
 public final class ProjectLayout {
 
-    private ProjectLayout() {}
+    private ProjectLayout() {
+    }
 
     // @anchor: projectLayout_excludedDirs
     // 默认排除目录名（任意段匹配）
@@ -53,5 +55,21 @@ public final class ProjectLayout {
     // 文件 basename 是否在排除集合内
     public static boolean isExcludedFile(String name) {
         return name != null && EXCLUDED_FILES.contains(name);
+    }
+
+    // @anchor: projectLayout_resolveProjectRoot
+    // 从沙箱内任意路径回溯到"项目根"（沙箱下一级目录）。
+    // 返回 null 表示：target 不在 sandboxRoot 内，或 target 就是 sandboxRoot 本身。
+    // 例：
+    //   sandbox/proj/src/Main.java → sandbox/proj
+    //   sandbox/proj              → sandbox/proj
+    //   sandbox                   → null
+    public static Path resolveProjectRoot(Path sandboxRoot, Path target) {
+        Path abs = target.toAbsolutePath().normalize();
+        Path root = sandboxRoot.toAbsolutePath().normalize();
+        if (!abs.startsWith(root)) return null;
+        Path relative = root.relativize(abs);
+        if (relative.getNameCount() == 0) return null;
+        return root.resolve(relative.getName(0));
     }
 }

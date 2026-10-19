@@ -49,6 +49,7 @@ public class Main {
     private volatile boolean stopRequested = false;
     private Thread runningThread = null;
     private String currentModel;
+    private volatile Call currentCall = null;
 
     // ===== 迭代监听器（供测试程序实时追踪） =====
     public interface IterationListener {
@@ -275,6 +276,8 @@ public class Main {
                 }
                 toolExecutor.flushDirtyAnchors();
                 contextManager.appendToWorking(currentRound);
+                // 保证末轮工具结果在 recovery 里，crash 后不重跑已完成的工作
+                contextManager.writeRecovery();
             }
 
             if (finalContent == null) {
@@ -302,7 +305,7 @@ public class Main {
                 if (finalContent != null) {
                     contextManager.mergeSummaryToBase(buildTaskSummary(finalContent));
                 } else {
-                    // 异常中断：清空工作区；recovery 文件已在每轮 flush 时保留
+                    // 异常中断：清空工作区；recovery 由上一轮工具执行后写入，保持不变
                     contextManager.clearVolatileWorking();
                 }
             } catch (Exception e) {
@@ -322,8 +325,8 @@ public class Main {
                 logger.warn("落盘原始日志失败", e);
             }
 
-            // 成功完成时清除 recovery；异常中断时保留供后续恢复
-            if (finalContent != null) {
+            // 自然完成或用户主动停止都清除 recovery；真实异常保留供后续恢复
+            if (finalContent != null || stopRequested) {
                 try {
                     contextManager.clearRecovery();
                 } catch (Exception e) {
@@ -339,6 +342,9 @@ public class Main {
 
             session.markIdle();
             this.runningThread = null;
+            // 如果 close() 在 stopTask 超时时注册了"任务结束后移除"回调，现在触发。
+            // 正常完成、用户停止、异常中断都会走到这里；有回调则执行 save + remove。
+            session.fireCloseIfRequested();
         }
     }
 
@@ -351,6 +357,9 @@ public class Main {
     private String buildTaskSummary(String finalContent) {
         if (finalContent == null || finalContent.isBlank()) {
             return "本轮任务结束（无输出）。";
+        }
+        if(finalContent.length() > 20_000){
+            logger.warn("任务摘要异常长（{}字符）", finalContent.length());
         }
         return finalContent;   // ← 原样返回
     }
@@ -377,7 +386,9 @@ public class Main {
                 .build();
 
         String responseBody;
-        try (Response response = httpClient.newCall(httpRequest).execute()) {
+        Call call = httpClient.newCall(httpRequest);
+        this.currentCall = call;
+        try (Response response = call.execute()) {
             if (!response.isSuccessful()) {
                 String errBody = response.body() != null ? response.body().string() : "(null)";
                 throw new IOException("API 请求失败: " + response.code() + " | " + errBody);
@@ -387,6 +398,8 @@ public class Main {
                 throw new IOException("响应体为空");
             }
             responseBody = body.string();
+        } finally{
+            this.currentCall = null;
         }
 
         contextManager.appendRawLog("response", responseBody);
@@ -425,9 +438,13 @@ public class Main {
     // ==================== 停止 ====================
 
     // @anchor: main_stop
-    // 请求停止任务：置停止标记并中断运行线程
+    // 请求停止任务：置停止标记、取消在途 HTTP、中断运行线程
     public void stop() {
         this.stopRequested = true;
+        Call c = this.currentCall;
+        if(c != null) {
+            try { c.cancel(); } catch (Exception ignored) {}
+        }
         Thread t = this.runningThread;
         if (t != null && t != Thread.currentThread()) {
             t.interrupt();

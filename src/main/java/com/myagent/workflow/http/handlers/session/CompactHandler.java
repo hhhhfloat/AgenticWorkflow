@@ -68,7 +68,7 @@ public class CompactHandler implements HttpHandler {
             return;
         }
         int keepRecentPairs = asInt(body.get("keepRecentPairs"), 2);
-        if (keepRecentPairs < 0) keepRecentPairs = 0;
+        if (keepRecentPairs < 1) keepRecentPairs = 1;
 
         AgentConfig globalConfig = HttpServerMain.getGlobalConfig();
         Session session = sessionManager.get(sessionId, globalConfig);
@@ -80,96 +80,103 @@ public class CompactHandler implements HttpHandler {
             HandlerUtils.sendResponse(exchange, 409, error("running", "会话正在运行，无法压缩"));
             return;
         }
-
-        AgentConfig config = session.getConfig();
-        ContextManager cm = session.getContextManager();
-        if (cm == null) {
-            HandlerUtils.sendResponse(exchange, 500, error("no-context", "会话上下文未初始化"));
+        // isRunning 是快速失败，许可才是真正的串行化（覆盖"刚 acquire 还没 markRunning"的窗口）
+        if (!sessionManager.acquireRunningPermit()) {
+            HandlerUtils.sendResponse(exchange, 409,
+                    error("busy", "已有其他任务正在运行，请稍后再试"));
             return;
         }
-        List<Map<String, Object>> base = cm.getImmutableBaseSnapshot();
-        int total = base.size();
-        int keepCount = Math.min(keepRecentPairs * 2, total - 1);
-        int compressEnd = total - keepCount;   // 压缩范围：[1, compressEnd)，跳过 SystemPrompt 与最近 keep 对
-        if (compressEnd <= 1) {
-            HandlerUtils.sendResponse(exchange, 400,
-                    error("too-short", "除 SystemPrompt 与最近 " + keepRecentPairs + " 对外无历史可压"));
-            return;
-        }
-        int beforeCount = total;
-
-        // 归档压缩前的基础区
-        String archiveFile;
         try {
-            archiveFile = sessionManager.archiveBase(sessionId, base);
-        } catch (IOException e) {
-            HandlerUtils.sendResponse(exchange, 500,
-                    error("archive-failed", "归档失败，已取消压缩: " + e.getMessage()));
-            return;
-        }
-
-        // 只发要压缩的部分（跳过 SystemPrompt，跳过最近 keep 对），加一条 user 指令
-        List<Map<String, Object>> reqMessages = new ArrayList<>(base.subList(1, compressEnd));
-        reqMessages.add(Map.of("role", "user", "content", cm.getCompactInstruction()));
-
-        String summary;
-        long promptTokens;
-        long completionTokens;
-        double cost;
-        boolean truncated = false;
-        try {
-            JsonNode root = callApi(reqMessages, config);
-            JsonNode choices = root.get("choices");
-            if (choices == null || choices.isEmpty()) {
-                HandlerUtils.sendResponse(exchange, 502, error("api-bad-response", "API 返回无 choices"));
+            AgentConfig config = session.getConfig();
+            ContextManager cm = session.getContextManager();
+            if (cm == null) {
+                HandlerUtils.sendResponse(exchange, 500, error("no-context", "会话上下文未初始化"));
                 return;
             }
-            JsonNode finish = choices.get(0).get("finish_reason");
-            truncated = finish != null && "length".equals(finish.asText());
-            if (truncated) {
-                logger.warn("压缩摘要被 max_tokens 截断，sessionId={}", sessionId);
-            }
-            JsonNode messageNode = choices.get(0).get("message");
-            summary = (messageNode != null && messageNode.has("content"))
-                    ? messageNode.get("content").asText()
-                    : null;
-            if (summary == null || summary.isBlank()) {
-                HandlerUtils.sendResponse(exchange, 502, error("api-empty-summary", "API 返回空摘要"));
+            List<Map<String, Object>> base = cm.getImmutableBaseSnapshot();
+            int total = base.size();
+            // 用 ContextManager 的切点方法，和 applyCompaction 保持严格一致
+            int compressEnd = cm.findCompactionStart(keepRecentPairs);   // 压缩范围 [1, compressEnd)
+            if (compressEnd <= 1) {
+                HandlerUtils.sendResponse(exchange, 400,
+                        error("too-short", "除 SystemPrompt 与最近 " + keepRecentPairs + " 对外无历史可压"));
                 return;
             }
-            JsonNode usage = root.get("usage");
-            promptTokens = (usage != null && usage.has("prompt_tokens"))
-                    ? usage.get("prompt_tokens").asLong(0) : 0;
-            completionTokens = (usage != null && usage.has("completion_tokens"))
-                    ? usage.get("completion_tokens").asLong(0) : 0;
-            cost = cm.recordUsage(config.model(), promptTokens, 0, completionTokens);
-        } catch (IOException e) {
-            logger.warn("压缩 API 调用失败: {}", e.getMessage());
-            HandlerUtils.sendResponse(exchange, 502, error("api-error", "API 调用失败: " + e.getMessage()));
-            return;
+            int beforeCount = total;
+            // 归档压缩前的基础区
+            String archiveFile;
+            try {
+                archiveFile = sessionManager.archiveBase(sessionId, base);
+            } catch (IOException e) {
+                HandlerUtils.sendResponse(exchange, 500,
+                        error("archive-failed", "归档失败，已取消压缩: " + e.getMessage()));
+                return;
+            }
+// 只发要压缩的部分（跳过 SystemPrompt，跳过最近 keep 对），加一条 user 指令
+            List<Map<String, Object>> reqMessages = new ArrayList<>(base.subList(1, compressEnd));
+            reqMessages.add(Map.of("role", "user", "content", cm.getCompactInstruction()));
+
+            String summary;
+            long promptTokens;
+            long completionTokens;
+            double cost;
+            boolean truncated = false;
+            try {
+                JsonNode root = callApi(reqMessages, config);
+                JsonNode choices = root.get("choices");
+                if (choices == null || choices.isEmpty()) {
+                    HandlerUtils.sendResponse(exchange, 502, error("api-bad-response", "API 返回无 choices"));
+                    return;
+                }
+                JsonNode finish = choices.get(0).get("finish_reason");
+                truncated = finish != null && "length".equals(finish.asText());
+                if (truncated) {
+                    logger.warn("压缩摘要被 max_tokens 截断，sessionId={}", sessionId);
+                }
+                JsonNode messageNode = choices.get(0).get("message");
+                summary = (messageNode != null && messageNode.has("content"))
+                        ? messageNode.get("content").asText()
+                        : null;
+                if (summary == null || summary.isBlank()) {
+                    HandlerUtils.sendResponse(exchange, 502, error("api-empty-summary", "API 返回空摘要"));
+                    return;
+                }
+                JsonNode usage = root.get("usage");
+                promptTokens = (usage != null && usage.has("prompt_tokens"))
+                        ? usage.get("prompt_tokens").asLong(0) : 0;
+                completionTokens = (usage != null && usage.has("completion_tokens"))
+                        ? usage.get("completion_tokens").asLong(0) : 0;
+                cost = cm.recordUsage(config.model(), promptTokens, 0, completionTokens);
+            } catch (IOException e) {
+                logger.warn("压缩 API 调用失败: {}", e.getMessage());
+                HandlerUtils.sendResponse(exchange, 502, error("api-error", "API 调用失败: " + e.getMessage()));
+                return;
+            }
+
+            cm.applyCompaction(summary, keepRecentPairs);
+            // 压缩后 immutableBase 变了，旧 recovery 跟它不再匹配，必须清掉
+            cm.clearRecovery();
+            sessionManager.save(session);
+
+            int afterCount = cm.getBaseMessageCount();
+
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("success", true);
+            resp.put("beforeCount", beforeCount);
+            resp.put("afterCount", afterCount);
+            resp.put("summary", summary);
+            resp.put("archiveFile", archiveFile);
+            resp.put("truncated", truncated);
+            Map<String, Object> usageOut = new LinkedHashMap<>();
+            usageOut.put("promptTokens", promptTokens);
+            usageOut.put("completionTokens", completionTokens);
+            usageOut.put("cost", cost);
+            resp.put("usage", usageOut);
+
+            HandlerUtils.sendResponse(exchange, 200, objectMapper.writeValueAsString(resp));
+        } finally {
+            sessionManager.releaseRunningPermit();
         }
-
-        cm.applyCompaction(summary, keepRecentPairs);
-        // 压缩后 immutableBase 变了，旧 recovery 跟它不再匹配，必须清掉
-        cm.clearRecovery();
-        sessionManager.save(session);
-
-        int afterCount = cm.getBaseMessageCount();
-
-        Map<String, Object> resp = new LinkedHashMap<>();
-        resp.put("success", true);
-        resp.put("beforeCount", beforeCount);
-        resp.put("afterCount", afterCount);
-        resp.put("summary", summary);
-        resp.put("archiveFile", archiveFile);
-        resp.put("truncated", truncated);
-        Map<String, Object> usageOut = new LinkedHashMap<>();
-        usageOut.put("promptTokens", promptTokens);
-        usageOut.put("completionTokens", completionTokens);
-        usageOut.put("cost", cost);
-        resp.put("usage", usageOut);
-
-        HandlerUtils.sendResponse(exchange, 200, objectMapper.writeValueAsString(resp));
     }
 
     // @anchor: compactHandler_callApi

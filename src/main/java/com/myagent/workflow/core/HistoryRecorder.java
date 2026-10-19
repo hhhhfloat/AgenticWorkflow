@@ -15,6 +15,9 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.zip.GZIPOutputStream;
@@ -75,7 +78,7 @@ public class HistoryRecorder {
 
     // @anchor: historyRecorder_cacheRawLog
     // 缓存本周期最新的 request 或 response 原文（覆盖写，暂不落盘）
-    public void cacheRawLog(String type, String jsonContent) {
+    public synchronized void cacheRawLog(String type, String jsonContent) {
         if ("request".equals(type)) {
             pendingRawRequest = jsonContent;
         } else if ("response".equals(type)) {
@@ -85,7 +88,7 @@ public class HistoryRecorder {
 
     // @anchor: historyRecorder_flushRawLog
     // 把缓存中的 request/response 追加写入 raw.jsonl 并清空缓存
-    public void flushRawLog() {
+    public synchronized void flushRawLog() {
         if (pendingRawRequest == null && pendingRawResponse == null) return;
 
         try {
@@ -106,12 +109,8 @@ public class HistoryRecorder {
                         now, pendingRawResponse
                 ));
             }
-            // 1. 追加到全量日志（temp，累积）
             Files.writeString(rawFile, sb.toString(), StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            // 2. 覆盖写 recovery（只保留最后一对）
-            Files.writeString(recoveryFile, sb.toString(), StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             pendingRawRequest = null;
             pendingRawResponse = null;
         } catch (IOException e) {
@@ -122,29 +121,36 @@ public class HistoryRecorder {
     // @anchor: historyRecorder_compress
     // 把 raw.jsonl 压缩为带时间戳的 .gz 并删除原文件
     public void compress() {
-        Path rawFile = rawFilePath();
-        if (!Files.exists(rawFile)) return;
+        String compressedName = null;
+        synchronized (this) {
+            Path rawFile = rawFilePath();
+            if (!Files.exists(rawFile)) return;
 
-        try {
-            String ts = LocalDateTime.now().format(TIME_FMT);
-            String rawName = rawFile.getFileName().toString();
-            String gzName = rawName.endsWith(".jsonl")
-                    ? rawName.substring(0, rawName.length() - ".jsonl".length()) + "_" + ts + ".jsonl.gz"
-                    : rawName + "_" + ts + ".gz";
-            Files.createDirectories(historyOutputDir);
-            Path gzFile = historyOutputDir.resolve(gzName);
-            try (InputStream in = Files.newInputStream(rawFile);
-                 OutputStream out = new GZIPOutputStream(Files.newOutputStream(gzFile))) {
-                byte[] buffer = new byte[8192];
-                int len;
-                while ((len = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, len);
+            try {
+                String ts = LocalDateTime.now().format(TIME_FMT);
+                String rawName = rawFile.getFileName().toString();
+                String gzName = rawName.endsWith(".jsonl")
+                        ? rawName.substring(0, rawName.length() - ".jsonl".length()) + "_" + ts + ".jsonl.gz"
+                        : rawName + "_" + ts + ".gz";
+                Files.createDirectories(historyOutputDir);
+                Path gzFile = historyOutputDir.resolve(gzName);
+                try (InputStream in = Files.newInputStream(rawFile);
+                     OutputStream out = new GZIPOutputStream(Files.newOutputStream(gzFile))) {
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, len);
+                    }
                 }
+                Files.delete(rawFile);
+                compressedName = gzFile.getFileName().toString();
+            } catch (IOException e) {
+                System.err.println("⚠️ 压缩原始日志失败: " + e.getMessage());
             }
-            Files.delete(rawFile);
-            log("📦 [系统] 原始日志已压缩: " + gzFile.getFileName());
-        } catch (IOException e) {
-            System.err.println("⚠️ 压缩原始日志失败: " + e.getMessage());
+        }
+        // log() 移到锁外：logConsumer 可能写 logger 或 SSE，避免长时间持锁
+        if (compressedName != null) {
+            log("📦 [系统] 原始日志已压缩: " + compressedName);
         }
     }
 
@@ -165,25 +171,73 @@ public class HistoryRecorder {
         }
     }
 
-    public void setLogConsumer(Consumer<String> consumer) {
-        this.logConsumer = consumer;
-    }
-
     // @anchor: historyRecorder_recovery
     // recovery 文件的存在检查、路径查询与清除
-    public boolean hasRecovery() {
-        return Files.exists(recoveryFile) && recoveryFile.toFile().length() > 0;
-    }
-
     public Path getRecoveryPath() {
         return recoveryFile;
     }
 
-    public void clearRecovery() {
+    public synchronized boolean hasRecovery() {
+        return readRecovery() != null;
+    }
+
+    public synchronized void clearRecovery() {
         try {
             Files.deleteIfExists(recoveryFile);
         } catch (IOException e) {
             System.err.println("⚠️ 清除 recovery 文件失败: " + e.getMessage());
+        }
+    }
+
+    public synchronized void setLogConsumer(Consumer<String> consumer) {
+        this.logConsumer = consumer;
+    }
+
+    // @anchor: historyRecorder_recoverySnapshot
+// recovery 快照：基础区指纹 + 完整消息列表
+    public record RecoverySnapshot(String fingerprint, List<Map<String, Object>> messages) {}
+
+    // @anchor: historyRecorder_writeRecovery
+// 覆盖写 recovery 快照（只保留最新一份）
+    public synchronized void writeRecovery(List<Map<String, Object>> messages, String fingerprint) {
+        try {
+            Map<String, Object> record = new LinkedHashMap<>();
+            record.put("type", "recovery");
+            record.put("timestamp", LocalDateTime.now().toString());
+            record.put("fingerprint", fingerprint);
+            record.put("messages", messages);
+            String json = objectMapper.writeValueAsString(record);
+            Files.writeString(recoveryFile, json + "\n", StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException e) {
+            System.err.println("⚠️ 写 recovery 失败: " + e.getMessage());
+        }
+    }
+
+    // @anchor: historyRecorder_readRecovery
+// 读 recovery 快照；旧格式或文件损坏时返回 null
+    public synchronized RecoverySnapshot readRecovery() {
+        if (!Files.exists(recoveryFile)) return null;
+        try {
+            String content = Files.readString(recoveryFile, StandardCharsets.UTF_8).trim();
+            if (content.isEmpty()) return null;
+            String[] lines = content.split("\n");
+            String lastLine = null;
+            for (int i = lines.length - 1; i >= 0; i--) {
+                if (!lines[i].isBlank()) { lastLine = lines[i]; break; }
+            }
+            if (lastLine == null) return null;
+            com.fasterxml.jackson.databind.JsonNode node = objectMapper.readTree(lastLine);
+            if (!"recovery".equals(node.path("type").asText())) return null;   // 旧格式不兼容
+            String fingerprint = node.path("fingerprint").asText(null);
+            if (fingerprint == null) return null;
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> messages = objectMapper.convertValue(
+                    node.path("messages"), List.class);
+            return new RecoverySnapshot(fingerprint, messages);
+        } catch (Exception e) {
+            System.err.println("⚠️ 读 recovery 失败: " + e.getMessage());
+            return null;
         }
     }
 }

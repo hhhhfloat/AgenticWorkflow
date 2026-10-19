@@ -7,6 +7,7 @@ import com.myagent.workflow.core.config.AgentConfig;
 import com.myagent.workflow.security.ScanResult;
 import com.myagent.workflow.security.SecurityScanner;
 import com.myagent.workflow.tools.PathUtils;
+import com.myagent.workflow.tools.ProjectLayout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,16 +81,13 @@ public class CompileRunner {
             }
 
             if (!isErrorResult(result)) {
-                Path projectDir = filePath.getParent();
-                if (Files.isDirectory(filePath)) {
-                    projectDir = filePath;
-                }
                 Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
-
-                if (projectDir != null && projectDir.startsWith(sandboxRoot)) {
-                    writeEntryFile(projectDir, filename, mode);
+                // C5：写入项目根（沙箱下一级目录），与 ProjectMetaHandler 读取侧对齐
+                Path projectRoot = ProjectLayout.resolveProjectRoot(sandboxRoot, filePath);
+                if (projectRoot != null) {
+                    writeEntryFile(projectRoot, filename, mode);
                 } else {
-                    logger.warn("⚠️ 路径检查未通过，跳过写入");
+                    logger.warn("⚠️ 无法解析项目根，跳过入口注册表写入: {}", filename);
                 }
             }
 
@@ -102,20 +100,18 @@ public class CompileRunner {
     }
 
     // @anchor: compileRunner_isError
-    // 判断编译/运行结果字符串是否表示失败
+    // 判断编译/运行结果是否表示失败。
+    // C4：各 Runner 的失败消息统一以 ❌ / ⏱️ / ⛔ 开头，直接按前缀判断，
+    // 去掉 contains("失败"/"exception"/"不存在"/"未找到") 这类会被用户程序输出误触发的规则。
     private boolean isErrorResult(String result) {
         if (result == null) return true;
-        return result.startsWith("❌") ||
-                result.contains("失败") ||
-                result.contains("超时") ||
-                result.contains("未找到") ||
-                result.contains("不存在") ||
-                result.contains("exception");
+        String head = result.stripLeading();
+        return head.startsWith("❌") || head.startsWith("⏱️") || head.startsWith("⛔");
     }
 
     // @anchor: compileRunner_writeEntry
     // 把最近一次成功运行的入口信息写入 .agent_entry.json
-    private void writeEntryFile(Path projectDir, String filename, String mode) {
+    private void writeEntryFile(Path projectRoot, String filename, String mode) {
         try {
             // 目标必须真实存在，避免为悬空文件写注册表
             Path target;
@@ -134,7 +130,7 @@ public class CompileRunner {
             String relPath = sandboxRoot.relativize(target.toAbsolutePath().normalize())
                     .toString().replace('\\', '/');
 
-            Path entryFile = projectDir.resolve(".agent_entry.json");
+            Path entryFile = projectRoot.resolve(".agent_entry.json");
             logger.info("📝 正在写入注册表: " + entryFile);
 
             Map<String, String> meta = new LinkedHashMap<>();

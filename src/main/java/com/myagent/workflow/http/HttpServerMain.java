@@ -21,7 +21,6 @@ import java.net.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Enumeration;
 import java.util.concurrent.Executors;
 
 // @anchor: httpServerMain_class
@@ -53,6 +52,7 @@ public class HttpServerMain {
     private static volatile AgentConfig globalConfig;
     private static volatile boolean apiKeyClearedByUser = false;
     private static volatile boolean heartbeatMonitorRunning = false;
+    private static volatile Thread heartbeatMonitorThread = null;
 
     // @anchor: httpServerMain_activeController
     /** 当前控制端：MOBILE / DESKTOP / null（首次访问者自动获取） */
@@ -154,6 +154,7 @@ public class HttpServerMain {
             }
 
             server.stop(0);
+            stopHeartbeatMonitor();
             System.out.println("服务已停止。");
         } catch (Exception e) {
             System.err.println("服务启动失败: " + e.getMessage());
@@ -240,36 +241,39 @@ public class HttpServerMain {
     // ==================== 心跳监控 ====================
 
     // @anchor: httpServerMain_startHeartbeatMonitor
-    // 启动心跳监控线程：超时会话自动停止任务
+    // 启动心跳监控线程：daemon 线程，超时会话自动强制停止并归一化状态
     private static void startHeartbeatMonitor() {
         if (heartbeatMonitorRunning) return;
         heartbeatMonitorRunning = true;
-
-        new Thread(() -> {
-            while (true) {
+        Thread t = new Thread(() -> {
+            while (heartbeatMonitorRunning) {
                 try {
                     Thread.sleep(HEARTBEAT_CHECK_INTERVAL_MS);
                     long now = System.currentTimeMillis();
                     for (var session : sessionManager.listActive()) {
                         if (!session.isRunning()) continue;
 
-                        // 硬超时：兜底清理
+                        // 硬超时：兜底强制停止 + 状态归一化
+                        // B8：先 stopTask 让 B9 的 call.cancel 生效，再 forceIdle 把状态置 IDLE，
+                        // 避免下一轮 5s 检查再次触发（state 仍 RUNNING 会无限重复）
                         long runningTime = now - session.getRunningStartedAt();
                         if (runningTime > TASK_HARD_TIMEOUT_MS) {
                             System.out.println("⚠️ 会话 " + session.getSessionId()
                                     + " 超过硬超时 " + (TASK_HARD_TIMEOUT_MS / 60000)
                                     + " 分钟，强制停止任务");
-                            session.log("[系统] ⏱️ 任务超过 " + (TASK_HARD_TIMEOUT_MS / 60000) + " 分钟，正在强制停止");
+                            session.log("[系统] ⏱️ 任务超过 " + (TASK_HARD_TIMEOUT_MS / 60000)
+                                    + " 分钟，正在强制停止");
                             session.stopTask();
+                            session.forceIdle();   // 状态归一化，下一轮 isRunning()=false 跳过
                             continue;
                         }
 
                         // 心跳超时：仅记录，不再停任务（前端会根据这个状态显示提示）
                         long noHeartbeat = now - session.getLastHeartbeatTime();
                         if (noHeartbeat > HEARTBEAT_TIMEOUT_MS) {
-                            // 只打日志，不停任务
-                            // System.out.println("💤 会话 " + session.getSessionId()
-                            //     + " 客户端心跳失联 " + (noHeartbeat / 1000) + " 秒，任务继续");
+                             // 只打日志，不停任务
+                             System.out.println("💤 会话 " + session.getSessionId()
+                                 + " 客户端心跳失联 " + (noHeartbeat / 1000) + " 秒，任务继续");
                         }
                     }
                 } catch (InterruptedException e) {
@@ -277,8 +281,22 @@ public class HttpServerMain {
                     break;
                 }
             }
-        }, "HeartbeatMonitor").start();
+        }, "HeartbeatMonitor");
+        t.setDaemon(true);
+        heartbeatMonitorThread = t;
+        t.start();
     }
+    // @anchor: httpServerMain_stopHeartbeatMonitor
+    // 停止心跳监控线程：置标志 + interrupt 唤醒 sleep，供 main 退出时调用
+    private static void stopHeartbeatMonitor() {
+        heartbeatMonitorRunning = false;
+        Thread t = heartbeatMonitorThread;
+        if (t != null) {
+            t.interrupt();
+        }
+        heartbeatMonitorThread = null;
+    }
+
     // @anchor: httpServerMain_startParentWatcher
     // 父进程存活监视：父进程退出后主动关闭 JVM，触发 ProcessRegistry 清理
     private static void startParentWatcher() {

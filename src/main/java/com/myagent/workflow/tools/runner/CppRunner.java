@@ -88,7 +88,7 @@ public class CppRunner {
                         "\n运行输出:\n" + runResult.output();
             }
             if (runResult.exitCode() != 0) {
-                return "✅ C++ 编译成功！但运行失败 (退出码 " + runResult.exitCode() + "):\n" +
+                return "❌ C++ 编译成功但运行失败 (退出码 " + runResult.exitCode() + "):\n" +
                         "编译输出:\n" + compileResult.output() + "\n运行输出:\n" + runResult.output();
             }
             return "✅ C++ 编译运行成功！\n编译输出:\n" + compileResult.output() +

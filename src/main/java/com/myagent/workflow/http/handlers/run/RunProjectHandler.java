@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.config.AgentConfig;
 import com.myagent.workflow.core.config.ConfigEditor;
+import com.myagent.workflow.http.HttpServerMain;
+import com.myagent.workflow.session.SessionManager;
 import com.myagent.workflow.tools.ToolExecutor;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -77,32 +79,43 @@ public class RunProjectHandler implements HttpHandler {
             return;
         }
 
+        // A3：获取全局运行许可，与 /run /resume / compact 互斥
+        // /runProject 会启动编译/运行子进程，与 Agent 的 compile_and_run 抢 CPU、./temp
+        SessionManager sessionManager = HttpServerMain.getSessionManager();
+        if (!sessionManager.acquireRunningPermit()) {
+            writeJson(exchange, 409, error("已有其他任务正在运行，请稍后再试"));
+            return;
+        }
         try {
-            AgentConfig config = ConfigEditor.buildFromRequest(root);
-            // 手动执行模式：用户主动操作，不限制工作项目写约束
-            ToolExecutor executor = ToolExecutor.forManualRun(config, mapper);
-            Map<String, Object> args = new HashMap<>();
-            args.put("filename", filename);
-            args.put("mode", mode);
-            args.put("run", true);
+            try {
+                AgentConfig config = ConfigEditor.buildFromRequest(root);
+                // 手动执行模式：用户主动操作，不限制工作项目写约束
+                ToolExecutor executor = ToolExecutor.forManualRun(config, mapper);
+                Map<String, Object> args = new HashMap<>();
+                args.put("filename", filename);
+                args.put("mode", mode);
+                args.put("run", true);
 
-            String result = executor.dispatch("compile_and_run", args);
+                String result = executor.dispatch("compile_and_run", args);
 
-            // 按结果前缀判断成功/失败，避免把错误渲染成"运行完成"
-            boolean ok = result != null && !result.startsWith("❌");
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("status", ok ? "success" : "error");
-            response.put("output", result);
-            if (!ok) {
-                response.put("error", result);
+                // 按结果前缀判断成功/失败，避免把错误渲染成"运行完成"
+                boolean ok = result != null && !result.startsWith("❌");
+                Map<String, Object> response = new LinkedHashMap<>();
+                response.put("status", ok ? "success" : "error");
+                response.put("output", result);
+                if (!ok) {
+                    response.put("error", result);
+                }
+
+                writeJson(exchange, 200, mapper.writeValueAsString(response));
+            } catch (Exception e) {
+                Map<String, Object> response = new LinkedHashMap<>();
+                response.put("status", "error");
+                response.put("error", e.getMessage());
+                writeJson(exchange, 500, mapper.writeValueAsString(response));
             }
-
-            writeJson(exchange, 200, mapper.writeValueAsString(response));
-        } catch (Exception e) {
-            Map<String, Object> response = new LinkedHashMap<>();
-            response.put("status", "error");
-            response.put("error", e.getMessage());
-            writeJson(exchange, 500, mapper.writeValueAsString(response));
+        } finally {
+            sessionManager.releaseRunningPermit();
         }
     }
 

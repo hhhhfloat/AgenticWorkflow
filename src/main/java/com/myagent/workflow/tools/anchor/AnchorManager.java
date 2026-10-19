@@ -49,7 +49,6 @@ public class AnchorManager {
 
     // ===== 转发：索引构建 =====
 
-
     // @anchor: anchorManager_buildIndex
     // 重建锚点索引（显式沙箱校验：拦绝对路径与 ".."，错误信息比底层 IOException 清晰）
     public String buildAnchorIndex(String projectPath) {
@@ -76,9 +75,8 @@ public class AnchorManager {
         AnchorLocation loc = resolveAnchor(anchorId, file);
         if (loc == null) return buildResolveError(anchorId, file);
 
-        String permErr = checkWritePermission(loc);
-        if (permErr != null) return permErr;
-
+        String permErr = checkWorkProjectPermission(loc);
+        if(permErr !=null) return permErr;
         // UPDATE.md 特殊约束：末尾锚点只能在其之前插入
         if ("after".equals(position)
                 && loc.filePath != null
@@ -120,8 +118,8 @@ public class AnchorManager {
         AnchorLocation startLoc = resolveAnchor(startAnchor, file);
         if (startLoc == null) return buildResolveError(startAnchor, file);
 
-        String permErr = checkWritePermission(startLoc);
-        if (permErr != null) return permErr;
+        String permErr = checkWorkProjectPermission(startLoc);
+        if(permErr != null) return permErr;
 
         // UPDATE.md 只追加：禁止删除其中间内容（与 SystemPrompt 的约定一致）
         if (startLoc.filePath != null
@@ -438,30 +436,28 @@ public class AnchorManager {
         return anchorIndex.isProjectFresh(projectPath);
     }
 
-    // @anchor: anchorManager_checkWritePermission
+    // @anchor: anchorManager_checkWorkProjectPermission
     /**
-     * 校验目标锚点所属项目是否可写。
-     * 沙箱边界已由 .anchors.json 的扫描范围保证，这里只做工作项目一致性校验：
-     * <ul>
-     *   <li>tmp/ 公共临时区始终可写；</li>
-     *   <li>未绑定工作项目：除 tmp/ 外一律拒绝（与 PathPolicy 对 write_file 的策略一致）；</li>
-     *   <li>已绑定工作项目：目标必须与 workProject 一致。</li>
-     * </ul>
+     * 工作项目写权限校验。与 PathPolicy.checkWorkProject 的语义对齐：
+     * tmp/ 公共临时区任意情况可写；未绑定工作项目时全沙箱可写；
+     * 已绑定工作项目时只能写 workProject 或 tmp/。
      */
-    private String checkWritePermission(AnchorLocation loc) {
+    private String checkWorkProjectPermission(AnchorLocation loc) {
         if (loc == null || loc.projectPath == null || loc.projectPath.isBlank()) {
             return "❌ 无法解析锚点所属项目";
         }
         String project = loc.projectPath;
+        // tmp/ 任意情况可写
         if ("tmp".equals(project) || project.startsWith("tmp/")) {
             return null;
         }
+        // 未绑定工作项目：全沙箱可写
         if (workProject == null) {
-            return "❌ 当前会话未绑定工作项目，只能修改 tmp/ 临时区。\n"
-                    + "  请在会话中选择或新建一个项目，再执行写操作。";
+            return null;
         }
+        // 已绑定：只能写 workProject
         if (!workProject.equals(project)) {
-            return "❌ 只能修改工作项目 [" + workProject + "]，当前锚点属于: " + project;
+            return "❌ 只能修改工作项目 [" + workProject + "] 或 tmp/ 临时区，当前锚点属于: " + project;
         }
         return null;
     }

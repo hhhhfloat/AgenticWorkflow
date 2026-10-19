@@ -140,23 +140,36 @@ public class SessionManager {
     }
 
     // @anchor: sessionManager_close
-// 关闭会话：运行中先停止并等待 idle；超时则保留在内存等任务自然结束
+    // 关闭会话：运行中先停止并等待 idle；超时则保留在内存等任务自然结束
     public void close(String sessionId) {
         Session session = activeSessions.get(sessionId);
         if (session == null) return;
 
         if (session.isRunning()) {
             session.stopTask();
-            if (session.getContextManager() != null) {
-                session.getContextManager().compressRawLog();
-            }
             boolean idle = waitForIdle(session, 5000);
             if (!idle) {
-                // 超时：任务线程仍在跑。
-                // 若继续 markIdle + save + 移出内存，任务 finally 会再次 save 把会话写回 index.json，
-                // 表现为“关了又冒出来”。保留在内存，交给任务线程的 finally 完成落盘。
-                logger.warn("⚠️ 会话 {} 停止超时，保留在内存等待任务自然结束", sessionId);
+                // 超时：任务线程仍在跑，无法安全 save/remove。
+                // 注册"任务结束后移除"回调，由 Main.runInternal 的 finally 触发：
+                //   save → activeSessions.remove
+                // 这样既保证落盘不丢，也不会"关了又冒出来"。
+                session.markCloseRequested(() -> {
+                    try {
+                        storage.save(session);
+                        logger.info("💾 会话 {} 已在任务结束后落盘并移除", sessionId);
+                    } catch (IOException e) {
+                        logger.error("关闭时落盘失败: {}", sessionId, e);
+                    }
+                    activeSessions.remove(sessionId);
+                });
+                logger.warn("⚠️ 会话 {} 停止超时，已注册任务结束后移除", sessionId);
                 return;
+            }
+            // 任务线程 finally 已经 flush + compress 过（Main.runInternal 的 finally），
+            // 这里的 compress 是兜底：如果 finally 的 compress 因异常被跳过，这里补一次。
+            // raw 文件已被删除时 compress 是 no-op。
+            if (session.getContextManager() != null) {
+                session.getContextManager().compressRawLog();
             }
         }
 
@@ -237,17 +250,16 @@ public class SessionManager {
 
     // @anchor: sessionManager_shutdown
     // 优雅关闭：停止运行中任务并将所有活跃会话落盘后清空内存
-    /**
-     * 优雅关闭：落盘所有活跃会话。
-     */
     public void shutdown() {
         for (Session session : activeSessions.values()) {
             if (session.isRunning()) {
                 session.stopTask();
-                if(session.getContextManager() != null){
+                boolean idle = waitForIdle(session, 5000);
+                if (idle && session.getContextManager() != null) {
+                    // 兜底压缩，同 close() 的逻辑
                     session.getContextManager().compressRawLog();
                 }
-                waitForIdle(session, 5000);
+                // 超时跳过 compress：任务线程还在写 raw，压缩不安全
             }
             // 落盘前强制归一化为 IDLE
             session.markIdle();

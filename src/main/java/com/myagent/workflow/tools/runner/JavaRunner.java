@@ -29,7 +29,7 @@ public class JavaRunner {
     }
 
     // @anchor: javaRunner_compileJava
-    // 编译并运行单个 Java 文件
+// 编译并运行单个 Java 文件
     public String compileJava(Path filePath, String filename, boolean run) {
         try {
             Path projectDir = filePath.getParent();
@@ -37,22 +37,21 @@ public class JavaRunner {
             Files.createDirectories(classesDir);
 
             ProcessBuilder compilePb = new ProcessBuilder(
-                    "javac", "-d", classesDir.toString(), filePath.toString());
+                    "javac",
+                    "-J-Dstdout.encoding=UTF-8",
+                    "-J-Dstderr.encoding=UTF-8",
+                    "-encoding", "UTF-8",
+                    "-d", classesDir.toString(), filePath.toString());
             compilePb.directory(projectDir.toFile());
-            compilePb.redirectErrorStream(true);
 
-            Process compileProc = compilePb.start();
-            boolean compileFinished = compileProc.waitFor(60, TimeUnit.SECONDS);
-            if (!compileFinished) {
-                ProcessRunner.killTree(compileProc);
-            }
-            String compileOutput = new String(compileProc.getInputStream().readAllBytes(), PROCESS_CHARSET);
-            if (!compileFinished) {
+            // A7：改走 ProcessRunner，异步 drain 输出，避免 waitFor + readAllBytes 死锁
+            ProcessRunner.ProcessResult compileResult = processRunner.executeProcess(compilePb, 60, false);
+            String compileOutput = compileResult.output();
+            if (compileResult.timedOut()) {
                 return "⏱️ Java 编译超时（60秒），已强制终止。\n输出:\n" + compileOutput;
             }
-            int compileExit = compileProc.exitValue();
-            if (compileExit != 0) {
-                return "编译失败 (退出码 " + compileExit + "):\n" + compileOutput;
+            if (compileResult.exitCode() != 0) {
+                return "❌ 编译失败 (退出码 " + compileResult.exitCode() + "):\n" + compileOutput;
             }
 
             if (!run) {
@@ -61,9 +60,12 @@ public class JavaRunner {
 
             String className = resolveClassName(filePath);
             ProcessBuilder runPb = new ProcessBuilder(
-                    "java", "-cp", classesDir.toString(), className);
+                "java",
+                "-Dstdout.encoding=UTF-8",
+                "-Dstderr.encoding=UTF-8",
+                "-Dfile.encoding=UTF-8",
+                "-cp", classesDir.toString(), className);
             runPb.directory(projectDir.toFile());
-            runPb.redirectErrorStream(true);
 
             ProcessRunner.ProcessResult result = processRunner.executeProcess(runPb, 30, true);
 
@@ -75,11 +77,11 @@ public class JavaRunner {
                 return "⏱️ 运行超时（超过30秒），已强制终止。\n输出:\n" + result.output();
             }
             if (result.exitCode() != 0) {
-                return "运行失败 (退出码 " + result.exitCode() + "):\n" + result.output();
+                return "❌ 运行失败 (退出码 " + result.exitCode() + "):\n" + result.output();
             }
-            return "运行成功！\n输出:\n" + result.output();
+            return "✅ 运行成功！\n输出:\n" + result.output();
 
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
             return "单文件 Java 执行异常: " + e.getMessage();
         }
     }

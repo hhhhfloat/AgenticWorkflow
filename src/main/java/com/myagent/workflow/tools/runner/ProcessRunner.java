@@ -44,11 +44,13 @@ public class ProcessRunner {
     }
 
     // @anchor: processRunner_executeProcess
-    // 执行外部进程并捕获输出（含超时/输入阻塞检测，finally 兜底回收）
+// 执行外部进程并捕获输出（含超时/输入阻塞检测，finally 兜底回收）
     public ProcessResult executeProcess(ProcessBuilder pb, long timeoutSeconds, boolean detectStdinStall) {
         // ========== 安全加固 ==========
         try {
             secureEnvironment(pb);
+            // C1：内部强制合并 stderr，不依赖调用方设置
+            pb.redirectErrorStream(true);
 
             File dir = pb.directory();
             if (dir != null) {
@@ -73,6 +75,7 @@ public class ProcessRunner {
         long lastLogTime = startTime;
 
         Process process = null;
+        Thread reader = null;
         try {
             process = pb.start();
             ProcessRegistry.register(process);
@@ -80,17 +83,17 @@ public class ProcessRunner {
             logger.info("✅ 进程已启动, PID={}", pid);
 
             Process finalProcess = process;
-            Thread reader = new Thread(() -> {
-                try (var is = finalProcess.getInputStream()) {
-                    byte[] buffer = new byte[1024];
+            reader = new Thread(() -> {
+                // C2：用 InputStreamReader 处理 UTF-8 多字节字符跨块边界，避免中文乱码
+                try (var is = new java.io.InputStreamReader(finalProcess.getInputStream(), PROCESS_CHARSET)) {
+                    char[] buffer = new char[1024];
                     int len;
                     while ((len = is.read(buffer)) != -1) {
-                        String chunk = new String(buffer, 0, len, PROCESS_CHARSET);
+                        String chunk = new String(buffer, 0, len);
                         synchronized (output) {
-                            output.append(chunk);
+                            appendCapped(output, chunk);   // C3：输出上限保护
                         }
                         lastOutputTime.set(System.currentTimeMillis());
-                        logger.trace("📝 读取到输出: {} 字符", chunk.length());
                     }
                 } catch (IOException e) {
                     logger.warn("读取进程输出时发生异常: {}", e.getMessage());
@@ -114,7 +117,8 @@ public class ProcessRunner {
                 if (elapsed > timeoutSeconds * 1000L) {
                     logger.warn("⏱️ 总超时 ({}秒)，强制终止进程", timeoutSeconds);
                     killTree(process);
-                    return new ProcessResult(output.toString(), -1, true, false);
+                    drainReader(reader, 300);   // C1：kill 后等 reader 收尾
+                    return new ProcessResult(cappedOutput(output), -1, true, false);
                 }
 
                 // 2. 输入阻塞检测
@@ -122,8 +126,9 @@ public class ProcessRunner {
                     if (elapsed > 10000 && silentDuration > 10000) {
                         logger.warn("⛔ 检测到输入阻塞（{}秒无输出），强制终止进程", silentDuration / 1000);
                         killTree(process);
+                        drainReader(reader, 300);
                         return new ProcessResult(
-                                output.toString() + "\n⚠️ 检测到程序在 10 秒内未输出任何内容，疑似在等待标准输入（stdin）。",
+                                cappedOutput(output) + "\n⚠️ 检测到程序在 10 秒内未输出任何内容，疑似在等待标准输入（stdin）。",
                                 -1, false, true);
                     }
                 }
@@ -132,14 +137,17 @@ public class ProcessRunner {
                 if (Thread.interrupted()) {
                     logger.info("⏹️ 收到中断信号，正在终止进程");
                     killTree(process);
-                    return new ProcessResult(output.toString() + "\n⏹️ 用户已停止任务", -1, false, false);
+                    drainReader(reader, 300);
+                    return new ProcessResult(cappedOutput(output) + "\n⏹️ 用户已停止任务", -1, false, false);
                 }
 
                 // 4. 检查进程是否结束
                 try {
                     int exitCode = process.exitValue();
                     logger.info("🏁 进程正常结束，退出码: {}", exitCode);
-                    return new ProcessResult(output.toString(), exitCode, false, false);
+                    // C1：exitValue 成功不代表 reader 已读完最后一块，join 一会儿
+                    drainReader(reader, 500);
+                    return new ProcessResult(cappedOutput(output), exitCode, false, false);
                 } catch (IllegalThreadStateException e) {
                     Thread.sleep(200);
                 }
@@ -185,4 +193,38 @@ public class ProcessRunner {
     // @anchor: processRunner_result
     // 进程执行结果：输出、退出码、超时标记、输入阻塞标记
     public record ProcessResult(String output, int exitCode, boolean timedOut, boolean stalledOnInput) {}
+
+    // @anchor: processRunner_appendCapped
+    // C3：输出上限保护，超过 MAX_OUTPUT_CHARS 后丢弃尾部
+    private static final int MAX_OUTPUT_CHARS = 1_000_000;
+
+    private static void appendCapped(StringBuilder output, String chunk) {
+        if (output.length() >= MAX_OUTPUT_CHARS) return;
+        int remaining = MAX_OUTPUT_CHARS - output.length();
+        if (chunk.length() <= remaining) {
+            output.append(chunk);
+        } else {
+            output.append(chunk, 0, remaining);
+            output.append("\n...[输出超过 ").append(MAX_OUTPUT_CHARS).append(" 字符，后续内容已截断]...\n");
+        }
+    }
+
+    // @anchor: processRunner_cappedOutput
+    // 统一取输出字符串（与 reader 的 append 互斥）
+    private static String cappedOutput(StringBuilder output) {
+        synchronized (output) {
+            return output.toString();
+        }
+    }
+
+    // @anchor: processRunner_drainReader
+    // C1：等 reader 线程收尾，避免尾部输出丢失
+    private static void drainReader(Thread reader, long timeoutMs) {
+        if (reader == null) return;
+        try {
+            reader.join(timeoutMs);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
 }

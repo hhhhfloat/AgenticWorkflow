@@ -158,20 +158,23 @@ public class ContextManager {
     }
 
     // @anchor: contextManager_applyCompaction
-    // 用 LLM 生成的摘要替换基础区历史，保留 SystemPrompt 与最近 N 对 (user, summary)
+// 用 LLM 生成的摘要替换基础区历史，保留 SystemPrompt 与最近 N 对 (user, summary)
     /**
-      * 应用压缩结果。
-      * <p>
-      * 结构变化（以 keepRecentPairs=2 为例）：
-      * <pre>
-      * 压缩前：[system][user][summary][user][summary][user][summary]...
-      * 压缩后：[system][历史摘要][user][summary][user][summary]
-      * </pre>
-      * SystemPrompt 永远保留在第 0 位；最近 keepRecentPairs 对消息原样保留。
-      *
-      * @param summary         LLM 生成的压缩摘要
-      * @param keepRecentPairs 保留最近多少对 (user, summary)，建议 2
-      */
+     * 应用压缩结果。
+     * <p>
+     * 结构变化（以 keepRecentPairs=2 为例）：
+     * <pre>
+     * 压缩前：[system][user1][summary1][user2][summary2][user3][summary3]
+     * 压缩后：[system][历史摘要][user2][summary2][user3][summary3]
+     * </pre>
+     * SystemPrompt 永远保留在第 0 位；从第 K 个最新 user 开始保留到末尾。
+     * <p>
+     * 切点语义：保留范围一定以 user 开头（通过 {@link #findCompactionStart} 保证），
+     * 不会出现"只有 summary 没有对应 user"的孤儿摘要；半轮（user 无 summary）也会被保留。
+     *
+     * @param summary         LLM 生成的压缩摘要
+     * @param keepRecentPairs 保留最近多少对 (user, summary)，下限 1
+     */
     public void applyCompaction(String summary, int keepRecentPairs) {
         if (summary == null || summary.isBlank()) {
             log("⚠️ [系统] 压缩摘要为空，跳过");
@@ -182,15 +185,20 @@ public class ContextManager {
             return;
         }
 
+        // 下限 1：至少保留最近一轮 user 请求，避免压缩后模型看不到用户最新意图
+        int effectivePairs = Math.max(1, keepRecentPairs);
+        int startIdx = findCompactionStart(effectivePairs);
+
+        // startIdx <= 1：压缩范围为 [1, startIdx)，为空；不改变基础区
+        if (startIdx <= 1) {
+            log("⚠️ [系统] 压缩范围为空，跳过（基础区 " + immutableBase.size() + " 条）");
+            return;
+        }
+
         int beforeCount = immutableBase.size();
-
-        // 保留 SystemPrompt
         Map<String, Object> sysPrompt = immutableBase.get(0);
-
-        // 保留最近 keepRecentPairs 对，但不越过 SystemPrompt
-        int keepCount = Math.min(keepRecentPairs * 2, immutableBase.size() - 1);
         List<Map<String, Object>> recent = new ArrayList<>(
-                immutableBase.subList(immutableBase.size() - keepCount, immutableBase.size())
+                immutableBase.subList(startIdx, immutableBase.size())
         );
 
         immutableBase.clear();
@@ -199,7 +207,47 @@ public class ContextManager {
         immutableBase.addAll(recent);
 
         log("📦 [系统] 基础区已压缩：" + beforeCount + " 条 → " + immutableBase.size()
-                + " 条（保留最近 " + keepRecentPairs + " 对）");
+                + " 条（保留最近 " + effectivePairs + " 对，从索引 " + startIdx + " 开始）");
+    }
+
+    // @anchor: contextManager_findCompactionStart
+    /**
+     * 找到压缩切点：从尾部向前数 keepRecentPairs 个 user 消息，返回该 user 的索引。
+     * <p>
+     * 索引 0 始终是 SystemPrompt；压缩范围是 [1, startIdx)，保留范围是 [startIdx, size)。
+     * <p>
+     * 语义保证：
+     * <ul>
+     *   <li>保留范围一定以 user 开头，不会出现"只有 summary 没有对应 user"的孤儿摘要；</li>
+     *   <li>如果历史中 user 数量不足 K 个，返回第一个 user 的索引（全部保留，等于不压缩）；</li>
+     *   <li>如果没有任何 user（只有 SystemPrompt + summary），返回 size（压缩范围为空）；</li>
+     *   <li>不依赖基础区形状是否规整（有半轮时也能正确定位）。</li>
+     * </ul>
+     *
+     * @param keepRecentPairs 保留最近多少对，调用方保证 >= 1
+     * @return 保留范围的起始索引；压缩范围是 [1, 返回值)
+     */
+    public int findCompactionStart(int keepRecentPairs) {
+        if (keepRecentPairs < 1) keepRecentPairs = 1;
+
+        int userCount = 0;
+        for (int i = immutableBase.size() - 1; i > 0; i--) {
+            Map<String, Object> msg = immutableBase.get(i);
+            if ("user".equals(msg.get("role"))) {
+                userCount++;
+                if (userCount == keepRecentPairs) {
+                    return i;
+                }
+            }
+        }
+        // 历史中 user 数量不足 K 个：从第一个 user 开始保留（不压缩任何 user）
+        for (int i = 1; i < immutableBase.size(); i++) {
+            if ("user".equals(immutableBase.get(i).get("role"))) {
+                return i;
+            }
+        }
+        // 没有任何 user
+        return immutableBase.size();
     }
 
     // ==================== 构建 ====================
@@ -313,6 +361,27 @@ public class ContextManager {
     // 输出累计用量与成本统计
     public void printStats() {
         log(usageTracker.formatStats());
+    }
+
+    // @anchor: contextManager_baseFingerprint
+    // 基础区指纹：条数 + 最后一条消息 content 的 hash
+    public String getBaseFingerprint() {
+        if (immutableBase.isEmpty()) return "0:empty";
+        Map<String, Object> last = immutableBase.get(immutableBase.size() - 1);
+        String content = String.valueOf(last.get("content"));
+        return immutableBase.size() + ":" + Integer.toHexString(content.hashCode());
+    }
+
+    // @anchor: contextManager_writeRecovery
+    // 写 recovery 快照：当前 buildMessages() + 基础区指纹
+    public void writeRecovery() {
+        historyRecorder.writeRecovery(buildMessages(), getBaseFingerprint());
+    }
+
+    // @anchor: contextManager_readRecovery
+    // 读 recovery 快照；格式不兼容或损坏时返回 null
+    public HistoryRecorder.RecoverySnapshot readRecovery() {
+        return historyRecorder.readRecovery();
     }
 
     // ==================== 日志 ====================
