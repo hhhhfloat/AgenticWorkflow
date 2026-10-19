@@ -215,6 +215,17 @@ public class ToolExecutor {
         }
     }
 
+    // @anchor: toolExecutor_rebuildCurrentProjectIndex
+    // 强制重建指定项目的锚点索引（不检查 freshness），用于"运行前确保当前项目最新"
+    public void rebuildCurrentProjectIndex(String projectName) {
+        if (projectName == null || projectName.isBlank()) return;
+        try {
+            anchorMgr.rebuildProjectIndex(projectName);
+        } catch (Exception e) {
+            logger.warn("强制重建项目索引失败: {} - {}", projectName, e.getMessage());
+        }
+    }
+
     /**
      * 由 Main 在一轮工具调用结束后触发，批量刷新锚点索引。
      */

@@ -194,6 +194,17 @@ public class Main {
             session.markRunning(this);
             session.touch();
 
+            try{
+                String wp = session.getWorkProject();
+                if(wp != null && !wp.isBlank()){
+                    toolExecutor.rebuildCurrentProjectIndex(wp);
+                } else {
+                    toolExecutor.refreshAllProjectIndexes();
+                }
+            } catch (Exception e){
+                logger.warn("任务启动前刷新项目索引失败", e);
+            }
+
             startPrompt = contextManager.getTotalPromptTokens();
             startCached = contextManager.getTotalCachedTokens();
             startCompletion = contextManager.getTotalCompletionTokens();

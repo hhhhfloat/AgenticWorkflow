@@ -63,7 +63,7 @@ public class AnchorManager {
     // ===== 文件内容操作 =====
 
     // @anchor: anchorManager_insertAtAnchor
-// 在锚点前/后插入代码，并标记文件为脏
+    // 在锚点前/后插入代码，并标记文件为脏
     public String insertAtAnchor(String anchorId, String content, String position, String file) {
         if (anchorId == null || anchorId.isBlank()) {
             return "❌ 缺少参数 anchor_id";
@@ -110,7 +110,7 @@ public class AnchorManager {
     }
 
     // @anchor: anchorManager_deleteBetweenAnchors
-// 删除两锚点之间的内容
+    // 删除两锚点之间的内容
     public String deleteBetweenAnchors(String startAnchor, String endAnchor, String file) {
         if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
         if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";
@@ -119,68 +119,38 @@ public class AnchorManager {
         if (startLoc == null) return buildResolveError(startAnchor, file);
 
         String permErr = checkWorkProjectPermission(startLoc);
-        if(permErr != null) return permErr;
+        if (permErr != null) return permErr;
 
         // UPDATE.md 只追加：禁止删除其中间内容（与 SystemPrompt 的约定一致）
+        // 放在配对解析之前：`(update_intro, update_intro)` 应直接报 UPDATE.md 保护，
+        // 而不是先去找 `update_intro_end` 再报"没有配对锚点"。
         if (startLoc.filePath != null
-                        && startLoc.filePath.toLowerCase().endsWith("update.md")) {
+                && startLoc.filePath.toLowerCase().endsWith("update.md")) {
             return "❌ UPDATE.md 只允许追加，不允许删除内容。\n"
                     + "  如需修正记录，请用 insert_at_anchor 在末尾锚点之前插入新记录。";
         }
 
-        AnchorLocation endLoc = resolveAnchor(endAnchor, file);
-        if (endLoc == null) return buildResolveError(endAnchor, file);
+        // 单锚点快捷：startAnchor == endAnchor 时自动解析配对锚点 xxx_end。
+        // 依据 SystemPrompt 约定：[module]_[function] 与 [module]_[function]_end 成对。
+        // 传两个不同锚点时行为完全不变（跨块操作不受影响）。
+        String effectiveEndAnchor = endAnchor;
+        AnchorLocation endLoc;
 
-        if (!startLoc.projectPath.equals(endLoc.projectPath)) {
-            return "❌ 两个锚点不在同一个项目中";
-        }
-        if (!startLoc.filePath.equals(endLoc.filePath)) {
-            return "❌ 两个锚点不在同一个文件中";
-        }
-        if (startLoc.line >= endLoc.line) {
-            return "❌ 起始锚点必须在结束锚点之前";
-        }
-
-        try {
-            Path filePath = PathUtils.safeResolve(startLoc.projectPath, startLoc.filePath);
-            List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
-
-            int startLine = startLoc.line - 1;
-            int endLine = endLoc.line - 1;
-
-            if (endLine - startLine <= 1) {
-                return "⚠️ 两个锚点之间没有内容可删除";
+        if (startAnchor.equals(endAnchor) && !startAnchor.endsWith("_end")) {
+            String pairedId = startAnchor + "_end";
+            AnchorLocation pairedLoc = resolveAnchor(pairedId, file);
+            if (pairedLoc == null) {
+                return "❌ 锚点 " + startAnchor + " 没有配对锚点 " + pairedId + "，无法执行区间删除。\n"
+                        + "  💡 若 " + startAnchor + " 是独立锚点（如 xxx_intro），"
+                        + "该锚点无配对区间可删；\n"
+                        + "     若命名不是 xxx / xxx_end 格式，请直接传两个不同的锚点 id。";
             }
-
-            List<String> newLines = new ArrayList<>();
-            for (int i = 0; i < lines.size(); i++) {
-                if (i > startLine && i < endLine) {
-                    continue;
-                }
-                newLines.add(lines.get(i));
-            }
-
-            FileOperator.writeLinesAtomic(filePath, newLines);
-            onFileModified(startLoc.projectPath, startLoc.filePath);
-
-            int deletedLines = (endLine - startLine) - 1;
-            return "✅ 已删除从 [" + startAnchor + "] 到 [" + endAnchor + "] 之间的 " + deletedLines + " 行代码";
-
-        } catch (IOException e) {
-            logger.error("删除代码块失败", e);
-            return "❌ 删除失败: " + e.getMessage();
+            effectiveEndAnchor = pairedId;
+            endLoc = pairedLoc;
+        } else {
+            endLoc = resolveAnchor(endAnchor, file);
         }
-    }
 
-    // @anchor: anchorManager_readBetweenAnchors
-    // 读取两锚点之间的代码
-    public String readBetweenAnchors(String startAnchor, String endAnchor, String file) {
-        if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
-        if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";
-
-        AnchorLocation startLoc = resolveAnchor(startAnchor, file);
-        if (startLoc == null) return buildResolveError(startAnchor, file);
-        AnchorLocation endLoc = resolveAnchor(endAnchor, file);
         if (endLoc == null) return buildResolveError(endAnchor, file);
 
         if (!startLoc.projectPath.equals(endLoc.projectPath)) {
@@ -195,8 +165,90 @@ public class AnchorManager {
         }
         if (startLoc.line >= endLoc.line) {
             return "❌ 起始锚点必须在结束锚点之前\n" +
-                    "  起始锚点: " + startLoc.filePath + " 行 " + startLoc.line + "\n" +
-                    "  结束锚点: " + endLoc.filePath + " 行 " + endLoc.line;
+                    "  起始锚点所在行 " + startLoc.line + "\n" +
+                    "  结束锚点所在行 " + endLoc.line + "\n" +
+                    "  💡 检查是否把 startAnchor 和 endAnchor 传反了。";
+        }
+
+        try {
+            Path filePath = PathUtils.safeResolve(startLoc.projectPath, startLoc.filePath);
+            List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
+
+            int startLine = startLoc.line - 1;
+            int endLine = endLoc.line - 1;
+
+            if (endLine - startLine <= 1) {
+                return "⚠️ 锚点间无内容可删除";
+            }
+
+            List<String> newLines = new ArrayList<>();
+            for (int i = 0; i < lines.size(); i++) {
+                if (i > startLine && i < endLine) {
+                    continue;
+                }
+                newLines.add(lines.get(i));
+            }
+
+            FileOperator.writeLinesAtomic(filePath, newLines);
+            onFileModified(startLoc.projectPath, startLoc.filePath);
+
+            int deletedLines = (endLine - startLine) - 1;
+            // 用 effectiveEndAnchor：单锚点快捷时显示实际解析到的 xxx_end，让模型知道配对生效了
+            return "✅ 已删除从 [" + startAnchor + "] 到 [" + effectiveEndAnchor + "] 之间的 "
+                    + deletedLines + " 行代码";
+        } catch (IOException e) {
+            logger.error("删除代码块失败", e);
+            return "❌ 删除失败: " + e.getMessage();
+        }
+    }
+
+    // @anchor: anchorManager_readBetweenAnchors
+    // 读取两锚点之间的代码
+    public String readBetweenAnchors(String startAnchor, String endAnchor, String file) {
+        if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
+        if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";
+
+        AnchorLocation startLoc = resolveAnchor(startAnchor, file);
+        if (startLoc == null) return buildResolveError(startAnchor, file);
+
+        // 单锚点快捷：startAnchor == endAnchor 时自动解析配对锚点 xxx_end。
+        // 依据 SystemPrompt 约定：[module]_[function] 与 [module]_[function]_end 成对。
+        // 传两个不同锚点时行为完全不变（跨块操作不受影响）。
+        String effectiveEndAnchor = endAnchor;
+        AnchorLocation endLoc;
+
+        if (startAnchor.equals(endAnchor) && !startAnchor.endsWith("_end")) {
+            String pairedId = startAnchor + "_end";
+            AnchorLocation pairedLoc = resolveAnchor(pairedId, file);
+            if (pairedLoc == null) {
+                return "❌ 锚点 " + startAnchor + " 没有配对锚点 " + pairedId + "，无法执行区间读取。\n"
+                        + "  💡 若 " + startAnchor + " 是独立锚点（如 xxx_intro），"
+                        + "请改用 insert_at_anchor 而非区间读取；\n"
+                        + "     若命名不是 xxx / xxx_end 格式，请直接传两个不同的锚点 id。";
+            }
+            effectiveEndAnchor = pairedId;
+            endLoc = pairedLoc;
+        } else {
+            endLoc = resolveAnchor(endAnchor, file);
+        }
+
+        if (endLoc == null) return buildResolveError(endAnchor, file);
+
+        if (!startLoc.projectPath.equals(endLoc.projectPath)) {
+            return "❌ 两个锚点不在同一个项目中\n" +
+                    "  起始锚点: " + startLoc.projectPath + "\n" +
+                    "  结束锚点: " + endLoc.projectPath;
+        }
+        if (!startLoc.filePath.equals(endLoc.filePath)) {
+            return "❌ 两个锚点不在同一个文件中\n" +
+                    "  起始锚点: " + startLoc.filePath + "\n" +
+                    "  结束锚点: " + endLoc.filePath;
+        }
+        if (startLoc.line >= endLoc.line) {
+            return "❌ 起始锚点必须在结束锚点之前\n" +
+                    "  起始锚点所在行 " + startLoc.line + "\n" +
+                    "  结束锚点所在行 " + endLoc.line + "\n" +
+                    "  💡 检查是否把 startAnchor 和 endAnchor 传反了。";
         }
 
         try {
@@ -215,7 +267,7 @@ public class AnchorManager {
             }
 
             if (resultLines.isEmpty()) {
-                return "⚠️ 两个锚点之间没有内容可读取";
+                return "⚠️ 锚点间无内容";
             }
 
             StringBuilder sb = new StringBuilder();
@@ -232,7 +284,8 @@ public class AnchorManager {
 
             sb.append("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
             sb.append("📌 起始锚点: ").append(startAnchor).append(" (行 ").append(startLoc.line).append(")\n");
-            sb.append("📌 结束锚点: ").append(endAnchor).append(" (行 ").append(endLoc.line).append(")");
+            // 用 effectiveEndAnchor：单锚点快捷时显示实际解析到的 xxx_end，让模型知道配对生效了
+            sb.append("📌 结束锚点: ").append(effectiveEndAnchor).append(" (行 ").append(endLoc.line).append(")");
 
             return sb.toString();
 
@@ -243,7 +296,7 @@ public class AnchorManager {
     }
 
     // @anchor: anchorManager_markDirty
-// 标记某文件为脏，待批量刷新索引
+    // 标记某文件为脏，待批量刷新索引
     private void markDirty(String projectPath, String fileRelPath) {
         dirtyFiles.computeIfAbsent(projectPath, k -> new LinkedHashSet<>()).add(fileRelPath);
     }
@@ -335,15 +388,47 @@ public class AnchorManager {
 
 // @anchor: anchorManager_buildResolveError
     /**
-     * 生成消歧失败时的错误信息。
+     * 生成锚点解析失败的错误信息。
+     * <p>
+     * 分四种情况，避免"未找到唯一"这种误导性措辞：
+     * <ul>
+     *   <li>指定 file，该文件没有，全局也没有 → 锚点不存在</li>
+     *   <li>指定 file，该文件没有，全局有 → 列出其他位置</li>
+     *   <li>未指定 file，全局没有 → 锚点不存在</li>
+     *   <li>未指定 file，全局多个 → 列出候选</li>
+     * </ul>
      */
     private String buildResolveError(String anchorId, String fileHint) {
-        if (fileHint != null && !fileHint.isBlank()) {
-            return "❌ 在文件 " + fileHint + " 中未找到唯一锚点: " + anchorId;
-        }
         List<AnchorLocation> all = anchorQuery.findAllGlobally(anchorId, workProject);
-        if (all.isEmpty()) return "❌ 锚点不存在: " + anchorId;
 
+        // ===== 指定了 file =====
+        if (fileHint != null && !fileHint.isBlank()) {
+            if (all.isEmpty()) {
+                return "❌ 锚点不存在: " + anchorId + "\n"
+                        + "  已搜索文件 " + fileHint + " 和当前可搜索范围，均未找到。\n"
+                        + "  💡 请先 describe_anchors 确认锚点 id；\n"
+                        + "     注意：方法名/类名 ≠ 锚点 id，锚点 id 是源码中 @anchor 注释的值。";
+            }
+            StringBuilder sb = new StringBuilder();
+            sb.append("❌ 文件 ").append(fileHint).append(" 中没有锚点: ")
+                    .append(anchorId).append("\n");
+            sb.append("  但该锚点在以下位置存在：\n");
+            for (AnchorLocation loc : all) {
+                sb.append("   - ").append(loc.projectPath).append("/").append(loc.filePath)
+                        .append(" (L").append(loc.line).append(")\n");
+            }
+            sb.append("  💡 请检查 file 参数是否正确，或在上述位置之一查找。");
+            return sb.toString();
+        }
+
+        // ===== 未指定 file =====
+        if (all.isEmpty()) {
+            return "❌ 锚点不存在: " + anchorId + "\n"
+                    + "  💡 请先 describe_anchors 确认锚点 id；\n"
+                    + "     注意：方法名/类名 ≠ 锚点 id，锚点 id 是源码中 @anchor 注释的值。";
+        }
+
+        // 全局多个
         StringBuilder sb = new StringBuilder();
         sb.append("❌ 锚点 '").append(anchorId).append("' 在 ")
                 .append(all.size()).append(" 个文件中出现：\n");
