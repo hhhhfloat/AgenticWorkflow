@@ -420,7 +420,7 @@ public class AnchorManager {
             return sb.toString();
         }
 
-        // ===== 零命中且指定了 file：查全局，区分"其他位置有"和"确实不存在" =====
+        // ===== 零命中且指定了 file：先查全局是否有其他位置 =====
         if (hasFileHint) {
             List<AnchorLocation> elsewhere = anchorQuery.findAllGlobally(anchorId, workProject);
             if (!elsewhere.isEmpty()) {
@@ -435,20 +435,30 @@ public class AnchorManager {
                 sb.append("  💡 请检查 file 参数是否正确，或在上述位置之一查找。");
                 return sb.toString();
             }
+
+            // 全局也没有：尝试给出该文件中的相似锚点
+            List<AnchorLocation> anchorsInFile = anchorQuery.listAnchorsInFile(fileHint, workProject);
+            List<AnchorLocation> similar = findSimilarAnchors(anchorId, anchorsInFile, 5);
+            if (!similar.isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("❌ 文件 ").append(fileHint).append(" 中没有锚点: ")
+                        .append(anchorId).append("\n");
+                sb.append("  该文件中相似的锚点：\n");
+                for (AnchorLocation loc : similar) {
+                    sb.append("   - ").append(loc.id)
+                            .append(" (L").append(loc.line).append(")\n");
+                }
+                return sb.toString();
+            }
         }
 
         // ===== 零命中且全局也没有 =====
         StringBuilder sb = new StringBuilder();
-        sb.append("❌ 在").append(scope).append("中未找到锚点: ").append(anchorId).append("\n");
+        sb.append("❌ 在").append(scope).append(" 中未找到锚点: ").append(anchorId).append("\n");
         if (hasFileHint) {
             sb.append("  已搜索文件 ").append(fileHint).append(" 和").append(scope).append("的全部文件。\n");
         }
-        if (workProject != null) {
-            sb.append("  💡 锚点可能存在于其他项目，但当前会话只能操作工作项目 [")
-                    .append(workProject).append("]。\n");
-        }
-        sb.append("  💡 请先 describe_anchors 确认锚点 id；\n");
-        sb.append("     注意：方法名/类名 ≠ 锚点 id，锚点 id 是源码中 @anchor 注释的值。");
+        sb.append("  💡先 describe_anchors 确认锚点 id；\n");
         return sb.toString();
     }
 
@@ -583,5 +593,54 @@ public class AnchorManager {
             return anchorQuery.findAllGlobally(anchorId, workProject);
         }
         return anchorQuery.findAllInFile(anchorId, fileHint, workProject);
+    }
+    // @anchor: anchorManager_findSimilarAnchors
+    // 在候选锚点中按 ID 相似度找前 limit 个。编辑距离 + 公共前缀加权：
+    // 距离越小越好，公共前缀越长越好。阈值 = max(3, target.length/3)，避免短 ID 误匹配。
+    // 短 ID（< 8 字符）额外要求公共前缀 >= 2，避免 foo/bar 这种无关匹配。
+    private static List<AnchorLocation> findSimilarAnchors(
+            String target, List<AnchorLocation> candidates, int limit) {
+        if (candidates.isEmpty()) return List.of();
+        int threshold = Math.max(3, target.length() / 3);
+        record Scored(AnchorLocation loc, int score) {}
+        List<Scored> scored = new ArrayList<>();
+        for (AnchorLocation loc : candidates) {
+            if (loc.id == null) continue;
+            int dist = levenshtein(target, loc.id);
+            if (dist > threshold) continue;
+            int prefix = commonPrefixLength(target, loc.id);
+            // 短 ID 保护：长度 < 8 且公共前缀 < 2，视为无关匹配，跳过
+            if (target.length() < 8 && prefix < 2) continue;
+            // 距离权重 10，公共前缀权重 1：距离每多 1 扣 10 分，前缀每多 1 加 1 分
+            int score = dist * 10 - prefix;
+            scored.add(new Scored(loc, score));
+        }
+        scored.sort(Comparator.comparingInt(Scored::score));
+        return scored.stream().limit(limit).map(Scored::loc).toList();
+    }
+
+    // @anchor: anchorManager_levenshtein
+    // 标准编辑距离（插入/删除/替换各计 1）
+    private static int levenshtein(String a, String b) {
+        int[][] dp = new int[a.length() + 1][b.length() + 1];
+        for (int i = 0; i <= a.length(); i++) dp[i][0] = i;
+        for (int j = 0; j <= b.length(); j++) dp[0][j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            for (int j = 1; j <= b.length(); j++) {
+                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
+                dp[i][j] = Math.min(Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1), dp[i - 1][j - 1] + cost);
+            }
+        }
+        return dp[a.length()][b.length()];
+    }
+
+    // @anchor: anchorManager_commonPrefixLength
+    // 两个字符串的最长公共前缀长度
+    private static int commonPrefixLength(String a, String b) {
+        int n = Math.min(a.length(), b.length());
+        for (int i = 0; i < n; i++) {
+            if (a.charAt(i) != b.charAt(i)) return i;
+        }
+        return n;
     }
 }

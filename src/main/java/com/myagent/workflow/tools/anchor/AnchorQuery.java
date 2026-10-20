@@ -185,4 +185,57 @@ class AnchorQuery {
         }
         return all.size() == 1 ? all.get(0) : null;
     }
+
+    // @anchor: anchorQuery_listAnchorsInFile
+    // 列出指定文件中的全部锚点（用于"锚点 ID 猜错"时给出相似建议）。
+    // fileHint 匹配口径与 findAllInFile 一致（宽松 + ./ 归一化）。
+    List<AnchorLocation> listAnchorsInFile(String fileHint, String workProject) {
+        List<AnchorLocation> result = new ArrayList<>();
+        if (fileHint == null || fileHint.isBlank()) return result;
+
+        String hint = fileHint.replace('\\', '/');
+        while (hint.startsWith("./")) hint = hint.substring(2);
+        if (hint.isBlank()) return result;
+
+        try {
+            Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
+            try (var stream = Files.list(sandboxRoot)) {
+                for (Path projectDir : (Iterable<Path>) stream::iterator) {
+                    if (!Files.isDirectory(projectDir)) continue;
+                    String projectName = projectDir.getFileName().toString();
+                    if (projectName.startsWith(".")) continue;
+                    if (workProject != null && !workProject.equals(projectName)) continue;
+
+                    Path indexFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
+                    if (!Files.exists(indexFile)) continue;
+                    try {
+                        Map<String, List<Map<String, Object>>> projectAnchors = cache.load(indexFile);
+                        for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
+                            String filePath = fileEntry.getKey();
+                            String fullRel = projectName + "/" + filePath;
+                            boolean fileMatches = fullRel.equals(hint)
+                                    || filePath.equals(hint)
+                                    || fullRel.endsWith("/" + hint);
+                            if (!fileMatches) continue;
+
+                            for (Map<String, Object> anchor : fileEntry.getValue()) {
+                                AnchorLocation loc = new AnchorLocation();
+                                loc.projectPath = projectName;
+                                loc.filePath = filePath;
+                                loc.line = (int) anchor.get("line");
+                                loc.id = (String) anchor.get("id");
+                                loc.preview = (String) anchor.get("preview");
+                                result.add(loc);
+                            }
+                        }
+                    } catch (IOException e) {
+                        logger.warn("读取 {} 的索引失败，跳过: {}", projectName, e.getMessage());
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger.error("列文件锚点失败", e);
+        }
+        return result;
+    }
 }
