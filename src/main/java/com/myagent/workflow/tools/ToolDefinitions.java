@@ -95,7 +95,7 @@ public final class ToolDefinitions {
                 defineParams()
                         .prop("startAnchor", "string", "起始锚点 ID")
                         .prop("endAnchor", "string", "结束锚点 ID")
-                        .prop("file", "string", "可选。锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
+                        .prop("file", "string", "锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
                         .build(),
                 List.of("startAnchor", "endAnchor")
         ));
@@ -145,7 +145,7 @@ public final class ToolDefinitions {
                         .prop("anchor_id", "string", "锚点 ID")
                         .prop("content", "string", "要插入的代码内容")
                         .prop("position", "string", "'before' 或 'after'，默认 'after'")
-                        .prop("file", "string", "可选。锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
+                        .prop("file", "string", "锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
                         .build(),
                 List.of("anchor_id", "content")
         ));
@@ -210,7 +210,7 @@ public final class ToolDefinitions {
                 "返回锚点信息。file 支持逗号分隔多个片段。每个片段：先按文件匹配（精确或后缀），命中则列出该文件的全部锚点（含 _end，按行号升序）；未命中则按目录匹配，列出该目录下所有文件的 _intro 锚点描述（文件职责概览）；传 '.' 表示整个项目。",
                 defineParams()
                         .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
-                        .prop("file", "string", "必填。文件相对路径（逗号分隔多个文件）或目录路径（如 'src/main/java/game'）。传 '.' 表示整个项目。")
+                        .prop("file", "string", "必填。文件相对路径（逗号分隔多个文件）或目录路径（如 'src/main/java/game'）")
                         .build(),
                 List.of("project_path", "file")
         ));

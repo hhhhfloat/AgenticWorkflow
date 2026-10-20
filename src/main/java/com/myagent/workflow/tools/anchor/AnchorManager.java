@@ -72,11 +72,12 @@ public class AnchorManager {
         if (!"before".equals(position) && !"after".equals(position)) {
             return "❌ position 必须是 'before' 或 'after'，收到: " + position;
         }
-        AnchorLocation loc = resolveAnchor(anchorId, file);
-        if (loc == null) return buildResolveError(anchorId, file);
+        ResolveResult locRes = resolveOrError(anchorId, file);
+        if (!locRes.isOk()) return locRes.error();
+        AnchorLocation loc = locRes.location();
 
         String permErr = checkWorkProjectPermission(loc);
-        if(permErr !=null) return permErr;
+        if (permErr != null) return permErr;
         // UPDATE.md 特殊约束：末尾锚点只能在其之前插入
         if ("after".equals(position)
                 && loc.filePath != null
@@ -115,43 +116,38 @@ public class AnchorManager {
         if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
         if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";
 
-        AnchorLocation startLoc = resolveAnchor(startAnchor, file);
-        if (startLoc == null) return buildResolveError(startAnchor, file);
+        ResolveResult startRes = resolveOrError(startAnchor, file);
+        if (!startRes.isOk()) return startRes.error();
+        AnchorLocation startLoc = startRes.location();
 
         String permErr = checkWorkProjectPermission(startLoc);
         if (permErr != null) return permErr;
 
-        // UPDATE.md 只追加：禁止删除其中间内容（与 SystemPrompt 的约定一致）
-        // 放在配对解析之前：`(update_intro, update_intro)` 应直接报 UPDATE.md 保护，
-        // 而不是先去找 `update_intro_end` 再报"没有配对锚点"。
-        if (startLoc.filePath != null
-                && startLoc.filePath.toLowerCase().endsWith("update.md")) {
+        // UPDATE.md 检查不变
+        if (startLoc.filePath != null && startLoc.filePath.toLowerCase().endsWith("update.md")) {
             return "❌ UPDATE.md 只允许追加，不允许删除内容。\n"
                     + "  如需修正记录，请用 insert_at_anchor 在末尾锚点之前插入新记录。";
         }
 
-        // 单锚点快捷：startAnchor == endAnchor 时自动解析配对锚点 xxx_end。
-        // 依据 SystemPrompt 约定：[module]_[function] 与 [module]_[function]_end 成对。
-        // 传两个不同锚点时行为完全不变（跨块操作不受影响）。
+        // 单锚点配对（保留当前逻辑）
         String effectiveEndAnchor = endAnchor;
         AnchorLocation endLoc;
-
         if (startAnchor.equals(endAnchor) && !startAnchor.endsWith("_end")) {
             String pairedId = startAnchor + "_end";
-            AnchorLocation pairedLoc = resolveAnchor(pairedId, file);
-            if (pairedLoc == null) {
+            ResolveResult pairedRes = resolveOrError(pairedId, file);
+            if (!pairedRes.isOk()) {
                 return "❌ 锚点 " + startAnchor + " 没有配对锚点 " + pairedId + "，无法执行区间删除。\n"
                         + "  💡 若 " + startAnchor + " 是独立锚点（如 xxx_intro），"
                         + "该锚点无配对区间可删；\n"
                         + "     若命名不是 xxx / xxx_end 格式，请直接传两个不同的锚点 id。";
             }
             effectiveEndAnchor = pairedId;
-            endLoc = pairedLoc;
+            endLoc = pairedRes.location();
         } else {
-            endLoc = resolveAnchor(endAnchor, file);
+            ResolveResult endRes = resolveOrError(endAnchor, file);
+            if (!endRes.isOk()) return endRes.error();
+            endLoc = endRes.location();
         }
-
-        if (endLoc == null) return buildResolveError(endAnchor, file);
 
         if (!startLoc.projectPath.equals(endLoc.projectPath)) {
             return "❌ 两个锚点不在同一个项目中\n" +
@@ -208,8 +204,9 @@ public class AnchorManager {
         if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
         if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";
 
-        AnchorLocation startLoc = resolveAnchor(startAnchor, file);
-        if (startLoc == null) return buildResolveError(startAnchor, file);
+        ResolveResult startRes = resolveOrError(startAnchor, file);
+        if (!startRes.isOk()) return startRes.error();
+        AnchorLocation startLoc = startRes.location();
 
         // 单锚点快捷：startAnchor == endAnchor 时自动解析配对锚点 xxx_end。
         // 依据 SystemPrompt 约定：[module]_[function] 与 [module]_[function]_end 成对。
@@ -219,20 +216,20 @@ public class AnchorManager {
 
         if (startAnchor.equals(endAnchor) && !startAnchor.endsWith("_end")) {
             String pairedId = startAnchor + "_end";
-            AnchorLocation pairedLoc = resolveAnchor(pairedId, file);
-            if (pairedLoc == null) {
+            ResolveResult pairedRes = resolveOrError(pairedId, file);
+            if (!pairedRes.isOk()) {
                 return "❌ 锚点 " + startAnchor + " 没有配对锚点 " + pairedId + "，无法执行区间读取。\n"
                         + "  💡 若 " + startAnchor + " 是独立锚点（如 xxx_intro），"
                         + "请改用 insert_at_anchor 而非区间读取；\n"
                         + "     若命名不是 xxx / xxx_end 格式，请直接传两个不同的锚点 id。";
             }
             effectiveEndAnchor = pairedId;
-            endLoc = pairedLoc;
+            endLoc = pairedRes.location();
         } else {
-            endLoc = resolveAnchor(endAnchor, file);
+            ResolveResult endRes = resolveOrError(endAnchor, file);
+            if (!endRes.isOk()) return endRes.error();
+            endLoc = endRes.location();
         }
-
-        if (endLoc == null) return buildResolveError(endAnchor, file);
 
         if (!startLoc.projectPath.equals(endLoc.projectPath)) {
             return "❌ 两个锚点不在同一个项目中\n" +
@@ -386,58 +383,72 @@ public class AnchorManager {
         return anchorQuery.findInFile(anchorId, fileHint, workProject);
     }
 
-// @anchor: anchorManager_buildResolveError
+    // @anchor: anchorManager_buildResolveError
     /**
-     * 生成锚点解析失败的错误信息。
+     * 生成锚点解析失败的错误信息。四分类 + 多命中歧义。
      * <p>
-     * 分四种情况，避免"未找到唯一"这种误导性措辞：
-     * <ul>
-     *   <li>指定 file，该文件没有，全局也没有 → 锚点不存在</li>
-     *   <li>指定 file，该文件没有，全局有 → 列出其他位置</li>
-     *   <li>未指定 file，全局没有 → 锚点不存在</li>
-     *   <li>未指定 file，全局多个 → 列出候选</li>
-     * </ul>
+     * 搜索范围受 workProject 约束：绑定项目时 findAllGlobally 只搜当前项目。
+     * fileHint 非空时，若该文件零命中但全局有结果，附"其他位置"清单，让模型一次纠正 file 参数。
      */
-    private String buildResolveError(String anchorId, String fileHint) {
-        List<AnchorLocation> all = anchorQuery.findAllGlobally(anchorId, workProject);
+    private String buildResolveError(String anchorId, String fileHint, List<AnchorLocation> candidates) {
+        boolean hasFileHint = fileHint != null && !fileHint.isBlank();
+        String scope = workProject == null
+                ? "沙箱全部项目"
+                : "当前工作项目 [" + workProject + "]";
 
-        // ===== 指定了 file =====
-        if (fileHint != null && !fileHint.isBlank()) {
-            if (all.isEmpty()) {
-                return "❌ 锚点不存在: " + anchorId + "\n"
-                        + "  已搜索文件 " + fileHint + " 和当前可搜索范围，均未找到。\n"
-                        + "  💡 请先 describe_anchors 确认锚点 id；\n"
-                        + "     注意：方法名/类名 ≠ 锚点 id，锚点 id 是源码中 @anchor 注释的值。";
-            }
+        // ===== 多命中：告知歧义，让模型提供更精确的路径 =====
+        if (candidates.size() > 1) {
             StringBuilder sb = new StringBuilder();
-            sb.append("❌ 文件 ").append(fileHint).append(" 中没有锚点: ")
-                    .append(anchorId).append("\n");
-            sb.append("  但该锚点在以下位置存在：\n");
-            for (AnchorLocation loc : all) {
+            if (hasFileHint) {
+                sb.append("❌ 文件 ").append(fileHint).append(" 中有 ")
+                        .append(candidates.size()).append(" 处匹配锚点 ")
+                        .append(anchorId).append("：\n");
+            } else {
+                sb.append("❌ 锚点 '").append(anchorId).append("' 在 ")
+                        .append(candidates.size()).append(" 个文件中出现：\n");
+            }
+            for (AnchorLocation loc : candidates) {
                 sb.append("   - ").append(loc.projectPath).append("/").append(loc.filePath)
                         .append(" (L").append(loc.line).append(")\n");
             }
-            sb.append("  💡 请检查 file 参数是否正确，或在上述位置之一查找。");
+            if (hasFileHint) {
+                sb.append("  💡 请提供更精确的 file 路径（含子目录）。");
+            } else {
+                sb.append("请在 file 参数中指定目标文件。\n");
+                sb.append("建议：后续避免跨文件使用相同锚点 ID。");
+            }
             return sb.toString();
         }
 
-        // ===== 未指定 file =====
-        if (all.isEmpty()) {
-            return "❌ 锚点不存在: " + anchorId + "\n"
-                    + "  💡 请先 describe_anchors 确认锚点 id；\n"
-                    + "     注意：方法名/类名 ≠ 锚点 id，锚点 id 是源码中 @anchor 注释的值。";
+        // ===== 零命中且指定了 file：查全局，区分"其他位置有"和"确实不存在" =====
+        if (hasFileHint) {
+            List<AnchorLocation> elsewhere = anchorQuery.findAllGlobally(anchorId, workProject);
+            if (!elsewhere.isEmpty()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("❌ 文件 ").append(fileHint).append(" 中没有锚点: ")
+                        .append(anchorId).append("\n");
+                sb.append("  但该锚点在以下位置存在：\n");
+                for (AnchorLocation loc : elsewhere) {
+                    sb.append("   - ").append(loc.projectPath).append("/").append(loc.filePath)
+                            .append(" (L").append(loc.line).append(")\n");
+                }
+                sb.append("  💡 请检查 file 参数是否正确，或在上述位置之一查找。");
+                return sb.toString();
+            }
         }
 
-        // 全局多个
+        // ===== 零命中且全局也没有 =====
         StringBuilder sb = new StringBuilder();
-        sb.append("❌ 锚点 '").append(anchorId).append("' 在 ")
-                .append(all.size()).append(" 个文件中出现：\n");
-        for (AnchorLocation loc : all) {
-            sb.append("   - ").append(loc.projectPath).append("/").append(loc.filePath)
-                    .append(" (L").append(loc.line).append(")\n");
+        sb.append("❌ 在").append(scope).append("中未找到锚点: ").append(anchorId).append("\n");
+        if (hasFileHint) {
+            sb.append("  已搜索文件 ").append(fileHint).append(" 和").append(scope).append("的全部文件。\n");
         }
-        sb.append("请在 file 参数中指定目标文件。\n");
-        sb.append("建议：后续避免跨文件使用相同锚点 ID。");
+        if (workProject != null) {
+            sb.append("  💡 锚点可能存在于其他项目，但当前会话只能操作工作项目 [")
+                    .append(workProject).append("]。\n");
+        }
+        sb.append("  💡 请先 describe_anchors 确认锚点 id；\n");
+        sb.append("     注意：方法名/类名 ≠ 锚点 id，锚点 id 是源码中 @anchor 注释的值。");
         return sb.toString();
     }
 
@@ -545,5 +556,32 @@ public class AnchorManager {
             return "❌ 只能修改工作项目 [" + workProject + "] 或 tmp/ 临时区，当前锚点属于: " + project;
         }
         return null;
+    }
+
+    // @anchor: anchorManager_resolveResult
+    // 锚点解析结果：成功时 location 非空，失败时 error 携带可读错误信息。
+    private record ResolveResult(AnchorLocation location, String error) {
+        static ResolveResult ok(AnchorLocation loc) { return new ResolveResult(loc, null); }
+        static ResolveResult fail(String error) { return new ResolveResult(null, error); }
+        boolean isOk() { return location != null; }
+    }
+
+    // @anchor: anchorManager_resolveOrError
+    // 解析锚点并直接携带错误信息：唯一命中返回成功；零命中/多命中返回可读错误。
+    private ResolveResult resolveOrError(String anchorId, String fileHint) {
+        List<AnchorLocation> candidates = resolveAnchorCandidates(anchorId, fileHint);
+        if (candidates.size() == 1) {
+            return ResolveResult.ok(candidates.get(0));
+        }
+        return ResolveResult.fail(buildResolveError(anchorId, fileHint, candidates));
+    }
+
+    // @anchor: anchorManager_resolveAnchorCandidates
+    // 获取锚点的全部候选位置。fileHint 非空时只看该文件（宽松匹配），否则全局。
+    private List<AnchorLocation> resolveAnchorCandidates(String anchorId, String fileHint) {
+        if (fileHint == null || fileHint.isBlank()) {
+            return anchorQuery.findAllGlobally(anchorId, workProject);
+        }
+        return anchorQuery.findAllInFile(anchorId, fileHint, workProject);
     }
 }

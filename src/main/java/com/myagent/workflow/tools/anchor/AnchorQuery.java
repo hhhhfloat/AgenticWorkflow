@@ -115,19 +115,26 @@ class AnchorQuery {
         return results;
     }
 
-    // @anchor: anchorQuery_findInFile
-    AnchorLocation findInFile(String anchorId, String fileHint, String workProject) {
+    // @anchor: anchorQuery_findAllInFile
+    // 按文件提示查找锚点的全部匹配位置。返回 0 个（未找到）、1 个（唯一）、多个（歧义）。
+    // fileHint 匹配口径：宽松（fullRel 精确 / filePath 精确 / 路径后缀），
+    // 并做 "./" 与反斜杠归一化（与 AnchorFormatter.normalizeHint 对齐）。
+    List<AnchorLocation> findAllInFile(String anchorId, String fileHint, String workProject) {
+        List<AnchorLocation> matches = new ArrayList<>();
+        if (fileHint == null || fileHint.isBlank()) return matches;
+
+        // 归一化：反斜杠统一为 /，去掉开头的 ./
+        String hint = fileHint.replace('\\', '/');
+        while (hint.startsWith("./")) hint = hint.substring(2);
+        if (hint.isBlank()) return matches;
+
         try {
             Path sandboxRoot = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
-            List<AnchorLocation> matches = new ArrayList<>();
-
             try (var stream = Files.list(sandboxRoot)) {
                 for (Path projectDir : (Iterable<Path>) stream::iterator) {
                     if (!Files.isDirectory(projectDir)) continue;
                     String projectName = projectDir.getFileName().toString();
                     if (projectName.startsWith(".")) continue;
-
-                    // 有 workProject 时，只查该项目；否则查所有项目
                     if (workProject != null && !workProject.equals(projectName)) continue;
 
                     Path indexFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
@@ -137,9 +144,10 @@ class AnchorQuery {
                         for (Map.Entry<String, List<Map<String, Object>>> fileEntry : projectAnchors.entrySet()) {
                             String filePath = fileEntry.getKey();
                             String fullRel = projectName + "/" + filePath;
-                            boolean fileMatches = fullRel.equals(fileHint)
-                                    || filePath.equals(fileHint)
-                                    || fullRel.endsWith("/" + fileHint);
+                            // 宽松匹配：完整相对路径 / 纯文件相对路径 / 路径后缀
+                            boolean fileMatches = fullRel.equals(hint)
+                                    || filePath.equals(hint)
+                                    || fullRel.endsWith("/" + hint);
                             if (!fileMatches) continue;
 
                             for (Map<String, Object> anchor : fileEntry.getValue()) {
@@ -153,7 +161,6 @@ class AnchorQuery {
                                     loc.preview = (String) anchor.get("preview");
                                     matches.add(loc);
                                 }
-
                             }
                         }
                     } catch (IOException e) {
@@ -161,14 +168,21 @@ class AnchorQuery {
                     }
                 }
             }
-            if (matches.size() > 1) {
-                logger.warn("锚点 {} 在 fileHint={} 下匹配到 {} 个位置，需更精确的路径",
-                        anchorId, fileHint, matches.size());
-            }
-            return matches.size() == 1 ? matches.get(0) : null;
         } catch (IOException e) {
             logger.error("按文件查找锚点失败", e);
-            return null;
         }
+        return matches;
+    }
+
+    // @anchor: anchorQuery_findInFile
+    // 保留原语义：唯一命中返回位置，否则 null。
+    // 多命中时打 warn（服务端可见），调用方需要区分零/多命中时用 findAllInFile。
+    AnchorLocation findInFile(String anchorId, String fileHint, String workProject) {
+        List<AnchorLocation> all = findAllInFile(anchorId, fileHint, workProject);
+        if (all.size() > 1) {
+            logger.warn("锚点 {} 在 fileHint={} 下匹配到 {} 个位置，需更精确的路径",
+                    anchorId, fileHint, all.size());
+        }
+        return all.size() == 1 ? all.get(0) : null;
     }
 }
