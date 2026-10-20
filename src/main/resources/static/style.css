@@ -1230,3 +1230,13 @@ html, body {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.65; }
 }
+
+/* 工具日志：等宽字体 + 保留空白 + 1MB 上限内不换行截断 */
+.log-entry.log-tool pre {
+    margin: 0;
+    font-family: monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-size: 0.85em;
+    line-height: 1.4;
+}

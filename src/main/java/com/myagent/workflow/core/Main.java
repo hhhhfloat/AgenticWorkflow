@@ -276,7 +276,7 @@ public class Main {
                         session.log("⚠️ 本轮重复工具调用，跳过执行 [" + functionName + "] 参数: "
                                 + ToolLogFormatter.formatArgs(argumentsJson));
                     } else {
-                        session.log("🤖 调用工具 [" + functionName + "] 参数: "
+                        session.log("[工具] 🤖 调用工具 [" + functionName + "] 参数: "
                                 + ToolLogFormatter.formatArgs(argumentsJson));
                         try {
                             Map<String, Object> args = objectMapper.readValue(argumentsJson, Map.class);
@@ -285,7 +285,7 @@ public class Main {
                         } catch (Exception e) {
                             result = "【工具执行失败】" + e.getClass().getSimpleName() + ": " + e.getMessage()
                                     + "\n请调整参数或换一种方式重试。";
-                            session.log("⚠️ 工具 [" + functionName + "] 异常:\n"
+                            session.log("[工具] ⚠️ 工具 [" + functionName + "] 异常:\n"
                                     + ToolLogFormatter.formatStackTrace(e));
                             logger.error("工具异常: {}", functionName, e);
                         } catch (Throwable t) {
@@ -293,7 +293,7 @@ public class Main {
                             // 这里兜底：打完整堆栈到日志，同时把简短信息回灌给模型
                             StringWriter sw = new StringWriter();
                             t.printStackTrace(new PrintWriter(sw));
-                            session.log("⚠️ 工具 [" + functionName + "] 致命异常（Error）:\n" + sw);
+                            session.log("[工具] ⚠️ 工具 [" + functionName + "] 致命异常（Error）:\n" + sw);
                             logger.error("工具致命异常: {}", functionName, t);
                             result = "【工具致命异常】" + t.getClass().getSimpleName() + ": " + t.getMessage()
                                     + "\n这是 JVM 级错误，非参数问题，请停止重试并告知用户。";

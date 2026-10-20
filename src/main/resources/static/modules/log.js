@@ -41,13 +41,19 @@ function updateScrollBottomBtn() {
 }
 
 // @anchor: log_append
-// 将消息按类型着色渲染到 #output，支持对话气泡与迭代提示
+// 工具日志前缀：与后端 Main.runInternal 的 "[工具] " 保持一致
+const TOOL_LOG_PREFIX = '[工具] ';
 
-// ===== 日志输出模块（整合迭代提示） =====
 function appendLog(msg) {
     const stick = isScrolledToBottom(output);
     let color = 'log-info';
+    let extraClass = '';
     if (msg.startsWith('[错误]')) color = 'log-error';
+    else if (msg.startsWith('[工具]')) {
+        // 工具日志统一蓝色：✅/❌ 已在内容里，颜色不再区分成功/失败
+        color = 'log-info';
+        extraClass = ' log-tool';
+    }
     else if (msg.startsWith('[完成]') || msg.includes('✅')) color = 'log-success';
     else if (msg.startsWith('[系统]')) color = 'log-system';
 
@@ -55,6 +61,11 @@ function appendLog(msg) {
 
     if (msg.startsWith('[系统]')) {
         renderedContent = escapeHtml(msg);
+    } else if (msg.startsWith(TOOL_LOG_PREFIX)) {
+        // 工具日志：代码/文本片段，可能含 HTML 注释、Markdown 特殊字符，
+        // 直接 <pre> + escapeHtml，不走 marked.parse
+        const body = msg.slice(TOOL_LOG_PREFIX.length);
+        renderedContent = `<pre>${escapeHtml(body)}</pre>`;
     } else if (msg.startsWith('📁 ') && (msg.includes('项') || msg.includes('内容'))) {
         renderedContent = `<pre style="margin:0; font-family:inherit; white-space:pre-wrap;">${escapeHtml(msg)}</pre>`;
     } else {
@@ -70,11 +81,9 @@ function appendLog(msg) {
         }
     }
 
-    // ⭐ 核心修复 1：使用 insertAdjacentHTML 替代 innerHTML +=
-    const line = `<div class="log-entry ${color}">${renderedContent}</div>`;
+    const line = `<div class="log-entry ${color}${extraClass}">${renderedContent}</div>`;
     output.insertAdjacentHTML('beforeend', line);
 
-    // ⭐ 核心修复 2：自动截断（根据你的块状场景，保留 1000 条足够）
     const MAX_LOGS = 1000;
     while (output.children.length > MAX_LOGS) {
         output.removeChild(output.firstChild);
