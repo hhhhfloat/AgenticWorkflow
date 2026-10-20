@@ -81,8 +81,7 @@ function bindRecoveryControls() {
             if (visible) {
                 popover.style.display = 'none';
             } else {
-                const msgEl = document.getElementById('recoveryErrorMsg');
-                if (msgEl) msgEl.textContent = err.message || '未知错误';
+                renderRecoveryPopover(err);
                 popover.style.display = 'block';
             }
         });
@@ -216,4 +215,44 @@ async function runResumeStream(sessionId) {
     } finally {
         if (desktopRunAbort === myAbort) desktopRunAbort = null;
     }
+}
+// @anchor: recovery_renderPopover
+// 把错误信息渲染到弹窗：message 一行 + 可选的可折叠完整堆栈
+function renderRecoveryPopover(err) {
+    const msgEl = document.getElementById('recoveryErrorMsg');
+    if (!msgEl) return;
+    msgEl.textContent = err.message || '未知错误';
+
+    // 清理上一次渲染的堆栈（弹窗可能反复打开）
+    const oldStack = document.getElementById('recoveryErrorStack');
+    if (oldStack) oldStack.remove();
+
+    if (!err.stack) return;
+
+    // 可折叠的完整堆栈：默认收起，避免长堆栈挤满弹窗
+    const details = document.createElement('details');
+    details.id = 'recoveryErrorStack';
+    details.style.marginTop = '8px';
+    details.style.fontSize = '0.85em';
+
+    const summary = document.createElement('summary');
+    summary.textContent = '▸ 显示完整堆栈';
+    summary.style.cursor = 'pointer';
+    details.appendChild(summary);
+
+    const pre = document.createElement('pre');
+    pre.textContent = err.stack;
+    pre.style.maxHeight = '320px';
+    pre.style.overflow = 'auto';
+    pre.style.fontSize = '0.75em';
+    pre.style.background = '#f5f5f5';
+    pre.style.padding = '8px';
+    pre.style.borderRadius = '4px';
+    pre.style.whiteSpace = 'pre-wrap';
+    pre.style.wordBreak = 'break-all';
+    pre.style.margin = '6px 0 0 0';
+    details.appendChild(pre);
+
+    // 插到 message 元素之后
+    msgEl.parentNode.insertBefore(details, msgEl.nextSibling);
 }

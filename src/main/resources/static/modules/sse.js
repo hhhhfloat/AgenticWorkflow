@@ -163,6 +163,7 @@ function handleSpecialEvent(data) {
                 savePendingError({
                     sessionId: obj.sessionId || getCurrentSessionId(),
                     message: obj.message || '任务异常中断',
+                    stack: obj.stack || null,
                     timestamp: Date.now()
                 });
             }

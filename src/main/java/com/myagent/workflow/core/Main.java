@@ -16,6 +16,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 
@@ -281,11 +283,20 @@ public class Main {
                             result = toolExecutor.dispatch(functionName, args);
                             if (result == null) result = "（工具返回 null）";
                         } catch (Exception e) {
-                            result = "【工具执行失败】" + e.getClass().getSimpleName()
-                                    + ": " + e.getMessage() + "\n请调整参数或换一种方式重试。";
+                            result = "【工具执行失败】" + e.getClass().getSimpleName() + ": " + e.getMessage()
+                                    + "\n请调整参数或换一种方式重试。";
                             session.log("⚠️ 工具 [" + functionName + "] 异常:\n"
                                     + ToolLogFormatter.formatStackTrace(e));
                             logger.error("工具异常: {}", functionName, e);
+                        } catch (Throwable t) {
+                            // NoClassDefFoundError 等 Error 不会被 catch (Exception) 捕获，
+                            // 这里兜底：打完整堆栈到日志，同时把简短信息回灌给模型
+                            StringWriter sw = new StringWriter();
+                            t.printStackTrace(new PrintWriter(sw));
+                            session.log("⚠️ 工具 [" + functionName + "] 致命异常（Error）:\n" + sw);
+                            logger.error("工具致命异常: {}", functionName, t);
+                            result = "【工具致命异常】" + t.getClass().getSimpleName() + ": " + t.getMessage()
+                                    + "\n这是 JVM 级错误，非参数问题，请停止重试并告知用户。";
                         }
                         roundCache.put(dedupKey, result);
                     }

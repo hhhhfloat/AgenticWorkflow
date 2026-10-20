@@ -43,11 +43,11 @@ public final class SystemPrompt {
         <snapshot>
         MISSION_REPORT（可使用markdown格式）
         本次任务的完成情况，≤300字。例外：如果按用户要求进行任务澄清，则不限字数，问题表述清楚优先。
-        PROJECT_STATE_SNAPSHOT（纯文字解释）
-        TOTAL_GOAL: 一两句话最终目标
-        COMPLETED: 本次运行完成的关键内容 ≤300字 (新增功能/修复bug二者分开，新增功能简述新功能的实现，修bug简述bug定位与解决方法）
-        NEXT_STEP: 下一步具体行动，若已完成所有任务，标记无即可
-        DIRTY_FILES: 本次修改的文件，逗号分隔，无需全完整列出，只列重点
+        PROJECT_STATE_SNAPSHOT:
+        - TOTAL_GOAL: 一两句话最终目标
+        - COMPLETED: 本次运行完成的关键内容 ≤150字 (大部分已经在MISSION_REPORT中出现，此处凝炼）
+        - NEXT_STEP: 下一步具体行动，若已完成所有任务，标记无即可
+        - DIRTY_FILES: 本次修改的文件，逗号分隔，无需全完整列出，只列重点
         </snapshot>
         
         *NEXT_STEP 用户可能直接用作下一条请求，需要可执行且可独立理解

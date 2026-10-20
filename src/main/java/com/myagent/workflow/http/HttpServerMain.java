@@ -94,6 +94,11 @@ public class HttpServerMain {
     // @anchor: httpServerMain_main
     // 服务主流程：校验 API Key、建运行时目录、初始化会话并启动 HTTP 服务
     public static void main(String[] args) throws IOException {
+
+        Thread.setDefaultUncaughtExceptionHandler((thread, t) -> {
+            System.err.println("💥 未捕获异常 [thread=" + thread.getName() + "]: " + t);
+            t.printStackTrace();
+        });
         // 1. 校验 API Key
         String apiKey = System.getenv("DEEPSEEK_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {

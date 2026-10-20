@@ -177,6 +177,7 @@ public class RunHandler implements HttpHandler {
 
         } catch (Throwable t) {
             System.err.println("⚠️ /run 建立 SSE 失败: " + t.getMessage());
+            t.printStackTrace();   // 新增：打到 stderr，配合 logback 输出
             if (sse != null) {
                 sse.abort(true, t.getMessage() != null ? t.getMessage() : t.getClass().getSimpleName());
             } else if (logWriter != null) {

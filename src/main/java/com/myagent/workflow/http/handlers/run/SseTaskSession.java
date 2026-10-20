@@ -13,6 +13,8 @@ import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -107,6 +109,10 @@ public class SseTaskSession {
                 result = executor.run(agent, maxIterations);
             } catch (Throwable t) {
                 error = t;
+                // 把完整堆栈推到 SSE 日志（不只是 message）
+                StringWriter sw = new StringWriter();
+                t.printStackTrace(new PrintWriter(sw));
+                logSink.offer("[系统] ⚠️ 任务异常，完整堆栈:\n" + sw);
             }
 
             try {
@@ -132,8 +138,14 @@ public class SseTaskSession {
                 if (error != null) {
                     String msg = error.getMessage() != null
                             ? error.getMessage() : error.getClass().getSimpleName();
-                    logSink.sendControl(jsonEvent("error",
-                            Map.of("message", msg, "sessionId", sessionId)));
+                    // 附完整堆栈：前端感叹号弹窗展示，跨刷新仍可见
+                    StringWriter sw = new StringWriter();
+                    error.printStackTrace(new PrintWriter(sw));
+                    Map<String, Object> fields = new LinkedHashMap<>();
+                    fields.put("message", msg);
+                    fields.put("stack", sw.toString());
+                    fields.put("sessionId", sessionId);
+                    logSink.sendControl(jsonEvent("error", fields));
                 } else {
                     logSink.sendControl(jsonEvent("done", Map.of("summary", result == null ? "" : result)));
                 }
