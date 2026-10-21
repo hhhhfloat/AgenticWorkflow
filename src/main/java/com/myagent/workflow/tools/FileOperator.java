@@ -85,7 +85,7 @@ public class FileOperator {
 
 
     // @anchor: fileOperator_readFile
-// 读取沙箱内文件内容
+    // 读取沙箱内文件内容
     public String readFile(String filename) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -105,7 +105,7 @@ public class FileOperator {
     }
 
     // @anchor: fileOperator_deleteFile
-// 删除沙箱内文件
+    // 删除沙箱内文件
     public String deleteFile(String filename) {
         try {
             Path filePath = PathUtils.safeResolve(filename);

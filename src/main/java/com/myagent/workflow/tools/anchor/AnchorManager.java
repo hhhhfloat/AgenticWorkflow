@@ -445,7 +445,7 @@ public class AnchorManager {
                         .append(anchorId).append("\n");
                 sb.append("  该文件中相似的锚点：\n");
                 for (AnchorLocation loc : similar) {
-                    sb.append("   - ").append(loc.id)
+                    sb.append("  ").append(loc.id)
                             .append(" (L").append(loc.line).append(")\n");
                 }
                 return sb.toString();

@@ -90,7 +90,7 @@ public class ToolExecutor {
         handlers.put("compile_and_run", a ->
                 compileRunner.run(a.getString("filename"),
                         a.getString("mode", "auto"),
-                        a.getBool("run", true)));
+                        a.getBool("run", false)));
 
         handlers.put("list_directory", a ->
                 fileOp.listDirectory(a.getString("path", "."),

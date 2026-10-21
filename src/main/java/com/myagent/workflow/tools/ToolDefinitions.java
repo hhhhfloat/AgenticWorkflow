@@ -29,10 +29,10 @@ public final class ToolDefinitions {
         List<Map<String, Object>> tools = new ArrayList<>();
 
         // @anchor: toolDef_listDirectory
-// 工具：list_directory 列出目录树
+        // 工具：list_directory 列出目录树
         tools.add(defineTool(
                 "list_directory",
-                "列出沙箱目录下指定路径的所有文件和子目录。如果 recursive 为 true，则递归列出所有层级（慎用，仅当项目较小时使用）。",
+                "列出沙箱目录下指定路径的所有文件和子目录。",
                 defineParams()
                         .prop("path", "string", "要列出的相对路径，例如 '.' 表示沙箱根目录。默认为 '.'。")
                         .prop("recursive", "boolean", "是否递归列出所有子目录内容。默认为 false。仅在需要全面了解项目结构时设为 true。")
@@ -41,35 +41,35 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_writeFile
-// 工具：write_file 写入/覆盖文件
+        // 工具：write_file 写入/覆盖文件
         tools.add(defineTool(
                 "write_file",
-                "将源代码（Java/HTML/CSS/JS/Python/C++）写入沙箱目录下的指定文件。如果文件已存在则覆盖。",
+                "将文本内容写入沙箱目录下的指定文件，文件已存在则覆盖。",
                 defineParams()
-                        .prop("filename", "string", "文件名，例如 Tool.java （必须包含 .java 后缀）")
-                        .prop("code", "string", "完整的 Java 源代码（包括 package 声明）")
+                        .prop("filename", "string", "文件相对沙箱根的路径，例如 'demo/src/Main.java' 或 'demo/style.css'。")
+                        .prop("code", "string", "完整的文件内容")
                         .build(),
                 List.of("filename", "code")
         ));
 
         // @anchor: toolDef_compileRun
-// 工具：compile_and_run 编译并运行代码
+        // 工具：compile_and_run 编译并运行代码
         tools.add(defineTool(
                 "compile_and_run",
-                "编译并运行文件。Agent 可根据需要仅编译不运行。",
+                "编译并运行文件。可根据需要仅编译不运行。",
                 defineParams()
-                        .prop("filename", "string", "文件名或项目相对路径")
-                        .prop("mode", "string", "编译模式：html / java / maven / cpp / python / node，默认 auto")
-                        .prop("run", "boolean", "是否在编译后立即运行，默认 true。设为 false 可仅编译不运行")
+                        .prop("filename", "string", "要编译的文件路径，相对沙箱根，例如 'demo/src/Main.java'。mode=maven 时也可以传项目目录（如 'demo'），其余模式必须是文件路径。")
+                        .prop("mode", "string", "编译模式：html / java / maven / cpp / python / node，不填则自动识别")
+                        .prop("run", "boolean", "是否在编译后立即运行。默认 false，仅编译不运行。")
                         .build(),
                 List.of("filename")
         ));
 
         // @anchor: toolDef_getFileStructure
-// 工具：get_file_structure 获取代码结构
+        // 工具：get_file_structure 获取代码结构
         tools.add(defineTool(
                 "get_file_structure",
-                "获取文件的代码结构信息（类、方法、字段、锚点等），帮助快速了解文件内容，而不需要读取整个文件。",
+                "获取代码文件的代码结构信息（类、方法、字段、锚点等），帮助快速了解文件内容，而不需要读取整个文件。代码结构支持 java, C++, Python, html, JavaScript, Css。其余返回 describe_anchors 结果",
                 defineParams()
                         .prop("filename", "string", "文件相对沙箱根的路径，例如 'project/src/Main.java'")
                         .build(),
@@ -77,126 +77,126 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_readFile
-// 工具：read_file 读取文件内容
+        // 工具：read_file 读取文件内容
         tools.add(defineTool(
                 "read_file",
-                "读取沙箱目录下指定文件的内容（文本格式），返回文件内容。支持 Java、HTML、TXT 等文本文件。读取大小限制为 50000 字符，超过则截断并提示。",
+                "返回沙箱目录下指定文本文件的内容（最多返回 50000 字符，超出截断并标记）。不支持目录、以 . 开头的路径；UPDATE.md 不支持整体读取，需改用 read_between_anchors。",
                 defineParams()
-                        .prop("filename", "string", "文件名（相对路径），例如 'calculator.html' 或 'src/Tool.java'。")
+                        .prop("filename", "string", "文件相对沙箱根的路径，例如 'demo/src/Main.java' 或 'demo/style.css'。")
                         .build(),
                 List.of("filename")
         ));
 
         // @anchor: toolDef_readBetweenAnchors
-// 工具：read_between_anchors 按锚点区间读取
+        // 工具：read_between_anchors 按锚点区间读取
         tools.add(defineTool(
                 "read_between_anchors",
                 "读取两个锚点之间的所有代码内容（包含锚点所在行）。用于精准读取特定代码块，避免读取整个文件。",
                 defineParams()
                         .prop("startAnchor", "string", "起始锚点 ID")
                         .prop("endAnchor", "string", "结束锚点 ID")
-                        .prop("file", "string", "锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
+                        .prop("file", "string", "锚点所在文件，相对沙箱根。支持三种形态：完整路径 'demo/src/Main.java'、不带项目名 'src/Main.java'、只写文件名 'Main.java'（匹配所有同名文件）。用于跨文件同名锚点消歧；锚点 ID 全局唯一时可省略。")
                         .build(),
                 List.of("startAnchor", "endAnchor")
         ));
 
         // @anchor: toolDef_deleteFile
-// 工具：delete_file 删除文件
+        // 工具：delete_file 删除文件
         tools.add(defineTool(
                 "delete_file",
                 "删除沙箱目录下的指定文件。请谨慎使用，确认该文件不再需要后再删除。",
                 defineParams()
-                        .prop("filename", "string", "要删除的文件相对路径，例如 'calculator.html' 或 'src/main/java/com/old/Class.java'。")
+                        .prop("filename", "string", "要删除的文件，相对沙箱根，例如 'demo/src/Old.java'。")
                         .build(),
                 List.of("filename")
         ));
 
         // @anchor: toolDef_searchText
-// 工具：search_text 全文检索
+        // 工具：search_text 全文检索
         tools.add(defineTool(
                 "search_text",
                 "在沙箱目录中搜索指定文本（支持正则表达式），返回匹配的文件路径、行号和内容预览。用于查找代码引用、定位函数调用等。结果限制最多 30 条，超出会提示缩小范围。",
                 defineParams()
                         .prop("keyword", "string", "要搜索的关键词（支持正则表达式，如 'parse\\('）")
                         .prop("file_pattern", "string", "文件匹配模式，如 '*.java'、'*.html'，默认为所有文本文件")
-                        .prop("path", "string", "搜索起始相对路径，默认为 '.'（沙箱根目录）")
+                        .prop("path", "string", "搜索起始路径，相对沙箱根。默认为 '.'（沙箱根目录，搜索全部项目）。")
                         .build(),
                 List.of("keyword")
         ));
 
         // @anchor: toolDef_buildAnchor
-// 工具：build_anchor_index 重建锚点索引
+        // 工具：build_anchor_index 重建锚点索引
         tools.add(defineTool(
                 "build_anchor_index",
                 "扫描指定项目目录下的所有文本文件，提取所有 @anchor 注释，重建该项目锚点索引文件（.anchors.json）。通常在修改代码后调用此工具更新索引。",
                 defineParams()
-                        .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
+                        .prop("project_path", "string", "项目名，相对沙箱根的一级目录，例如 'demo' 或 'cipher-translator'。")
                         .build(),
                 List.of("project_path")
         ));
 
 
         // @anchor: toolDef_insertAnchor
-// 工具：insert_at_anchor 在锚点处插入代码
+        // 工具：insert_at_anchor 在锚点处插入代码
         tools.add(defineTool(
                 "insert_at_anchor",
-                "在锚点位置插入代码。position 为 'before' 表示在锚点行之前插入，'after' 表示在锚点行之后插入。",
+                "在锚点对应方位插入代码，不会修改锚点自身",
                 defineParams()
                         .prop("anchor_id", "string", "锚点 ID")
                         .prop("content", "string", "要插入的代码内容")
-                        .prop("position", "string", "'before' 或 'after'，默认 'after'")
-                        .prop("file", "string", "锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
+                        .prop("position", "string", "'before' 或 'after'，不填则默认 'after'")
+                        .prop("file", "string", "锚点所在文件，相对沙箱根。支持三种形态：完整路径 'demo/src/Main.java'、不带项目名 'src/Main.java'、只写文件名 'Main.java'（匹配所有同名文件）。用于跨文件同名锚点消歧；锚点 ID 全局唯一时可省略。")
                         .build(),
                 List.of("anchor_id", "content")
         ));
 
         // @anchor: toolDef_deleteBetween
-// 工具：delete_between_anchors 删除锚点区间
+        // 工具：delete_between_anchors 删除锚点区间
         tools.add(defineTool(
                 "delete_between_anchors",
                 "删除从 startAnchor 所在行开始，到 endAnchor 所在行结束之间的所有内容（不包含锚点所在行）。删除后索引自动更新。常用于配合 insert_at_anchor 实现区间替换。",
                 defineParams()
                         .prop("startAnchor", "string", "起始锚点 ID")
                         .prop("endAnchor", "string", "结束锚点 ID")
-                        .prop("file", "string", "锚点所在文件的相对路径（如 'js/main.js'），用于跨文件同名锚点的消歧。若锚点 ID 唯一，可省略。")
+                        .prop("file", "string", "锚点所在文件，相对沙箱根。支持三种形态：完整路径 'demo/src/Main.java'、不带项目名 'src/Main.java'、只写文件名 'Main.java'（匹配所有同名文件）。用于跨文件同名锚点消歧；锚点 ID 全局唯一时可省略。")
                         .build(),
                 List.of("startAnchor", "endAnchor")
         ));
 
         // @anchor: toolDef_findReferences
-// 工具：find_references 查找符号引用
+        // 工具：find_references 查找符号引用
         tools.add(defineTool(
                 "find_references",
                 "全文匹配：查找符号在项目中的所有出现位置（含定义行、声明、字符串）。返回文件、行号和代码预览。偏向全面覆盖，可能包含非调用点。",
                 defineParams()
                         .prop("symbol", "string", "要查找的符号名称，如 'handleNumber'、'renderTimeline'")
-                        .prop("path", "string", "搜索起始相对路径，默认为项目根目录")
+                        .prop("path", "string", "搜索起始路径，相对沙箱根。默认为 '.'（沙箱根目录，搜索全部项目）。")
                         .prop("file_pattern", "string", "文件匹配模式，如 '*.js'，默认为所有代码文件")
                         .build(),
                 List.of("symbol")
         ));
 
         // @anchor: toolDef_findCallers
-// 工具：find_callers 查找调用者
+        // 工具：find_callers 查找调用者
         tools.add(defineTool(
                 "find_callers",
                 "调用形态匹配：查找函数被调用的位置，跳过定义、字符串、注释。识别 NAME( / NAME?.( / NAME.call( / NAME.apply(，并返回所在函数上下文。比 find_references 精准，但字符串内容与无括号回调可能被忽略，需要时可两个工具交叉使用。",
                 defineParams()
                         .prop("functionName", "string", "要查找的函数名称")
-                        .prop("path", "string", "搜索起始相对路径，默认为项目根目录")
+                        .prop("path", "string", "搜索起始路径，相对沙箱根。默认为 '.'（沙箱根目录，搜索全部项目）。")
                         .prop("file_pattern", "string", "文件匹配模式，如 '*.js'，默认为所有代码文件")
                         .build(),
                 List.of("functionName")
         ));
 
         // @anchor: toolDef_findCallees
-// 工具：find_callees 查找被调用者
+        // 工具：find_callees 查找被调用者
         tools.add(defineTool(
                 "find_callees",
                 "查找函数内部直接调用的所有其他函数。返回被调用函数名称、调用行号和上下文。用于理解函数依赖和重构评估。",
                 defineParams()
                         .prop("functionName", "string", "要分析的函数名称")
-                        .prop("path", "string", "搜索起始相对路径，默认为项目根目录")
+                        .prop("path", "string", "搜索起始路径，相对沙箱根。默认为 '.'（沙箱根目录，搜索全部项目）。")
                         .prop("recursive", "boolean", "是否递归分析被调用函数的内部调用，默认为 false")
                         .prop("depth", "integer", "当 recursive 为 true 时的分析深度，默认为 1")
                         .build(),
@@ -204,13 +204,13 @@ public final class ToolDefinitions {
         ));
 
         // @anchor: toolDef_describeAnchors
-// 工具：describe_anchors 列出锚点及其职责描述
+        // 工具：describe_anchors 列出锚点及其职责描述
         tools.add(defineTool(
                 "describe_anchors",
                 "返回锚点信息。file 支持逗号分隔多个片段。每个片段：先按文件匹配（精确或后缀），命中则列出该文件的全部锚点（含 _end，按行号升序）；未命中则按目录匹配，列出该目录下所有文件的 _intro 锚点描述（文件职责概览）；传 '.' 表示整个项目。",
                 defineParams()
-                        .prop("project_path", "string", "项目相对路径，如 'cipher-translator'。")
-                        .prop("file", "string", "必填。文件相对路径（逗号分隔多个文件）或目录路径（如 'src/main/java/game'）")
+                        .prop("project_path", "string", "项目名，相对沙箱根的一级目录，例如 'demo' 或 'cipher-translator'。")
+                        .prop("file", "string", "必填。文件路径（相对沙箱根，可逗号分隔多个）或目录路径（如 'src/main/java/game'）。传 '.' 表示整个项目。")
                         .build(),
                 List.of("project_path", "file")
         ));
