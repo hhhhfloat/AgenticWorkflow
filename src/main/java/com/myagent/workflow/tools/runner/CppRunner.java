@@ -1,8 +1,9 @@
 // @anchor: cppRunner_intro
-// C++ 编译运行：支持 MinGW 与 MSVC 两条编译链
+// C++ 编译运行：支持 MinGW / GCC / Clang 与 MSVC 编译链
 package com.myagent.workflow.tools.runner;
 
 import com.myagent.workflow.core.config.AgentConfig;
+import com.myagent.workflow.core.config.env.Platform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,7 +13,7 @@ import java.nio.file.Paths;
 import java.util.Map;
 
 // @anchor: cppRunner_class
-// C++ 运行器：编译为 .exe 后启动
+// C++ 运行器：编译为平台对应的可执行文件后启动
 public class CppRunner {
 
     private static final Logger logger = LoggerFactory.getLogger(CppRunner.class);
@@ -27,27 +28,41 @@ public class CppRunner {
     }
 
     // @anchor: cppRunner_compileAndRunCpp
-    // 编译并运行 C++ 源文件（MSVC/MinGW）
+    // 编译并运行 C++ 源文件（MinGW / GCC / Clang / MSVC）
     public String compileAndRunCpp(Path filePath, String filename, boolean run) {
         logger.info("🔧 compileAndRunCpp 被调用: filename={}, run={}, filePath={}", filename, run, filePath);
         try {
             String fileNameStr = filePath.getFileName().toString();
-            String exeName = fileNameStr.replaceFirst("\\.(cpp|cc|cxx)$", ".exe");
+            // Linux 产物无后缀，Windows 补 .exe
+            String exeName = fileNameStr.replaceFirst("\\.(cpp|cc|cxx)$",
+                    Platform.isWindows() ? ".exe" : "");
             Path exePath = filePath.getParent().resolve(exeName);
 
+            String type = config.cppCompilerType() == null ? "" : config.cppCompilerType().toLowerCase();
+            boolean gccLike = "mingw".equals(type) || "gcc".equals(type) || "clang".equals(type);
+
             ProcessBuilder compilePb;
-            if ("mingw".equalsIgnoreCase(config.cppCompilerType())) {
-                Path mingwBin = Paths.get(config.mingwCompiler()).getParent();
-                String pathEnv = mingwBin + File.pathSeparator + System.getenv("PATH");
+            if (gccLike) {
+                String compiler = config.mingwCompiler();
+                if (compiler == null || compiler.isBlank()) {
+                    return "❌ 未配置 C++ 编译器路径（env.mingwCompiler 为空）";
+                }
                 compilePb = new ProcessBuilder(
-                        config.mingwCompiler(), "-std=c++17",
+                        compiler, "-std=c++17",
                         "-o", exePath.toString(), filePath.toString());
                 compilePb.directory(filePath.getParent().toFile());
                 compilePb.redirectErrorStream(true);
-                compilePb.environment().put("PATH", pathEnv);
+                // MinGW 需要把 bin 目录塞进 PATH 找 DLL；Linux 的 g++/clang++ 无需
+                if ("mingw".equals(type)) {
+                    injectBinToPath(compilePb, compiler);
+                }
             } else {
+                String msvc = config.msvcCompiler();
+                if (msvc == null || msvc.isBlank()) {
+                    return "❌ 未配置 MSVC 编译器路径（env.msvcCompiler 为空）";
+                }
                 compilePb = new ProcessBuilder(
-                        config.msvcCompiler(), "/EHsc", "/std:c++17", "/utf-8", filePath.toString());
+                        msvc, "/EHsc", "/std:c++17", "/utf-8", filePath.toString());
                 compilePb.directory(filePath.getParent().toFile());
                 compilePb.redirectErrorStream(true);
                 Map<String, String> env = compilePb.environment();
@@ -71,9 +86,8 @@ public class CppRunner {
             ProcessBuilder runPb = new ProcessBuilder(exePath.toString());
             runPb.directory(filePath.getParent().toFile());
             runPb.redirectErrorStream(true);
-            if ("mingw".equalsIgnoreCase(config.cppCompilerType())) {
-                Path mingwBin = Paths.get(config.mingwCompiler()).getParent();
-                runPb.environment().put("PATH", mingwBin + File.pathSeparator + System.getenv("PATH"));
+            if ("mingw".equals(type)) {
+                injectBinToPath(runPb, config.mingwCompiler());
             }
 
             ProcessRunner.ProcessResult runResult = processRunner.executeProcess(runPb, 30, true);
@@ -97,5 +111,16 @@ public class CppRunner {
         } catch (Exception e) {
             return "❌ C++ 执行异常: " + e.getMessage();
         }
+    }
+
+    // @anchor: cppRunner_injectBinToPath
+    // 将编译器所在 bin 目录加入子进程 PATH（MinGW 运行时找 DLL 用）
+    private static void injectBinToPath(ProcessBuilder pb, String compiler) {
+        if (compiler == null || compiler.isBlank()) return;
+        Path bin = Paths.get(compiler).getParent();
+        if (bin == null) return;
+        String old = pb.environment().get("PATH");
+        String sep = File.pathSeparator;
+        pb.environment().put("PATH", bin + sep + (old == null ? "" : old));
     }
 }
