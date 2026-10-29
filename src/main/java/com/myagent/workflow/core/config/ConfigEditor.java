@@ -128,13 +128,14 @@ public class ConfigEditor {
     }
 
     // @anchor: configEditor_safeCppType
-    // cppCompilerType 只允许 "mingw" / "msvc"，其余回退默认
+    // cppCompilerType 允许 mingw / msvc / gcc / clang，其余回退默认
     private static String safeCppType(JsonNode cfg, String baseValue) {
         if (!cfg.has("cppCompilerType") || cfg.get("cppCompilerType").isNull()) {
             return baseValue;
         }
         String v = cfg.get("cppCompilerType").asText().trim().toLowerCase();
-        if ("mingw".equals(v) || "msvc".equals(v)) {
+        if ("mingw".equals(v) || "msvc".equals(v) 
+                || "gcc".equals(v) || "clang".equals(v)) { // 必须有 gcc 和 clang
             return v;
         }
         return baseValue;

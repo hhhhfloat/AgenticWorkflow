@@ -123,8 +123,9 @@ public class MavenRunner {
         }
 
         Path classpath = projectDir.resolve("target/classes");
+        String javaCmd = resolveJavaTool("java"); // <--- 改这里
         ProcessBuilder runPb = new ProcessBuilder(
-                "java",
+                javaCmd,
                 "-Dstdout.encoding=UTF-8",
                 "-Dstderr.encoding=UTF-8",
                 "-Dfile.encoding=UTF-8",
@@ -148,6 +149,18 @@ public class MavenRunner {
                     "编译输出:\n" + compileOutput + "\n运行输出:\n" + result.output();
         }
         return "✅ Maven 编译运行成功！\n编译输出:\n" + compileOutput + "\n运行输出:\n" + result.output();
+    }
+
+    // @anchor: mavenRunner_resolveJavaTool
+    // 优先使用 config.javaHome() 下的可执行文件，回退到 PATH
+    private String resolveJavaTool(String tool) {
+        String home = config.javaHome();
+        if (home != null && !home.isBlank()) {
+            boolean win = System.getProperty("os.name").toLowerCase().contains("win");
+            Path p = Paths.get(home, "bin", win ? tool + ".exe" : tool);
+            if (Files.isRegularFile(p)) return p.toString();
+        }
+        return tool;
     }
 
     // @anchor: mavenRunner_findMainClass

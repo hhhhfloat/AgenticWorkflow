@@ -158,17 +158,19 @@
                         <label>C++ 编译器类型</label>
                         <select id="setCppCompilerType">
                             <option value="">（自动探测）</option>
-                            <option value="msvc">MSVC</option>
                             <option value="mingw">MinGW</option>
+                            <option value="msvc">MSVC</option>
+                            <option value="gcc">GCC (Linux)</option>
+                            <option value="clang">Clang (Linux/macOS)</option>
                         </select>
                     </div>
                     <div class="setting-row">
-                        <label>MSVC 编译器路径</label>
-                        <input type="text" id="setMsvcCompiler" placeholder="cl.exe 路径">
+                        <label>MSVC 编译器路径 (Windows)</label>
+                        <input type="text" id="setMsvcCompiler" placeholder="留空自动探测 (cl.exe 路径)">
                     </div>
                     <div class="setting-row">
-                        <label>MinGW 编译器路径</label>
-                        <input type="text" id="setMingwCompiler" placeholder="g++.exe 路径">
+                        <label>C++ 编译器路径 (GCC/MinGW)</label>
+                        <input type="text" id="setMingwCompiler" placeholder="留空自动探测 (/usr/bin/g++ 或 g++.exe)">
                     </div>
                     <div class="setting-row">
                         <label>🛡️ 安全扫描</label>

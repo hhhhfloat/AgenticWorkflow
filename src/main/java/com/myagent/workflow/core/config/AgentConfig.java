@@ -3,6 +3,7 @@
 package com.myagent.workflow.core.config;
 
 import com.myagent.workflow.core.config.env.EnvDetector;
+import com.myagent.workflow.core.config.env.Platform;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -50,7 +51,7 @@ public record AgentConfig(
     // ===== 默认值（配置文件缺失时兜底；机器相关路径一律留空） =====
     private static final String  DEFAULT_MODEL               = MODEL_FLASH;
     private static final boolean DEFAULT_AUTO_OPEN_BROWSER   = false;
-    private static final String  DEFAULT_CPP_TYPE            = "mingw";
+    private static final String  DEFAULT_CPP_TYPE            = Platform.isWindows() ? "mingw" : "gcc";
     private static final boolean DEFAULT_SECURITY_SCAN       = true;
     private static final int     DEFAULT_MAX_ITERATIONS      = 100;
 

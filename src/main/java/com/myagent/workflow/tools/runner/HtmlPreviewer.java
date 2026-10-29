@@ -4,7 +4,6 @@ package com.myagent.workflow.tools.runner;
 
 import com.myagent.workflow.core.config.AgentConfig;
 
-import java.awt.Desktop;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,11 +35,30 @@ public class HtmlPreviewer {
         }
         String url = "/sandbox/" + relativePath;
 
-        if (autoOpenBrowser && Desktop.isDesktopSupported()) {
-            Desktop.getDesktop().browse(filePath.toFile().toURI());
-            return "✅ 已在浏览器中打开 " + filename + "\n🔗 访问地址: " + url;
-        } else {
-            return "✅ 预览就绪，请手动访问: " + url;
+        if (autoOpenBrowser) {
+            try {
+                openPath(filePath.toString());
+                return "✅ 已在浏览器中打开 " + filename + "\n🔗 访问地址: " + url;
+            } catch (Exception e) {
+                return "✅ 预览就绪，请手动访问: " + url + "（自动打开失败：" + e.getMessage() + "）";
+            }
         }
+        return "✅ 预览就绪，请手动访问: " + url;
+    }
+
+    // @anchor: htmlPreviewer_openPath
+    // 根据平台调用系统命令打开文件
+    private void openPath(String path) throws IOException {
+        String os = System.getProperty("os.name", "").toLowerCase();
+        ProcessBuilder pb;
+        if (os.contains("win")) {
+            pb = new ProcessBuilder("cmd", "/c", "start", "", path);
+        } else if (os.contains("mac")) {
+            pb = new ProcessBuilder("open", path);
+        } else {
+            pb = new ProcessBuilder("xdg-open", path);
+        }
+        pb.redirectErrorStream(true);
+        pb.start();
     }
 }

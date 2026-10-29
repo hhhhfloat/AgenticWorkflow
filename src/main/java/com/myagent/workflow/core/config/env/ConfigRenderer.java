@@ -40,7 +40,8 @@ public final class ConfigRenderer {
         sb.append("env.pythonInterpreter=").append(esc(env.get("pythonInterpreter"))).append('\n');
         sb.append("env.nodeInterpreter=").append(esc(env.get("nodeInterpreter"))).append('\n');
         sb.append('\n');
-        sb.append("env.cppCompilerType=").append(env.get("cppCompilerType")).append('\n');
+        sb.append("env.cppCompilerType=").append(esc(env.get("cppCompilerType"))).append('\n');
+        sb.append("# 通用 C++ 编译器路径（Windows 填 g++.exe，Linux 填 /usr/bin/g++ 或 /usr/bin/clang++）\n");
         sb.append("env.mingwCompiler=").append(esc(env.get("mingwCompiler"))).append('\n');
         sb.append("env.msvcCompiler=").append(esc(env.get("msvcCompiler"))).append('\n');
         sb.append("env.msvcInclude=").append(esc(env.get("msvcInclude"))).append('\n');

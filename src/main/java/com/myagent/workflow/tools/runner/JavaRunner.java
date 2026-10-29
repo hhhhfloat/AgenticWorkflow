@@ -11,8 +11,8 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 // @anchor: javaRunner_class
 // Java 单文件运行器：编译到 classes/ 后从 classpath 启动
@@ -21,30 +21,32 @@ public class JavaRunner {
     private static final Logger logger = LoggerFactory.getLogger(JavaRunner.class);
     private static final Charset PROCESS_CHARSET = StandardCharsets.UTF_8;
 
+    private final AgentConfig config;
     private final ProcessRunner processRunner;
 
     // @anchor: javaRunner_constructor
     public JavaRunner(AgentConfig config, ProcessRunner processRunner) {
+        this.config = config;
         this.processRunner = processRunner;
     }
 
     // @anchor: javaRunner_compileJava
-// 编译并运行单个 Java 文件
+    // 编译并运行单个 Java 文件
     public String compileJava(Path filePath, String filename, boolean run) {
         try {
             Path projectDir = filePath.getParent();
             Path classesDir = projectDir.resolve("classes");
             Files.createDirectories(classesDir);
 
+            String javacCmd = resolveJavaTool("javac");
             ProcessBuilder compilePb = new ProcessBuilder(
-                    "javac",
+                    javacCmd,
                     "-J-Dstdout.encoding=UTF-8",
                     "-J-Dstderr.encoding=UTF-8",
                     "-encoding", "UTF-8",
                     "-d", classesDir.toString(), filePath.toString());
             compilePb.directory(projectDir.toFile());
 
-            // A7：改走 ProcessRunner，异步 drain 输出，避免 waitFor + readAllBytes 死锁
             ProcessRunner.ProcessResult compileResult = processRunner.executeProcess(compilePb, 60, false);
             String compileOutput = compileResult.output();
             if (compileResult.timedOut()) {
@@ -59,8 +61,9 @@ public class JavaRunner {
             }
 
             String className = resolveClassName(filePath);
+            String javaCmd = resolveJavaTool("java");
             ProcessBuilder runPb = new ProcessBuilder(
-                "java",
+                javaCmd,
                 "-Dstdout.encoding=UTF-8",
                 "-Dstderr.encoding=UTF-8",
                 "-Dfile.encoding=UTF-8",
@@ -105,5 +108,17 @@ public class JavaRunner {
             break;
         }
         return baseName;
+    }
+
+    // @anchor: javaRunner_resolveJavaTool
+    // 优先使用 config.javaHome() 下的可执行文件，回退到 PATH
+    private String resolveJavaTool(String tool) {
+        String home = config.javaHome();
+        if (home != null && !home.isBlank()) {
+            boolean win = System.getProperty("os.name").toLowerCase().contains("win");
+            Path p = Paths.get(home, "bin", win ? tool + ".exe" : tool);
+            if (Files.isRegularFile(p)) return p.toString();
+        }
+        return tool;
     }
 }

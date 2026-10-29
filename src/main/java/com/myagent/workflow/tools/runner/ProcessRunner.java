@@ -4,6 +4,7 @@ package com.myagent.workflow.tools.runner;
 
 import com.myagent.workflow.core.ProcessRegistry;
 import com.myagent.workflow.core.config.AgentConfig;
+import com.myagent.workflow.core.config.env.Platform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,16 +32,31 @@ public class ProcessRunner {
         this.sandboxDir = AgentConfig.getSandboxDir();
     }
 
-    // @anchor: processRunner_killTree
-    // 递归杀掉进程及其全部后代（Windows 上 mvn.cmd 会启动 java，只杀父进程不管用）
+        // @anchor: processRunner_killTree
+    // 递归杀掉进程及其全部后代（Linux 下利用进程组彻底清理孤儿进程）
     public static void killTree(Process p) {
         if (p == null) return;
+        long pid = p.pid();
+        
+        // 1. 跨平台：尝试正常杀子进程和父进程
         try {
             p.descendants().forEach(ph -> {
                 try { ph.destroyForcibly(); } catch (Exception ignored) {}
             });
         } catch (Exception ignored) {}
         try { p.destroyForcibly(); } catch (Exception ignored) {}
+
+        // 2. Linux 专属：由于启动时加了 setsid，pid 即进程组 PGID
+        // 发送 SIGKILL 给整个进程组，能彻底清掉那些被 init 领养的孤儿进程
+        if (!Platform.isWindows()) {
+            try {
+                // 注意：负号 "-" + pid 表示杀整个进程组
+                Process killPb = new ProcessBuilder("kill", "-9", "-" + pid).start();
+                killPb.waitFor();
+            } catch (Exception e) {
+                logger.warn("Linux 进程组清理失败: {}", e.getMessage());
+            }
+        }
     }
 
     // @anchor: processRunner_executeProcess
@@ -66,6 +82,16 @@ public class ProcessRunner {
         } catch (IOException e) {
             logger.error("❌ 安全加固设置失败: {}", e.getMessage(), e);
             return new ProcessResult("安全加固异常: " + e.getMessage(), -1, false, false);
+        }
+
+        // ========== Linux 专属：setsid 启动 ==========
+        if (!com.myagent.workflow.core.config.env.Platform.isWindows()) {
+            java.util.List<String> cmd = new java.util.ArrayList<>(pb.command());
+            if (!cmd.isEmpty() && !"setsid".equals(cmd.get(0))) {
+                cmd.add(0, "setsid");
+                cmd.add(1, "-w");
+                pb.command(cmd);
+            }
         }
 
         logger.info("🚀 启动进程: command={}, directory={}", pb.command(), pb.directory());

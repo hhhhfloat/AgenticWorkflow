@@ -18,15 +18,21 @@ public final class EnvDetector {
     public static final String CONFIG_FILE_NAME = "agent-config.properties";
 
     // @anchor: envDetector_probes
-    // 探测顺序：与旧实现的 Map 写入顺序保持一致
-    private static final List<Probe> PROBES = List.of(
+    // 探测顺序按平台分派：Windows 保留 MinGW/MSVC，Linux 用 GccProbe
+    private static final List<Probe> PROBES = Platform.isWindows()
+            ? List.of(
             new JavaHomeProbe(),
             new MavenProbe(),
             new PythonProbe(),
             new NodeProbe(),
             new MinGwProbe(),
-            new MsvcProbe()
-    );
+            new MsvcProbe())
+            : List.of(
+            new JavaHomeProbe(),
+            new MavenProbe(),
+            new PythonProbe(),
+            new NodeProbe(),
+            new GccProbe());
 
     private EnvDetector() {}
 
@@ -70,9 +76,9 @@ public final class EnvDetector {
         String mingw = m.getOrDefault("mingwCompiler", "");
         String msvc  = m.getOrDefault("msvcCompiler", "");
         String cppType;
-        if (!mingw.isEmpty())     cppType = "mingw";
+        if (!mingw.isEmpty())     cppType = Platform.isWindows() ? "mingw" : "gcc";
         else if (!msvc.isEmpty()) cppType = "msvc";
-        else                      cppType = "mingw";
+        else                      cppType = Platform.isWindows() ? "mingw" : "gcc";
         m.put("cppCompilerType", cppType);
         return m;
     }
