@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+
+# 加载环境变量（确保 API Key 和 JAVA_HOME 被读取）
+[ -f ~/.bashrc ] && source ~/.bashrc
+
 set -euo pipefail
 
 # ===== 解析参数 =====
