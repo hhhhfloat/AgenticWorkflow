@@ -215,7 +215,7 @@ public class HistoryRecorder {
     }
 
     // @anchor: historyRecorder_readRecovery
-// 读 recovery 快照；旧格式或文件损坏时返回 null
+    // 读 recovery 快照；旧格式或文件损坏时返回 null
     public synchronized RecoverySnapshot readRecovery() {
         if (!Files.exists(recoveryFile)) return null;
         try {

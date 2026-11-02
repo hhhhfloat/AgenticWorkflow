@@ -27,7 +27,7 @@ public class FileOperator {
 
     // ===== 工具方法 =====
     // @anchor: fileOperator_writeFile
-// 写入或覆盖沙箱内文件
+    // 写入或覆盖沙箱内文件
     public String writeFile(String filename, String code) {
         try {
             Path filePath = PathUtils.safeResolve(filename);
@@ -36,7 +36,11 @@ public class FileOperator {
             return "✅ " + filename;
         } catch (Exception e) {
             logger.error("写入文件失败", e);
-            return "写入文件失败: " + e.getMessage();
+            String msg = e.getMessage();
+            if (msg == null) {
+                msg = e.getClass().getSimpleName(); // 至少能显示 NullPointerException
+            }
+            return "写入文件失败: " + msg;
         }
     }
 
@@ -62,7 +66,7 @@ public class FileOperator {
         }
     }
 
-// @anchor: fileOperator_writeLinesAtomic
+    // @anchor: fileOperator_writeLinesAtomic
     /**
      * 原子写入行列表，行为与 Files.write(path, lines) 一致。
      */

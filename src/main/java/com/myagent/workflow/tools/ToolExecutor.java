@@ -82,8 +82,14 @@ public class ToolExecutor {
     private void registerHandlers() {
         handlers.put("write_file", a -> {
             String filename = a.getString("filename");
-            String result = fileOp.writeFile(filename, a.getString("code"));
-            if (result != null) anchorMgr.markDirtyByFilename(filename);
+            String code = a.getString("code");
+            if (code == null) {
+                return "❌ 参数错误：缺少 'code' 字段或内容为空。请检查你的 JSON 格式。";
+            }
+            String result = fileOp.writeFile(filename, code);
+            if (result != null && result.startsWith("✅")) {
+                anchorMgr.markDirtyByFilename(filename);
+            }
             return result;
         });
 
@@ -125,7 +131,13 @@ public class ToolExecutor {
                 anchorMgr.deleteBetweenAnchors(a.getString("startAnchor"),
                         a.getString("endAnchor"),
                         a.getString("file")));
-
+        handlers.put("edit_between_anchors", a ->
+                anchorMgr.editBetweenAnchors(
+                        a.getString("startAnchor"),
+                        a.getString("endAnchor"),
+                        a.getString("file"),
+                        a.getString("old_string"),
+                        a.getString("new_string")));
         handlers.put("describe_anchors", a ->
                 anchorMgr.describeAnchors(a.getString("project_path"),
                         a.getString("file")));
