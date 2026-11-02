@@ -2,14 +2,12 @@
 // 锚点描述输出：项目/目录/文件的锚点清单渲染
 package com.myagent.workflow.tools.anchor;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.tools.PathUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;

@@ -198,10 +198,10 @@ public class Main {
 
             try{
                 String wp = session.getWorkProject();
-                if(wp != null && !wp.isBlank()){
-                    toolExecutor.rebuildCurrentProjectIndex(wp);
+                if (wp != null && !wp.isBlank()) {
+                    toolExecutor.refreshSessionProjectIndexes(wp, true);   // 启动时强制重建 wp，tmp 按需
                 } else {
-                    toolExecutor.refreshAllProjectIndexes();
+                    toolExecutor.refreshAllProjectIndexes();               // 未绑定：保持全量兜底
                 }
             } catch (Exception e){
                 logger.warn("任务启动前刷新项目索引失败", e);
@@ -349,7 +349,12 @@ public class Main {
             }
 
             try {
-                toolExecutor.refreshAllProjectIndexes();
+                String wp = session.getWorkProject();
+                if (wp != null && !wp.isBlank()) {
+                    toolExecutor.refreshSessionProjectIndexes(wp, false);  // 结束时按需检查
+                } else {
+                    toolExecutor.refreshAllProjectIndexes();
+                }
             } catch (Exception e) {
                 logger.warn("刷新项目索引失败", e);
             }

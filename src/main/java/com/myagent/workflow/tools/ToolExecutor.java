@@ -226,6 +226,34 @@ public class ToolExecutor {
         }
     }
 
+    // @anchor: toolExecutor_refreshSessionProjectIndexes
+    // 只刷新会话相关项目的锚点索引（workProject + tmp），避免全沙箱遍历。
+    // forceWorkProject=true 时强制重建 workProject（不看 isProjectFresh），用于运行开始时确保最新。
+    public void refreshSessionProjectIndexes(String workProject, boolean forceWorkProject) {
+        Set<String> targets = new LinkedHashSet<>();
+        if (workProject != null && !workProject.isBlank()) {
+            targets.add(workProject);
+        }
+        targets.add("tmp");   // tmp 是公共临时区，任何会话都可能在用
+
+        for (String name : targets) {
+            try {
+                Path projectDir = Paths.get(AgentConfig.getSandboxDir())
+                        .resolve(name).toAbsolutePath().normalize();
+                if (!Files.isDirectory(projectDir)) continue;
+                Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
+                if (!Files.exists(anchorsFile)) continue;
+
+                boolean shouldRebuild = (forceWorkProject && name.equals(workProject))
+                        || !anchorMgr.isProjectFresh(name);
+                if (!shouldRebuild) continue;
+                anchorMgr.rebuildProjectIndex(name);
+            } catch (Exception e) {
+                logger.warn("刷新项目索引失败: {} - {}", name, e.getMessage());
+            }
+        }
+    }
+
     /**
      * 由 Main 在一轮工具调用结束后触发，批量刷新锚点索引。
      */

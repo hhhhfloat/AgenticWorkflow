@@ -4,9 +4,6 @@ package com.myagent.workflow.parser;
 
 import com.myagent.workflow.model.*;
 
-import java.util.List;
-import java.util.stream.Collectors;
-
 /**
  * 将 FileStructure 转换为精简文本格式，减少 Agent 接收的冗余信息
  */

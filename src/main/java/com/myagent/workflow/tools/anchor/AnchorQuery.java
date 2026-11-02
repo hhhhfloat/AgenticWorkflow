@@ -2,7 +2,6 @@
 // 锚点查询：按 id、文件或全局定位锚点位置
 package com.myagent.workflow.tools.anchor;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.config.AgentConfig;
 import com.myagent.workflow.model.AnchorLocation;
