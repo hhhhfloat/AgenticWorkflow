@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agentic Workflow v5.0 · 使用说明</title>
+    <title>Agentic Workflow v5.x · 使用说明</title>
     <style>
         * {
             margin: 0;
@@ -182,18 +182,19 @@
     <h1>⚙️ Agentic Workflow</h1>
     <div class="subtitle">
         基于 DeepSeek API 的本地 AI 编程助手<br>
-        用自然语言描述需求，Agent 自动拆解并执行完整项目任务
+        用自然语言描述需求，Agent 自动拆解并执行项目任务
     </div>
 
     <h2>📌 环境要求</h2>
     <ul>
-        <li>跨平台支持（Windows / macOS / Linux）</li>
-        <li>需要安装 <strong>Java 21 或更高版本</strong>（必须 21+）</li>
+        <li>跨平台支持（Windows / Linux）</li>
+        <li>需要安装 <strong>Java 21 或更高版本</strong></li>
         <li>可下载：
             <a href="https://www.oracle.com/java/technologies/downloads/" target="_blank">Oracle JDK</a>
             或 <a href="https://adoptium.net/" target="_blank">Eclipse Temurin</a>
         </li>
         <li>安装后，在命令行输入 <code>java -version</code> 能正常输出版本信息即可</li>
+        <li>如果显示找不到命令，问问 AI 如何配环境变量</li>
     </ul>
 
     <h2>🚀 如何使用？</h2>
@@ -207,17 +208,24 @@
     <h2>📝 v5.x 更新</h2>
     <ul>
         <li><strong>会话</strong>：单场会话中，可连续对话，且上下文不膨胀</li>
-        <li><strong>锚点</strong>：锚点增量，除展示锚点名称外，以注释形式agent自维护description</li>
+        <li><strong>锚点</strong>：锚点增量，附带注释形式agent自维护description；新增edit_between_anchors工具</li>
         <li><strong>手机</strong>：增加了手机界面与tailscale连接</li>
         <li><strong>前端</strong>：可带高亮预览代码文件与图片，锚点为目录</li>
         <li><strong>异常</strong>：对异常导致的运行中断给出“继续运行”功能，复用上下文</li>
+        <li><strong>兼容</strong>：简单兼容了Linux</li>
         <li><strong>bug</strong>：各种各样的bug都修</li>
     </ul>
 
-    <h2>附：上下文解析器</h2>
+    <h2>附：附带工具</h2>
+    <h3>全量上下文解析器</h3>
     <ul>
         <li><strong>网址：</strong>https://github.com/hhhhfloat/DA-context-parser</li>
         <li><strong>使用：</strong>在 <code>HistoryOutput/</code> 对应会话下将对应的压缩文件拖入即可解析</li>
+    </ul>
+    <h3>黑箱工具测试</h3>
+    <ul>
+        <li><strong>网址：</strong>https://github.com/hhhhfloat/tools-lab</li>
+        <li><strong>使用：</strong>不是给人用的。在会话中要求agent使用该项目对工具进行黑箱测试。</li>
     </ul>
 
     <h2>📂 新版文件目录说明</h2>
@@ -249,8 +257,8 @@
     <hr>
 
     <div class="footer-meta">
-        <span>📌 版本 <span class="version-tag">v5.0</span></span>
-        <span style="color:#8b949e;">Made with DeepSeek · 整个项目由架构设计 + AI 逐步实现</span>
+        <span>📌 版本 <span class="version-tag">v5.x</span></span>
+        <span style="color:#8b949e;">Made with DeepSeek · 整个项目通过自主设计 + 古法AI制作</span>
     </div>
 </div>
 </body>
