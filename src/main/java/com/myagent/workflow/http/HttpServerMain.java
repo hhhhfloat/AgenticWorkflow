@@ -216,6 +216,7 @@ public class HttpServerMain {
         reg(server, "/upload", new UploadHandler(), true);
         reg(server, "/createProject", new CreateProjectHandler(), true);
         reg(server, "/openFolder", new OpenFolderHandler(), true);
+        reg(server, "/openTerminal", new OpenTerminalHandler(), true); 
         reg(server, "/scan-files", new ScanFilesHandler(), false);
         reg(server, "/tool", new ToolHandler(), true);
 

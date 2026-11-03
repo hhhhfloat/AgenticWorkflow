@@ -16,6 +16,10 @@ function addActionButtons(label, path, isRoot) {
             onClick: async () => { await openFolder('sandbox'); }
         });
         items.push({
+            icon: '>_', label: '在此打开终端',          // ← 新增
+            onClick: async () => { await openTerminal('sandbox'); }
+        });
+        items.push({
             icon: '➕', label: '创建新项目',
             onClick: async () => {
                 const projectName = prompt('请输入新项目名称（仅允许字母、数字、- 和 _）：');
@@ -42,6 +46,10 @@ function addActionButtons(label, path, isRoot) {
                     appendLog('[系统] ❌ runner.js 未加载');
                 }
             }
+        });
+        items.push({
+            icon: '>_', label: '在此打开终端',          // ← 新增
+            onClick: async () => { await openTerminal('sandbox/' + projectName); }
         });
         items.push({
             icon: '📦', label: '归档到 TestProjects',

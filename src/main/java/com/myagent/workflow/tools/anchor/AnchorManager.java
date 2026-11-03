@@ -371,7 +371,11 @@ public class AnchorManager {
         // === 2. 权限与一致性校验（严格） ===
         String permErr = checkWorkProjectPermission(startLoc);
         if (permErr != null) return permErr;
-
+        // UPDATE.md 检查：edit 也属于修改既有内容，必须拦住
+        if (startLoc.filePath != null && startLoc.filePath.toLowerCase().endsWith("update.md")) {
+            return "❌ UPDATE.md 只允许追加，不允许修改既有内容。\n" +
+                    "  如需修正记录，请用 insert_at_anchor 在末尾锚点之前插入新记录。";
+        }
         if (!startLoc.projectPath.equals(endLoc.projectPath)) {
             return "❌ 两个锚点不在同一个项目中";
         }
@@ -382,7 +386,7 @@ public class AnchorManager {
             return "❌ 起始锚点必须在结束锚点之前（行 " + startLoc.line + " >= 行 " + endLoc.line + "）\n" +
                 "  💡 检查是否把 startAnchor 和 endAnchor 传反了。";
         }
-
+        
         try {
             Path filePath = PathUtils.safeResolve(startLoc.projectPath, startLoc.filePath);
             if (!Files.exists(filePath)) return "❌ 文件不存在: " + startLoc.filePath;
