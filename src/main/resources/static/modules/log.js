@@ -1,5 +1,5 @@
 // @anchor: log_intro
-// 日志辅助：判断文本是否 Markdown、HTML 转义
+// 日志渲染层：Markdown 渲染 + HTML 消毒 + 自动贴底 + 索引进度条 + 会话消息追加
 
 function escapeHtml(text) {
     const div = document.createElement('div');

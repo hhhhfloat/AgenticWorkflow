@@ -3,6 +3,7 @@
 package com.myagent.workflow.tools.runner;
 
 import com.myagent.workflow.core.config.AgentConfig;
+import com.myagent.workflow.core.config.env.Platform;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -15,6 +16,7 @@ public class HtmlPreviewer {
     private final boolean autoOpenBrowser;
 
     // @anchor: htmlPreviewer_constructor
+    // 构造：记录配置中的"自动打开浏览器"开关
     public HtmlPreviewer(AgentConfig config) {
         this.autoOpenBrowser = config.autoOpenBrowser();
     }
@@ -47,13 +49,12 @@ public class HtmlPreviewer {
     }
 
     // @anchor: htmlPreviewer_openPath
-    // 根据平台调用系统命令打开文件
+    // 按平台选择打开方式（Windows start / macOS open / 其他 xdg-open）
     private void openPath(String path) throws IOException {
-        String os = System.getProperty("os.name", "").toLowerCase();
         ProcessBuilder pb;
-        if (os.contains("win")) {
+        if (Platform.isWindows()) {
             pb = new ProcessBuilder("cmd", "/c", "start", "", path);
-        } else if (os.contains("mac")) {
+        } else if (Platform.isMac()) {
             pb = new ProcessBuilder("open", path);
         } else {
             pb = new ProcessBuilder("xdg-open", path);

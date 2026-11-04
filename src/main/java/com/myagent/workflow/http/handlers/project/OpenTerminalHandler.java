@@ -2,6 +2,7 @@
 // 打开终端处理器：GET /openTerminal，白名单内唤起终端并定位到指定目录
 package com.myagent.workflow.http.handlers.project;
 
+import com.myagent.workflow.core.config.env.Platform;
 import com.myagent.workflow.core.config.env.ShellPathResolver;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
@@ -18,6 +19,7 @@ import java.util.Map;
 public class OpenTerminalHandler implements HttpHandler {
 
     // @anchor: openTerminalHandler_handle
+    // 处理打开请求：白名单目录校验后按平台唤起终端
     @Override
     public void handle(HttpExchange exchange) throws IOException {
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -55,15 +57,13 @@ public class OpenTerminalHandler implements HttpHandler {
     // @anchor: openTerminalHandler_openTerminal
     // 平台分派：Windows / macOS / WSL2 / 原生 Linux
     private void openTerminal(String absPath) throws IOException {
-        String os = System.getProperty("os.name", "").toLowerCase();
-
-        if (os.contains("win")) {
+        if (Platform.isWindows()) {
             ProcessBuilder pb = new ProcessBuilder(
                     "cmd", "/c", "start", "cmd.exe", "/k",
                     "cd /d \"" + absPath + "\"");
             pb.redirectErrorStream(true);
             pb.start();
-        } else if (os.contains("mac")) {
+        } else if (Platform.isMac()) {
             ProcessBuilder pb = new ProcessBuilder("open", "-a", "Terminal", absPath);
             pb.redirectErrorStream(true);
             pb.start();
@@ -112,6 +112,8 @@ public class OpenTerminalHandler implements HttpHandler {
     }
 
     // @anchor: openTerminalHandler_isWsl
+    // 探测是否运行在 WSL 内（读 /proc/version 关键字）
+
     private static boolean isWsl() {
         try {
             String v = Files.readString(Paths.get("/proc/version")).toLowerCase();

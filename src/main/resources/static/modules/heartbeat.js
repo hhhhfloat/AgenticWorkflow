@@ -3,7 +3,7 @@
 
 // ===== 心跳机制（含断联/重连检测） =====
 
-// 新增：心跳失败计数器
+// 断联计数：连续失败 3 次（约 15 秒）判定为断联，恢复后清零
 let heartbeatFailCount = 0;
 let isDisconnectedLogged = false;
 

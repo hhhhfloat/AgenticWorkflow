@@ -1,7 +1,8 @@
 // @anchor: treeApi_intro
 // 文件树数据层：目录浏览、项目元信息、配置读取
 
-// @anchor: modules_tree_fetchDir
+// @anchor: treeApi_fetchDir
+// 拉取目录内容（10 秒超时中断）
 async function fetchDir(path) {
     const url = `/browse?path=${encodeURIComponent(path)}`;
     const controller = new AbortController();

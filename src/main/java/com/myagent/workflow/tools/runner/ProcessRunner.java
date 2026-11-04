@@ -32,12 +32,12 @@ public class ProcessRunner {
         this.sandboxDir = AgentConfig.getSandboxDir();
     }
 
-        // @anchor: processRunner_killTree
+    // @anchor: processRunner_killTree
     // 递归杀掉进程及其全部后代（Linux 下利用进程组彻底清理孤儿进程）
     public static void killTree(Process p) {
         if (p == null) return;
         long pid = p.pid();
-        
+
         // 1. 跨平台：尝试正常杀子进程和父进程
         try {
             p.descendants().forEach(ph -> {
@@ -60,7 +60,7 @@ public class ProcessRunner {
     }
 
     // @anchor: processRunner_executeProcess
-// 执行外部进程并捕获输出（含超时/输入阻塞检测，finally 兜底回收）
+    // 执行外部进程并捕获输出（含超时/输入阻塞检测，finally 兜底回收）
     public ProcessResult executeProcess(ProcessBuilder pb, long timeoutSeconds, boolean detectStdinStall) {
         // ========== 安全加固 ==========
         try {
@@ -85,7 +85,7 @@ public class ProcessRunner {
         }
 
         // ========== Linux 专属：setsid 启动 ==========
-        if (!com.myagent.workflow.core.config.env.Platform.isWindows()) {
+        if (!Platform.isWindows()) {
             java.util.List<String> cmd = new java.util.ArrayList<>(pb.command());
             if (!cmd.isEmpty() && !"setsid".equals(cmd.get(0))) {
                 cmd.add(0, "setsid");
@@ -208,8 +208,7 @@ public class ProcessRunner {
         env.put("TEMP", tmpPath);
         env.put("TMP", tmpPath);
 
-        String os = System.getProperty("os.name").toLowerCase();
-        if (os.contains("win")) {
+        if (Platform.isWindows()) {
             env.put("USERPROFILE", sandboxRoot.toString());
         } else {
             env.put("HOME", sandboxRoot.toString());

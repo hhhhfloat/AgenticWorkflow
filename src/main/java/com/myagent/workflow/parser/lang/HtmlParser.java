@@ -17,9 +17,11 @@ import java.util.regex.Pattern;
 public class HtmlParser implements StructureParser {
 
     // @anchor: htmlParser_patterns
-    // HTML 锚点与各类标签/属性的匹配正则集合
+    // HTML 锚点与各类标签/属性的匹配正则集合。锚点两种形态：
+    // 页面结构用 <!-- @anchor: id -->，页面内嵌 <script> 里用 // @anchor: id
+    // (?m) 让 $ 匹配行尾，否则内嵌脚本里的 // 形态只有文件末尾才能命中
     private static final Pattern ANCHOR_PATTERN = Pattern.compile(
-            "<!--\\s*@anchor:\\s*(\\w+)\\s*-->"
+            "(?m)<!--\\s*@anchor:\\s*(\\w+)\\s*-->|//\\s*@anchor:\\s*(\\w+)[ \\t]*$"
     );
 
     // DOCTYPE
@@ -86,13 +88,14 @@ public class HtmlParser implements StructureParser {
         // 提取锚点
         var anchorMatcher = ANCHOR_PATTERN.matcher(fullContent);
         while (anchorMatcher.find()) {
-            String id = anchorMatcher.group(1);
+            String id = anchorMatcher.group(1) != null ? anchorMatcher.group(1) : anchorMatcher.group(2);
             // 计算行号（近似）
             int lineNum = 1;
             for (int i = 0; i < anchorMatcher.start(); i++) {
                 if (fullContent.charAt(i) == '\n') lineNum++;
             }
-            anchors.add(new AnchorSummary(id, lineNum, "<!-- @anchor: " + id + " -->"));
+            // preview 回填源码里的锚点原文，保留实际注释形态（HTML 注释或内嵌 script 的 //）
+            anchors.add(new AnchorSummary(id, lineNum, anchorMatcher.group().trim()));
         }
 
         // 提取外部资源

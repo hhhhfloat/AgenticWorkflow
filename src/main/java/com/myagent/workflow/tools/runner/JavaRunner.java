@@ -3,6 +3,7 @@
 package com.myagent.workflow.tools.runner;
 
 import com.myagent.workflow.core.config.AgentConfig;
+import com.myagent.workflow.core.config.env.Platform;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,7 +116,7 @@ public class JavaRunner {
     private String resolveJavaTool(String tool) {
         String home = config.javaHome();
         if (home != null && !home.isBlank()) {
-            boolean win = System.getProperty("os.name").toLowerCase().contains("win");
+            boolean win = Platform.isWindows();
             Path p = Paths.get(home, "bin", win ? tool + ".exe" : tool);
             if (Files.isRegularFile(p)) return p.toString();
         }

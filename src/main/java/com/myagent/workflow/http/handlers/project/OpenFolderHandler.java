@@ -2,6 +2,7 @@
 // 打开文件夹处理器：GET /openFolder，白名单内调用系统资源管理器
 package com.myagent.workflow.http.handlers.project;
 
+import com.myagent.workflow.core.config.env.Platform;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.myagent.workflow.http.utils.HandlerUtils;
@@ -40,7 +41,7 @@ public class OpenFolderHandler implements HttpHandler {
             HandlerUtils.sendResponse(exchange, 404, "{\"status\":\"error\", \"message\":\"目录不存在\"}");
             return;
         }
-        
+
         try {
             openPath(targetPath.toString());
             HandlerUtils.sendResponse(exchange, 200, "{\"status\":\"success\", \"message\":\"已打开 " + target + " 文件夹\"}");
@@ -50,13 +51,12 @@ public class OpenFolderHandler implements HttpHandler {
     }
 
     // @anchor: openFolderHandler_openPath
-    // 根据平台调用系统命令打开路径
+    // 按平台选择打开方式（Windows start / macOS open / 其他 xdg-open）
     private void openPath(String path) throws IOException {
-        String os = System.getProperty("os.name", "").toLowerCase();
         ProcessBuilder pb;
-        if (os.contains("win")) {
+        if (Platform.isWindows()) {
             pb = new ProcessBuilder("cmd", "/c", "start", "", path);
-        } else if (os.contains("mac")) {
+        } else if (Platform.isMac()) {
             pb = new ProcessBuilder("open", path);
         } else {
             pb = new ProcessBuilder("xdg-open", path);

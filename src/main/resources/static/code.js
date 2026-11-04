@@ -1,4 +1,4 @@
-// @anchor: codePreview_intro
+// @anchor: codeJs_intro
 // 代码预览逻辑：拉取文件内容、调用 highlight.js 高亮、加载锚点侧栏、点击跳转
 
 const params = new URLSearchParams(location.search);

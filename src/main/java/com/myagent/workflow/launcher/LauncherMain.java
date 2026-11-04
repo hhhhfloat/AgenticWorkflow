@@ -3,6 +3,7 @@
 package com.myagent.workflow.launcher;
 
 import com.myagent.workflow.core.config.BindAddressResolver;
+import com.myagent.workflow.core.config.env.Platform;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 
@@ -282,7 +283,7 @@ public class LauncherMain {
 
     private static String resolveJavaExe() {
         String home = System.getProperty("java.home");
-        boolean win = System.getProperty("os.name").toLowerCase().contains("win");
+        boolean win = Platform.isWindows();
         return home + File.separator + "bin" + File.separator + (win ? "java.exe" : "java");
     }
 

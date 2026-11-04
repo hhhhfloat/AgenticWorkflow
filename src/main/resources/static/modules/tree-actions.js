@@ -16,7 +16,7 @@ function addActionButtons(label, path, isRoot) {
             onClick: async () => { await openFolder('sandbox'); }
         });
         items.push({
-            icon: '>_', label: '在此打开终端',          // ← 新增
+            icon: '>_', label: '在此打开终端',
             onClick: async () => { await openTerminal('sandbox'); }
         });
         items.push({
@@ -48,7 +48,7 @@ function addActionButtons(label, path, isRoot) {
             }
         });
         items.push({
-            icon: '>_', label: '在此打开终端',          // ← 新增
+            icon: '>_', label: '在此打开终端',
             onClick: async () => { await openTerminal('sandbox/' + projectName); }
         });
         items.push({
