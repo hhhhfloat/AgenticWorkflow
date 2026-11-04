@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.function.Consumer;
 import java.util.*;
 
 // @anchor: anchorManager_class
@@ -55,13 +56,38 @@ public class AnchorManager {
     // @anchor: anchorManager_buildIndex
     // 重建锚点索引（显式沙箱校验：拦绝对路径与 ".."，错误信息比底层 IOException 清晰）
     public String buildAnchorIndex(String projectPath) {
+        return buildAnchorIndex(projectPath, null);
+    }
+
+    // @anchor: anchorManager_buildIndex
+    // 工具入口：Agent 显式调用 build_anchor_index 时走这里
+    public String buildAnchorIndex(String projectPath, Consumer<String> progress) {
+        return rebuildInternal(projectPath, "build_anchor_index", progress);
+    }
+
+    // @anchor: anchorManager_refreshIndex
+    // 内部刷新入口：启动/结束自动刷新、脏文件兜底全量时走这里
+    // 与 buildAnchorIndex 共用底层，tag 区分来源（前端显示不同文案）
+    public String refreshProjectIndexes(String projectPath, Consumer<String> progress) {
+        return rebuildInternal(projectPath, "refresh_index", progress);
+    }
+
+    // @anchor: anchorManager_rebuildInternal
+    // 全量重建的唯一底层入口：显式路径校验 + 统一进度格式
+    // 进度消息格式：<tag> <project> <phase> <cur>/<total> <file>
+    private String rebuildInternal(String projectPath, String tag, Consumer<String> progress) {
         if (projectPath == null || projectPath.isBlank()) return "❌ 缺少参数 project_path";
         try {
             PathUtils.safeResolve(projectPath);
         } catch (IOException e) {
             return "❌ 非法的项目路径: " + projectPath + "（" + e.getMessage() + "）";
         }
-        return anchorIndex.rebuild(projectPath);
+        return anchorIndex.rebuild(projectPath, p -> {
+            if (progress == null) return;
+            String phaseLabel = "scan".equals(p.phase()) ? "扫描" : "解析";
+            progress.accept(String.format("%s %s %s %d/%d %s",
+                    tag, projectPath, phaseLabel, p.current(), p.total(), p.currentFile()));
+        });
     }
 
     // ===== 文件内容操作 =====
@@ -469,9 +495,10 @@ public class AnchorManager {
         markDirty(projectPath, fileRelPath);
     }
 
-    // @anchor: anchorManager_flushDirty
+     // @anchor: anchorManager_flushDirty
     // 批量刷新所有脏文件。由 ToolExecutor 在一轮工具调用结束后触发。
-    public void flushDirty() {
+    // 缺失索引的全量兜底用 tag=flush_rebuild 走带进度的路径
+    public void flushDirty(Consumer<String> progress) {
         if (dirtyFiles.isEmpty()) return;
         Set<String> fullRebuiltProjects = new HashSet<>();
         for (Map.Entry<String, Set<String>> e : dirtyFiles.entrySet()) {
@@ -481,14 +508,14 @@ public class AnchorManager {
                 Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
                 if (!Files.exists(anchorsFile)) {
                     if (fullRebuiltProjects.contains(project)) continue;
-                    anchorIndex.rebuild(project);
+                    rebuildInternal(project, "flush_rebuild", progress);
                     fullRebuiltProjects.add(project);
                 } else {
                     anchorIndex.refreshProjectIndexFiles(project, e.getValue());
                 }
             } catch (Exception ex) {
                 logger.warn("批量刷新脏文件失败: {} - {}", project, ex.getMessage());
-            }
+           }
         }
         dirtyFiles.clear();
     }
@@ -531,12 +558,6 @@ public class AnchorManager {
     // @anchor: anchorManager_findAnchor
     public AnchorLocation findAnchor(String projectPath, String anchorId) {
         return anchorQuery.find(projectPath, anchorId);
-    }
-
-    // @anchor: anchorManager_rebuildProjectIndex
-    public String rebuildProjectIndex(String projectPath) {
-        if (projectPath == null || projectPath.isBlank()) return "❌ 缺少参数 project_path";
-        return anchorIndex.rebuildProjectIndex(projectPath);
     }
 
     // @anchor: anchorManager_describeAnchors

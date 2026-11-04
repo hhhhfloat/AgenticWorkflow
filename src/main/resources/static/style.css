@@ -144,6 +144,46 @@ button:disabled {
     padding-left: 20px;
 }
 
+/* @anchor: style_mdLinkAndInline */
+/* 日志区链接、加粗、图片样式（与 md.html 保持一致的暗色主题配色） */
+.log-entry a {
+    color: #58a6ff;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(88, 166, 255, 0.3);
+    transition: color 0.15s, border-color 0.15s;
+}
+.log-entry a:hover {
+    color: #79c0ff;
+    border-bottom-color: #79c0ff;
+}
+.log-entry a:visited {
+    color: #a371f7;
+}
+.log-entry a:visited:hover {
+    color: #d2a8ff;
+    border-bottom-color: #d2a8ff;
+}
+
+.log-entry strong, .log-entry b {
+    color: #f0f6fc;
+    font-weight: 600;
+}
+
+.log-entry img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+    margin: 6px 0;
+}
+
+/* 针对日志区行内代码做一点微调（保持原样，只加醒目色） */
+.log-entry code {
+    color: #ff9d6f;
+}
+.log-entry pre code {
+    color: #d4d4d4;
+}
+
 /* @anchor: style_systemPre */
 /* 系统日志预格式化：保留空白 */
 .log-system .log-entry {
@@ -1239,4 +1279,33 @@ html, body {
     word-break: break-all;
     font-size: 0.85em;
     line-height: 1.4;
+}
+/* @anchor: style_toolProgress */
+/* 工具执行进度条 */
+.tool-progress-bar {
+    display: none;
+    padding: 8px 12px;
+    background: #252526;
+    border: 1px solid #444;
+    border-radius: 4px;
+    margin: 6px 0;
+    font-size: 12px;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+.tool-progress-label {
+    color: #9cdcfe;
+    margin-bottom: 6px;
+}
+.tool-progress-track {
+    height: 4px;
+    background: #1e1e1e;
+    border-radius: 2px;
+    overflow: hidden;
+}
+.tool-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0e639c, #4ec9b0);
+    border-radius: 2px;
+    width: 0;
+    transition: width 0.2s ease;
 }

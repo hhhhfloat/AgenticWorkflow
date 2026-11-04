@@ -70,6 +70,82 @@
         #content table { border-collapse: collapse; margin: 1em 0; }
         #content th, #content td { border: 1px solid #444; padding: 6px 12px; }
         #content th { background: #2a2a2a; }
+                /* ===== 链接 ===== */
+        #content a {
+            color: #58a6ff;
+            text-decoration: none;
+            border-bottom: 1px solid rgba(88, 166, 255, 0.3);
+            transition: color 0.15s, border-color 0.15s;
+        }
+        #content a:hover {
+            color: #79c0ff;
+            border-bottom-color: #79c0ff;
+        }
+        #content a:visited { color: #a371f7; }
+        #content a:visited:hover { color: #d2a8ff; border-bottom-color: #d2a8ff; }
+
+        /* ===== 强调 ===== */
+        #content strong, #content b { color: #f0f6fc; font-weight: 600; }
+        #content em, #content i { color: #d0d7de; }
+        #content del { color: #6e7681; }
+
+        /* ===== 引用块 ===== */
+        #content blockquote {
+            margin: 1em 0;
+            padding: 8px 16px;
+            border-left: 3px solid #4a8aff;
+            background: #202020;
+            color: #b0b8c0;
+            border-radius: 0 4px 4px 0;
+        }
+        #content blockquote p { margin: 0.3em 0; }
+        #content blockquote a { color: #79c0ff; }
+
+        /* ===== 分隔线 ===== */
+        #content hr {
+            border: none;
+            border-top: 1px solid #333;
+            margin: 1.5em 0;
+        }
+
+        /* ===== 行内代码（与已有的 pre code 区分） ===== */
+        #content :not(pre) > code {
+            background: #2a2a2a;
+            color: #ff9d6f;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+
+        /* ===== 图片 ===== */
+        #content img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin: 0.5em 0;
+        }
+
+        /* ===== 任务列表 checkbox ===== */
+        #content input[type="checkbox"] {
+            margin-right: 6px;
+            vertical-align: middle;
+            accent-color: #4a8aff;
+        }
+        #content li > input[type="checkbox"] { margin-left: -1.3em; }
+
+        /* ===== 代码块改进（语法高亮无插件，用色阶区分） ===== */
+        #content pre {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 14px 16px;
+        }
+        #content pre code {
+            color: #e6edf3;
+            font-size: 13px;
+            line-height: 1.5;
+        }
         .empty { color: #888; text-align: center; padding: 40px 0; }
         .error { color: #f88; }
 

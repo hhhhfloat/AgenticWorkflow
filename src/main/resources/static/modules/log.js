@@ -27,6 +27,18 @@ function sanitizeHtml(html) {
             }
         }
     });
+
+    // 遍历所有注释节点，替换为等价的文本节点，防止被浏览器吞掉
+    const walker = document.createTreeWalker(tpl.content, NodeFilter.SHOW_COMMENT);
+    const comments = [];
+    while (walker.nextNode()) {
+        comments.push(walker.currentNode);
+    }
+    comments.forEach(node => {
+        const textNode = document.createTextNode(`<!--${node.nodeValue}-->`);
+        node.parentNode.replaceChild(textNode, node);
+    });
+
     return tpl.innerHTML;
 }
 
@@ -45,6 +57,10 @@ function updateScrollBottomBtn() {
 const TOOL_LOG_PREFIX = '[工具] ';
 
 function appendLog(msg) {
+    if (msg && msg.startsWith('[进度] ')) {
+        handleProgressLog(msg.slice(5));
+        return;
+    }
     const stick = isScrolledToBottom(output);
     let color = 'log-info';
     let extraClass = '';
@@ -92,6 +108,16 @@ function appendLog(msg) {
     if (stick) output.scrollTop = output.scrollHeight;
     updateScrollBottomBtn();
 
+    // 工具结果返回时清理进度条
+    if (msg && msg.includes('工具 [build_anchor_index] 结果')) {
+        const bar = document.getElementById('toolProgressBar');
+        if (bar) {
+            clearTimeout(bar._showTimer);
+            clearTimeout(bar._hideTimer);
+            setTimeout(() => { bar.style.display = 'none'; }, 600);
+        }
+    }
+
     // 迭代提示（不变）
     if (msg.includes('--- 第') && msg.includes('次迭代 ---')) {
         const tip = getRandomQuote();
@@ -106,6 +132,48 @@ function appendLog(msg) {
         }
     }
 }
+
+function handleProgressLog(payload) {
+    const m = payload.match(/^(\S+) (\S+) (\S+) (\d+)\/(\d+) (.+)$/);
+    if (!m) return;
+    const [, tag, project, phase, cur, total, file] = m;
+
+    const tagLabel = {
+        'build_anchor_index': '🔨 重建索引',
+        'refresh_index': '🔄 刷新索引',
+        'flush_rebuild': '🧹 补全索引'
+    }[tag] || tag;
+
+    let bar = document.getElementById('toolProgressBar');
+    const wasHidden = !bar || bar.style.display === 'none' || bar.style.display === '';
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'toolProgressBar';
+        bar.className = 'tool-progress-bar';
+        bar.innerHTML = `
+            <div class="tool-progress-label"></div>
+            <div class="tool-progress-track"><div class="tool-progress-fill"></div></div>
+        `;
+        output.parentNode.insertBefore(bar, output);
+    }
+
+    const pct = total > 0 ? (parseInt(cur) / parseInt(total) * 100) : 0;
+    bar.querySelector('.tool-progress-label').textContent =
+        `${tagLabel} · ${project} · ${phase}：${cur}/${total} (${file})`;
+    bar.querySelector('.tool-progress-fill').style.width = pct + '%';
+
+    // 从隐藏恢复时重新触发"延迟 300ms 显示"，避免小任务闪一下
+    if (wasHidden) {
+        clearTimeout(bar._showTimer);
+        bar._showTimer = setTimeout(() => { bar.style.display = 'block'; }, 300);
+    }
+
+    clearTimeout(bar._hideTimer);
+    bar._hideTimer = setTimeout(() => {
+        bar.style.display = 'none';
+    }, 5000);
+}
+
 /**
  * 以"对话消息"形式追加到 #output。
  * @param {string} role - 'user' | 'assistant' | 'system'

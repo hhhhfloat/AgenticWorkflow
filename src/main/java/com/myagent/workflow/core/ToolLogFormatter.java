@@ -34,7 +34,7 @@ public final class ToolLogFormatter {
     // 长文本参数（content / code）与普通参数各自的展示上限
     private static final int MAX_LONG_PARAM_LEN = 100;
     private static final int MAX_SHORT_PARAM_LEN = 200;
-    private static final Set<String> LONG_TEXT_PARAMS = Set.of("content", "code");
+    private static final Set<String> LONG_TEXT_PARAMS = Set.of("content", "code", "old_string", "new_string");
 
     // ===== 结果展示上限 =====
     // @anchor: toolLogFormatter_resultLimits

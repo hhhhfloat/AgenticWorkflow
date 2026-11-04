@@ -110,7 +110,7 @@ public class HistoryRecorder {
                 ));
             }
             Files.writeString(rawFile, sb.toString(), StandardCharsets.UTF_8,
-                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                    StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
             pendingRawRequest = null;
             pendingRawResponse = null;
         } catch (IOException e) {

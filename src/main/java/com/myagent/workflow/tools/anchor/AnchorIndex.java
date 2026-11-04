@@ -17,6 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
+import java.util.function.Consumer;
 import java.util.*;
 
 /**
@@ -120,13 +121,11 @@ class AnchorIndex {
 
     // ===== 构建索引 =====
 
-    /**
-     * 重建锚点索引：扫描项目下的所有源文件，提取 @anchor 注释，
-     * 重写 .anchors.json（坐标）与 .project_index.json（描述+符号）。
-     */
-    // @anchor: anchorIndex_rebuild
-    // 全量重建：扫描项目全部文本文件，重写两份索引文件
-    String rebuild(String projectPath) {
+    // @anchor: anchorIndex_buildProgress
+    // 全量重建：扫描项目全部文本文件，重写两份索引文件，progress 传 null 表示不需要进度回调
+    record BuildProgress(String phase, int current, int total, String currentFile) {}
+
+    String rebuild(String projectPath, Consumer<BuildProgress> progress) {
         migrateOldIndexIfNeeded();
 
         try {
@@ -137,17 +136,21 @@ class AnchorIndex {
 
             Map<String, List<Map<String, Object>>> projectAnchors = new LinkedHashMap<>();
 
-            // O2: 用剪枝遍历，跳过 .git / target / node_modules 等大目录
             List<Path> files = SearchFileFilter.collectFiles(
                     projectDir,
                     SearchFileFilter.DEFAULT_EXCLUDED_DIRS,
-                    List.of());   // 文件级排除交给下方循环（点开头 + 具体索引名）
+                    List.of());
 
+            // ===== 阶段 1：扫描锚点（scan） =====
+            int total = files.size();
+            int processed = 0;
+            long lastEmit = 0;
             for (Path file : files) {
                 String name = file.getFileName().toString();
-                // 统一口径：隐藏名（含索引文件）+ 显式排除文件
-                if (ProjectLayout.isHiddenBasename(name)) continue;
-                if (ProjectLayout.isExcludedFile(name)) continue;
+                if (ProjectLayout.isHiddenBasename(name) || ProjectLayout.isExcludedFile(name)) {
+                    processed++;
+                    continue;
+                }
                 try {
                     String rel = projectDir.relativize(file).toString().replace('\\', '/');
                     List<Map<String, Object>> anchors = AnchorScanner.scan(file);
@@ -156,25 +159,30 @@ class AnchorIndex {
                     logger.warn("扫描失败，跳过该文件: {} - {}",
                             projectDir.relativize(file), e.getMessage());
                 }
+                processed++;
+                if (progress != null) {
+                    long now = System.currentTimeMillis();
+                    if (now - lastEmit > 100 || processed == total) {
+                        emitProgress(progress, new BuildProgress("scan", processed, total,
+                                file.getFileName().toString()));
+                        lastEmit = now;
+                    }
+                }
             }
-            // 写 .anchors.json（精简版：id + line + preview）
+
             Path indexFile = getIndexPath(projectPath);
             if (indexFile == null) {
                 return "❌ 项目路径无效: " + projectPath;
             }
 
-            // O8：先在内存中构造两份 JSON，序列化失败不会留下部分写入
             String anchorsJson = objectMapper.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(AnchorScanner.leanize(projectAnchors));
-            String projectIndexJson = buildProjectIndexJson(projectPath, projectAnchors);
-
-            // 先写 .anchors.json；失败则中止，两份都是旧状态
             FileOperator.writeAtomic(indexFile, anchorsJson);
             cache.invalidate(indexFile);
 
-            // 再写 .project_index.json；失败时 .anchors.json 已是新版本，
-            // 但 isProjectFresh 会因 .project_index.json 的旧 mtime 判定为 stale，
-            // 下一次任务收尾自动重建 —— 不会永久分叉
+            // ===== 阶段 2：构建 project_index（AST 解析，慢） =====
+            String projectIndexJson = buildProjectIndexJson(projectPath, projectAnchors, progress);
+
             Path projIdxFile = PathUtils.safeResolve(projectPath).resolve(PROJECT_INDEX_NAME);
             FileOperator.writeAtomic(projIdxFile, projectIndexJson);
             cache.invalidate(projIdxFile);
@@ -192,6 +200,12 @@ class AnchorIndex {
             logger.error("重建锚点索引失败", e);
             return "❌ 重建锚点索引失败: " + e.getMessage();
         }
+    }
+
+    // @anchor: anchorIndex_emitProgress
+    // 安全 emit：进度回调异常不影响主流程
+    private static void emitProgress(java.util.function.Consumer<BuildProgress> cb, BuildProgress p) {
+        try { cb.accept(p); } catch (Exception ignored) {}
     }
 
 
@@ -221,16 +235,30 @@ class AnchorIndex {
      * 将锚点结果（含 desc）写入 .project_index.json。
      */
     // @anchor: anchorIndex_buildProjectIndexJson
-    // O8：只构造 .project_index.json 的 JSON 字符串，不写盘
+    // 只构造 .project_index.json 的 JSON 字符串，不写盘
     private String buildProjectIndexJson(String projectPath,
-                             Map<String, List<Map<String, Object>>> projectAnchors) throws IOException {
+                     Map<String, List<Map<String, Object>>> projectAnchors,
+                     java.util.function.Consumer<BuildProgress> progress) throws IOException {
         Path projectDir = PathUtils.safeResolve(projectPath);
         Map<String, List<Map<String, Object>>> index = new LinkedHashMap<>();
+        int total = projectAnchors.size();
+        int processed = 0;
+        long lastEmit = 0;
+
         for (Map.Entry<String, List<Map<String, Object>>> e : projectAnchors.entrySet()) {
             String relPath = e.getKey();
             Path filePath = projectDir.resolve(relPath);
             List<Map<String, Object>> entries = buildIndexEntries(filePath, e.getValue());
             if (!entries.isEmpty()) index.put(relPath, entries);
+
+            processed++;
+            if (progress != null) {
+                long now = System.currentTimeMillis();
+                if (now - lastEmit > 100 || processed == total) {
+                    emitProgress(progress, new BuildProgress("index", processed, total, relPath));
+                    lastEmit = now;
+                }
+            }
         }
         return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(index);
     }
@@ -246,7 +274,7 @@ class AnchorIndex {
             Path projectDir = PathUtils.safeResolve(projectPath);
             Path anchorsFile = getIndexPath(projectPath);
             if (anchorsFile == null || !Files.exists(anchorsFile)) {
-                return rebuild(projectPath);
+                return rebuild(projectPath, null);
             }
             // 复制一份可变 Map，不污染缓存持有的对象
             Map<String, List<Map<String, Object>>> projectAnchors = new LinkedHashMap<>(cache.load(anchorsFile));
@@ -413,30 +441,6 @@ class AnchorIndex {
             }
         });
         return max[0];
-    }
-
-    /**
-     * 单独重建 .project_index.json。供外部一行调用。
-     */
-    // @anchor: anchorIndex_rebuildProjectIndex
-    // 重建项目的 .project_index.json（缺 .anchors.json 时退化为全量重建）
-    String rebuildProjectIndex(String projectPath) {
-        migrateOldIndexIfNeeded();
-        try {
-            Path projectDir = PathUtils.safeResolve(projectPath);
-            if (!Files.exists(projectDir) || !Files.isDirectory(projectDir)) {
-                return "❌ 项目目录不存在: " + projectPath;
-            }
-            Path indexFile = getIndexPath(projectPath);
-            if (indexFile == null || !Files.exists(indexFile)) {
-                return rebuild(projectPath);  // 没有 .anchors.json，走完整重建
-            }
-            // 复用 .anchors.json 的扫描结果不现实（desc 不在其中），直接 rebuild 一次
-            return rebuild(projectPath);
-        } catch (IOException e) {
-            logger.error("重建项目索引失败", e);
-            return "❌ 重建项目索引失败: " + e.getMessage();
-        }
     }
 
 }

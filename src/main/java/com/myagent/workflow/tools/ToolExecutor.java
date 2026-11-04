@@ -118,8 +118,11 @@ public class ToolExecutor {
                         a.getString("file_pattern", ".*"),
                         a.getString("path", ".")));
 
-        handlers.put("build_anchor_index", a ->
-                anchorMgr.buildAnchorIndex(a.getString("project_path")));
+        handlers.put("build_anchor_index", a -> {
+            Consumer<String> lc = this.logConsumer;
+            return anchorMgr.buildAnchorIndex(a.getString("project_path"),
+                    p -> { if (lc != null) lc.accept("[进度] " + p); });
+        });
 
         handlers.put("insert_at_anchor", a ->
                 anchorMgr.insertAtAnchor(a.getString("anchor_id"),
@@ -204,6 +207,7 @@ public class ToolExecutor {
             Path sandbox = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
             if (!Files.isDirectory(sandbox)) return;
 
+            Consumer<String> lc = this.logConsumer;
             try (var stream = Files.list(sandbox)) {
                 for (Path projectDir : (Iterable<Path>) stream::iterator) {
                     if (!Files.isDirectory(projectDir)) continue;
@@ -214,9 +218,9 @@ public class ToolExecutor {
                     if (!Files.exists(anchorsFile)) continue;
 
                     try {
-                        // O1：索引仍新鲜（无外部改动）则跳过重建
+                        // 索引仍新鲜（无外部改动）则跳过重建
                         if (anchorMgr.isProjectFresh(name)) continue;
-                        anchorMgr.rebuildProjectIndex(name);
+                        anchorMgr.refreshProjectIndexes(name, p -> { if (lc != null) lc.accept("[进度] " + p); });
                     } catch (Exception e) {
                         logger.warn("刷新项目索引失败: {} -> {}", name, e.getMessage());
                     }
@@ -224,17 +228,6 @@ public class ToolExecutor {
             }
         } catch (IOException e) {
             logger.warn("刷新所有项目索引失败: {}", e.getMessage());
-        }
-    }
-
-    // @anchor: toolExecutor_rebuildCurrentProjectIndex
-    // 强制重建指定项目的锚点索引（不检查 freshness），用于"运行前确保当前项目最新"
-    public void rebuildCurrentProjectIndex(String projectName) {
-        if (projectName == null || projectName.isBlank()) return;
-        try {
-            anchorMgr.rebuildProjectIndex(projectName);
-        } catch (Exception e) {
-            logger.warn("强制重建项目索引失败: {} - {}", projectName, e.getMessage());
         }
     }
 
@@ -248,6 +241,7 @@ public class ToolExecutor {
         }
         targets.add("tmp");   // tmp 是公共临时区，任何会话都可能在用
 
+        Consumer<String> lc = this.logConsumer;
         for (String name : targets) {
             try {
                 Path projectDir = Paths.get(AgentConfig.getSandboxDir())
@@ -259,7 +253,7 @@ public class ToolExecutor {
                 boolean shouldRebuild = (forceWorkProject && name.equals(workProject))
                         || !anchorMgr.isProjectFresh(name);
                 if (!shouldRebuild) continue;
-                anchorMgr.rebuildProjectIndex(name);
+                anchorMgr.refreshProjectIndexes(name, p -> { if (lc != null) lc.accept("[进度] " + p); });
             } catch (Exception e) {
                 logger.warn("刷新项目索引失败: {} - {}", name, e.getMessage());
             }
@@ -272,7 +266,8 @@ public class ToolExecutor {
     // @anchor: toolExecutor_flushDirtyAnchors
     // 一轮工具调用结束后批量刷新锚点索引中的脏文件
     public void flushDirtyAnchors() {
-        anchorMgr.flushDirty();
+        Consumer<String> lc = this.logConsumer;
+        anchorMgr.flushDirty(p -> { if (lc != null) lc.accept("[进度] " + p); });
     }
 
 }
