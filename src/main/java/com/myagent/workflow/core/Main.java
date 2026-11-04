@@ -310,6 +310,14 @@ public class Main {
                     session.log("工具 [" + functionName + "] 结果: "
                             + ToolLogFormatter.formatResult(functionName, result));
                 }
+
+                // ===== 迭代上限预警：在最后一个 tool 消息末尾注入 =====
+                String warning = IterationGuard.getWarning(iteration, maxIterations);
+                if (warning != null) {
+                    appendWarningToLastToolMessage(currentRound, warning);
+                    session.log("[系统] ⚠️ 第 " + (iteration + 1) + " 次迭代，注入收尾提醒");
+                }
+
                 toolExecutor.flushDirtyAnchors();
                 contextManager.appendToWorking(currentRound);
                 // 保证末轮工具结果在 recovery 里，crash 后不重跑已完成的工作
@@ -530,6 +538,20 @@ public class Main {
         } catch (IOException e) {
             System.err.println("运行 Agent 时发生错误: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    // @anchor: main_appendWarningToLastToolMessage
+    // 把警告拼接到 currentRound 里最后一个 role=tool 的消息末尾
+    private static void appendWarningToLastToolMessage(
+            List<Map<String, Object>> round, String warning) {
+        for (int i = round.size() - 1; i >= 0; i--) {
+            Map<String, Object> msg = round.get(i);
+            if ("tool".equals(msg.get("role"))) {
+                String old = String.valueOf(msg.get("content"));
+                msg.put("content", old + warning);
+                return;
+            }
         }
     }
 }
