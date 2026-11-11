@@ -108,6 +108,8 @@
         }
     }
     async function act(cmd) {
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = true;
         document.getElementById('out').textContent = '正在执行 ' + cmd + ' …';
         try {
             const r = await fetch('/' + cmd, { method: 'POST' });

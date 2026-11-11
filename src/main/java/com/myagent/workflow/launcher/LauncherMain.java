@@ -45,6 +45,8 @@ public class LauncherMain {
     private static Process mainProcess = null;
     private static String lastError = null;
     private static String launcherBindAddress = null;
+    private static boolean isStarting = false;
+    private static final Object startLock = new Object();
 
     // @anchor: launcherMain_page
     // 按钮页内容：启动时从 classpath 读入，避免把 HTML 塞进 Java 源码
@@ -108,7 +110,7 @@ public class LauncherMain {
         System.out.println("   主服务目标: http://" + bindAddr + ":" + MAIN_PORT);
     }
 
-    // @anchor: launcherMain_handleStart
+        // @anchor: launcherMain_handleStart
     // 拉起主服务：已在跑则直接返回，否则 ProcessBuilder 启动并轮询就绪
     private static void handleStart(HttpExchange exchange) throws IOException {
         if ("OPTIONS".equalsIgnoreCase(exchange.getRequestMethod())) {
@@ -119,34 +121,51 @@ public class LauncherMain {
             return;
         }
 
-        // 只接受 POST，防止 <img src> 之类的跨站 GET 触发启动
         if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
             exchange.sendResponseHeaders(405, -1);
             return;
         }
 
-        if (isMainRunning()) {
-            writeJson(exchange, 200, "{\"status\":\"already_running\"}");
-            return;
-        }
+        // ===== 【新增】并发控制块 =====
+        synchronized (startLock) {
+            if (isMainRunning()) {
+                writeJson(exchange, 200, "{\"status\":\"already_running\"}");
+                return;
+            }
+            // 如果已经在启动流程中，直接返回，避免重复拉起进程
+            if (isStarting) {
+                writeJson(exchange, 200, "{\"status\":\"starting\",\"message\":\"主服务正在启动中，请稍候\"}");
+                return;
+            }
 
-        // 端口已被别的实例占用（比如用户手动 start.bat）
-        if (probeMainPort()) {
-            writeJson(exchange, 200,
-                    "{\"status\":\"port_in_use\",\"message\":\"8080 已被其他实例占用\"}");
-            return;
-        }
+            // 端口已被别的实例占用（比如用户手动 start.bat）
+            if (probeMainPort()) {
+                writeJson(exchange, 200,
+                        "{\"status\":\"port_in_use\",\"message\":\"8080 已被其他实例占用\"}");
+                return;
+            }
 
-        try {
-            startMainProcess();
-        } catch (Exception e) {
-            lastError = e.getMessage();
-            writeJson(exchange, 500,
-                    "{\"status\":\"error\",\"message\":" + jsonString(e.getMessage()) + "}");
-            return;
+            try {
+                isStarting = true; // 标记正在启动
+                startMainProcess();
+            } catch (Exception e) {
+                isStarting = false; // 启动失败，重置标志
+                lastError = e.getMessage();
+                writeJson(exchange, 500,
+                        "{\"status\":\"error\",\"message\":" + jsonString(e.getMessage()) + "}");
+                return;
+            }
         }
+        // ==============================
 
+        // 锁外等待就绪（可能耗时几十秒，不要锁住整个启动过程）
         boolean ready = waitForMainReady();
+        
+        // 无论成功失败，清除启动中标志
+        synchronized (startLock) {
+            isStarting = false;
+        }
+
         if (ready) {
             writeJson(exchange, 200, "{\"status\":\"started\"}");
         } else {
