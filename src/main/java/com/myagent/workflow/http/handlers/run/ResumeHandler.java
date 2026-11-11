@@ -81,23 +81,23 @@ public class ResumeHandler implements HttpHandler {
             return;
         }
         ContextManager cm = session.getContextManager();
-                if (cm == null) {
-                        writeJsonError(exchange, 400, "会话上下文未初始化");
-                        return;
-                    }
-                HistoryRecorder.RecoverySnapshot snapshot = cm.readRecovery();
-                if (snapshot == null) {
-                        writeJsonError(exchange, 400, "没有可恢复的进度");
-                        return;
-                    }
-                // C7：指纹校验，基础区自 recovery 生成以来变过就拒绝
-                        String currentFingerprint = cm.getBaseFingerprint();
-                if (!currentFingerprint.equals(snapshot.fingerprint())) {
-                        writeJsonError(exchange, 409,
-                                        "上下文已变化，无法续跑（recovery 指纹 " + snapshot.fingerprint()
-                                                        + "，当前 " + currentFingerprint + "）。请重新发起任务。");
-                        return;
-                    }
+        if (cm == null) {
+            writeJsonError(exchange, 400, "会话上下文未初始化");
+            return;
+        }
+        HistoryRecorder.RecoverySnapshot snapshot = cm.readRecovery();
+        if (snapshot == null) {
+            writeJsonError(exchange, 400, "没有可恢复的进度");
+            return;
+        }
+        // C7：指纹校验，基础区自 recovery 生成以来变过就拒绝
+        String currentFingerprint = cm.getBaseFingerprint();
+        if (!currentFingerprint.equals(snapshot.fingerprint())) {
+            writeJsonError(exchange, 409,"上下文已变化，无法续跑（recovery 指纹 " + snapshot.fingerprint() + "，当前 " + currentFingerprint + "）。请重新发起任务。");
+            return;
+        }
+        // 从快照读已用轮数，续跑时循环从这里继续
+        final int startIteration = snapshot.iterationsUsed();
 
         // ===== 全局许可 =====
         if (!sessionManager.acquireRunningPermit()) {
@@ -132,7 +132,7 @@ public class ResumeHandler implements HttpHandler {
 
             // 启动 Agent（runResume，无 iteration listener）
             sse.start(
-                    (agent, maxIter) -> agent.runResume(maxIter),
+                    (agent, maxIter) -> agent.runResume(maxIter, startIteration),
                     null,
                     maxIterations
             );

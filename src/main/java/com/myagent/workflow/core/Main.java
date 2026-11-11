@@ -166,16 +166,18 @@ public class Main {
     // ==================== 运行入口 ====================
 
     // @anchor: main_run
-// 执行一次新任务：准备用户消息 → 主循环 → finally 清理
+    // 执行一次新任务：准备用户消息 → 主循环 → finally 清理
     public String run(String userRequest, int maxIterations) throws IOException {
-        return runInternal(true, userRequest, maxIterations);
+        return runInternal(true, userRequest, maxIterations, 0);
     }
 
     // @anchor: main_runResume
     // 恢复执行：跳过 prepareUserMessage，volatileWorking 已从 recovery 恢复
-    public String runResume(int maxIterations) throws IOException {
-        return runInternal(false, null, maxIterations);
+    // startIteration：从 recovery 里读到的已用轮数，循环从这里继续
+    public String runResume(int maxIterations, int startIteration) throws IOException {
+        return runInternal(false, null, maxIterations, startIteration);
     }
+
     // @anchor: main_runDefault
     // 便捷重载：使用默认最大迭代次数运行
     public String run(String userRequest) throws IOException {
@@ -184,7 +186,7 @@ public class Main {
 
     // @anchor: main_runInternal
     // 统一执行入口：isNew=true 走新任务流程，false 走恢复流程
-    private String runInternal(boolean isNew, String userRequest, int maxIterations) throws IOException {
+    private String runInternal(boolean isNew, String userRequest, int maxIterations, int startIteration) throws IOException {
         this.runningThread = Thread.currentThread();
 
         long startPrompt = 0, startCached = 0, startCompletion = 0;
@@ -192,6 +194,7 @@ public class Main {
         double startPrice = 0;
 
         String finalContent = null;
+        boolean truncated = false;
         try {
             session.markRunning(this);
             session.touch();
@@ -216,12 +219,16 @@ public class Main {
             // 新任务才准备用户消息；恢复任务的工作区已由 ResumeHandler 注入
             if (isNew) {
                 session.prepareUserMessage(userRequest, SystemPrompt.get(session.getWorkProject()));
+                // 运行 = 开新局，丢弃可能残留的旧断点
+                try { contextManager.clearRecovery(); } catch (Exception ignored) {}
             }
 
             List<Map<String, Object>> tools = ToolDefinitions.build();
 
             // ===== 主循环 =====
-            for (int iteration = 0; iteration < maxIterations; iteration++) {
+            // 续跑时从 startIteration 开始（recovery 里记录的已用轮数）
+
+            for (int iteration = startIteration; iteration < maxIterations; iteration++) {
                 checkStop();
                 session.log("--- 第 " + (iteration + 1) + " 次迭代 ---");
 
@@ -320,12 +327,14 @@ public class Main {
 
                 toolExecutor.flushDirtyAnchors();
                 contextManager.appendToWorking(currentRound);
-                // 保证末轮工具结果在 recovery 里，crash 后不重跑已完成的工作
-                contextManager.writeRecovery();
+                // 保证末轮工具结果在 recovery 里，crash / 暂停后不重跑已完成的工作
+                // 记录"已完成到第几轮"，续跑时循环从这里继续
+                contextManager.writeRecovery(iteration + 1);
             }
 
             if (finalContent == null) {
                 finalContent = "达到最大迭代次数，任务可能未完成。";
+                truncated = true;
             }
 
             return finalContent;
@@ -374,8 +383,8 @@ public class Main {
                 logger.warn("落盘原始日志失败", e);
             }
 
-            // 自然完成或用户主动停止都清除 recovery；真实异常保留供后续恢复
-            if (finalContent != null || stopRequested) {
+            // 只有"真正完成"才清 recovery。停止/异常/迭代耗尽都保留，供续跑
+            if (finalContent != null && !truncated) {
                 try {
                     contextManager.clearRecovery();
                 } catch (Exception e) {
@@ -502,7 +511,7 @@ public class Main {
 
     private void checkStop() throws IOException {
         if (stopRequested) {
-            throw new IOException("用户手动停止了任务");
+            throw new IOException("用户暂停了任务（可点击「继续上次任务」从断点续跑）");
         }
     }
 

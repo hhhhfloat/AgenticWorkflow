@@ -369,8 +369,8 @@ public class ContextManager {
 
     // @anchor: contextManager_writeRecovery
     // 写 recovery 快照：当前 buildMessages() + 基础区指纹
-    public void writeRecovery() {
-        historyRecorder.writeRecovery(buildMessages(), getBaseFingerprint());
+    public void writeRecovery(int iterationsUsed) {
+        historyRecorder.writeRecovery(buildMessages(), getBaseFingerprint(), iterationsUsed);
     }
 
     // @anchor: contextManager_readRecovery

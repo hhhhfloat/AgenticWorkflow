@@ -194,17 +194,18 @@ public class HistoryRecorder {
     }
 
     // @anchor: historyRecorder_recoverySnapshot
-// recovery 快照：基础区指纹 + 完整消息列表
-    public record RecoverySnapshot(String fingerprint, List<Map<String, Object>> messages) {}
+    // recovery 快照：基础区指纹 + 完整消息列表
+    public record RecoverySnapshot(String fingerprint, List<Map<String, Object>> messages, int iterationsUsed) {}
 
     // @anchor: historyRecorder_writeRecovery
-// 覆盖写 recovery 快照（只保留最新一份）
-    public synchronized void writeRecovery(List<Map<String, Object>> messages, String fingerprint) {
+    // 覆盖写 recovery 快照（只保留最新一份）
+    public synchronized void writeRecovery(List<Map<String, Object>> messages, String fingerprint, int iterationsUsed) {
         try {
             Map<String, Object> record = new LinkedHashMap<>();
             record.put("type", "recovery");
             record.put("timestamp", LocalDateTime.now().toString());
             record.put("fingerprint", fingerprint);
+            record.put("iterationsUsed", iterationsUsed);
             record.put("messages", messages);
             String json = objectMapper.writeValueAsString(record);
             Files.writeString(recoveryFile, json + "\n", StandardCharsets.UTF_8,
@@ -234,7 +235,8 @@ public class HistoryRecorder {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> messages = objectMapper.convertValue(
                     node.path("messages"), List.class);
-            return new RecoverySnapshot(fingerprint, messages);
+            int iterationsUsed = node.path("iterationsUsed").asInt(0);  // 旧快照缺字段默认 0
+            return new RecoverySnapshot(fingerprint, messages, iterationsUsed);
         } catch (Exception e) {
             System.err.println("⚠️ 读 recovery 失败: " + e.getMessage());
             return null;
