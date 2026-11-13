@@ -51,7 +51,7 @@
             padding: 6px 14px; border-radius: 4px; cursor: pointer;
             font-size: 13px;
         }
-        #tocToggleBtn { display: none; }
+        #tocToggleBtn { display: inline-block; }
         #reloadBtn:hover, #tocToggleBtn:hover { background: #5a9aff; }
 
         #content {
@@ -168,6 +168,13 @@
             flex-direction: column;
             flex-shrink: 0;
             overflow: hidden;
+            transition: width 0.25s ease, opacity 0.25s ease;
+        }
+        #tocPanel.collapsed {
+            width: 0;
+            opacity: 0;
+            border-left: none;
+            pointer-events: none;
         }
         #tocHeader {
             padding: 10px 16px;
@@ -323,10 +330,33 @@
         if (filePath) loadMd(filePath);
     });
 
-    document.getElementById('tocToggleBtn').addEventListener('click', () => {
-        const show = !tocPanel.classList.contains('show');
-        setPanelOpen(show);
+    const tocToggleBtn = document.getElementById('tocToggleBtn');
+
+    tocToggleBtn.addEventListener('click', () => {
+        // 窄屏：使用原有的浮动遮罩逻辑
+        if (window.matchMedia('(max-width: 768px)').matches) {
+            const show = !tocPanel.classList.contains('show');
+            setPanelOpen(show);
+        } 
+        // 宽屏：使用新增的 collapsed 类
+        else {
+            const isCollapsed = tocPanel.classList.toggle('collapsed');
+            // 可选：收起时改变图标提示
+            tocToggleBtn.textContent = isCollapsed ? '▶' : '☰';
+        }
     });
+
+    // 新增：窗口大小切换时，清理不匹配的状态类，防止界面错乱
+    window.addEventListener('resize', () => {
+       if (window.innerWidth > 768) {
+            tocPanel.classList.remove('show');
+            document.getElementById('tocMask').classList.remove('show');
+        } else {
+            tocPanel.classList.remove('collapsed');
+            tocToggleBtn.textContent = '☰';
+        }
+    });
+    
     document.getElementById('tocCloseBtn').addEventListener('click', () => {
         setPanelOpen(false);
     });
