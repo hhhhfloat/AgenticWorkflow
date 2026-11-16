@@ -25,14 +25,15 @@ public final class GccProbe implements Probe {
         String cxx = ShellPathResolver.which("g++", "clang++", "c++");
         if (cxx == null) {
             for (String dir : CANDIDATE_BINS) {
-                for (String name : new String[]{"g++", "clang++", "c++"}) {
+                for (String name : new String[] { "g++", "clang++", "c++" }) {
                     Path p = Paths.get(dir, name);
                     if (Files.isRegularFile(p) && Files.isExecutable(p)) {
                         cxx = p.toString();
                         break;
                     }
                 }
-                if (cxx != null) break;
+                if (cxx != null)
+                    break;
             }
         }
 

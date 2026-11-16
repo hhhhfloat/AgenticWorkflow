@@ -21,14 +21,17 @@ public class MavenProbe implements Probe {
     // @anchor: mavenProbe_findMaven
     private String findMaven() {
         String p = ShellPathResolver.which("mvn.cmd", "mvn.bat", "mvn");
-        if (p != null) return EnvUtil.normalize(p);
+        if (p != null)
+            return EnvUtil.normalize(p);
 
         String mh = System.getenv("MAVEN_HOME");
-        if (mh == null) mh = System.getenv("M2_HOME");
+        if (mh == null)
+            mh = System.getenv("M2_HOME");
         if (mh != null && !mh.isBlank()) {
-            for (String exe : new String[]{"mvn.cmd", "mvn.bat", "mvn"}) {
+            for (String exe : new String[] { "mvn.cmd", "mvn.bat", "mvn" }) {
                 Path c = Paths.get(mh, "bin", exe);
-                if (Files.isRegularFile(c)) return EnvUtil.normalize(c.toString());
+                if (Files.isRegularFile(c))
+                    return EnvUtil.normalize(c.toString());
             }
         }
 
@@ -49,9 +52,11 @@ public class MavenProbe implements Probe {
                 "C:\\ProgramData\\chocolatey\\lib\\maven\\apache-maven-*\\bin\\mvn.cmd",
         };
         for (String pat : patterns) {
-            if (pat == null) continue;
+            if (pat == null)
+                continue;
             String f = GlobUtil.latestFile(pat);
-            if (f != null) return EnvUtil.normalize(f);
+            if (f != null)
+                return EnvUtil.normalize(f);
         }
         return "";
     }

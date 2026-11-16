@@ -18,8 +18,7 @@ public class MinGwProbe implements Probe {
             "winsxs", "assembly", "installer", "msocache",
             "node_modules", ".git", ".svn", ".hg",
             "temp", "tmp", "cache", ".cache",
-            "onedrive", "dropbox", "appdata"
-    );
+            "onedrive", "dropbox", "appdata");
 
     @Override
     public Map<String, String> detect() {
@@ -35,7 +34,8 @@ public class MinGwProbe implements Probe {
                 "x86_64-w64-mingw32-g++.exe",
                 "i686-w64-mingw32-g++.exe",
                 "aarch64-w64-mingw32-g++.exe");
-        if (p != null) return EnvUtil.normalize(p);
+        if (p != null)
+            return EnvUtil.normalize(p);
 
         String gcc = ShellPathResolver.which(
                 "gcc.exe", "gcc",
@@ -44,7 +44,8 @@ public class MinGwProbe implements Probe {
                 "aarch64-w64-mingw32-gcc.exe");
         if (gcc != null) {
             String gpp = gcc.replaceAll("gcc(\\.exe)?$", "g++$1");
-            if (Files.isRegularFile(Paths.get(gpp))) return EnvUtil.normalize(gpp);
+            if (Files.isRegularFile(Paths.get(gpp)))
+                return EnvUtil.normalize(gpp);
         }
 
         String[] keywords = {
@@ -54,21 +55,25 @@ public class MinGwProbe implements Probe {
         };
         for (Path dir : WindowsRegistryReader.findUninstallLocations(keywords)) {
             String hit = probeBin(dir);
-            if (hit != null) return hit;
+            if (hit != null)
+                return hit;
         }
 
         for (Path root : scanRoots()) {
             String hit = scanForGpp(root, MAX_SCAN_DEPTH);
-            if (hit != null) return hit;
+            if (hit != null)
+                return hit;
         }
         return "";
     }
 
     // @anchor: mingwProbe_probeBin
     private String probeBin(Path dir) {
-        if (dir == null || !Files.isDirectory(dir)) return null;
+        if (dir == null || !Files.isDirectory(dir))
+            return null;
         Path bin = dir.resolve("bin");
-        if (!Files.isDirectory(bin)) return null;
+        if (!Files.isDirectory(bin))
+            return null;
         return findGppIn(bin);
     }
 
@@ -82,7 +87,8 @@ public class MinGwProbe implements Probe {
         };
         for (String name : exact) {
             Path f = binDir.resolve(name);
-            if (Files.isRegularFile(f)) return EnvUtil.normalize(f.toString());
+            if (Files.isRegularFile(f))
+                return EnvUtil.normalize(f.toString());
         }
         try (var s = Files.list(binDir)) {
             return s.filter(p -> p.getFileName().toString().matches(".*g\\+\\+\\.exe"))
@@ -99,27 +105,30 @@ public class MinGwProbe implements Probe {
         List<Path> roots = new ArrayList<>();
         for (File f : File.listRoots()) {
             Path p = f.toPath();
-            if (Files.exists(p)) roots.add(p);
+            if (Files.exists(p))
+                roots.add(p);
         }
         String home = EnvUtil.userHome();
         String localApp = System.getenv("LOCALAPPDATA");
         String programData = System.getenv("ProgramData");
-        for (String s : new String[]{
+        for (String s : new String[] {
                 localApp == null ? null : localApp + "\\Programs",
                 localApp == null ? null : localApp + "\\Microsoft\\WinGet\\Packages",
                 home + "\\scoop\\apps",
                 programData == null ? null : programData + "\\chocolatey",
         }) {
-            if (s == null) continue;
+            if (s == null)
+                continue;
             Path p = Paths.get(s);
-            if (Files.isDirectory(p)) roots.add(p);
+            if (Files.isDirectory(p))
+                roots.add(p);
         }
         return roots;
     }
 
     // @anchor: mingwProbe_scanForGpp
     private String scanForGpp(Path root, int maxDepth) {
-        final String[] result = {null};
+        final String[] result = { null };
         try {
             Files.walkFileTree(root, EnumSet.noneOf(FileVisitOption.class), maxDepth,
                     new SimpleFileVisitor<>() {
@@ -127,7 +136,8 @@ public class MinGwProbe implements Probe {
                         public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
                             Path nameP = dir.getFileName();
                             String name = nameP == null ? "" : nameP.toString().toLowerCase(Locale.ROOT);
-                            if (SKIP_DIRS.contains(name)) return FileVisitResult.SKIP_SUBTREE;
+                            if (SKIP_DIRS.contains(name))
+                                return FileVisitResult.SKIP_SUBTREE;
 
                             Path bin = dir.resolve("bin");
                             if (Files.isDirectory(bin)) {
@@ -145,7 +155,8 @@ public class MinGwProbe implements Probe {
                             return FileVisitResult.CONTINUE;
                         }
                     });
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return result[0];
     }
 }

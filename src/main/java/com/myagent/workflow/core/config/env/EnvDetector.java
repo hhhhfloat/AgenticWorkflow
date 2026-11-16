@@ -21,20 +21,21 @@ public final class EnvDetector {
     // 探测顺序按平台分派：Windows 保留 MinGW/MSVC，Linux 用 GccProbe
     private static final List<Probe> PROBES = Platform.isWindows()
             ? List.of(
-            new JavaHomeProbe(),
-            new MavenProbe(),
-            new PythonProbe(),
-            new NodeProbe(),
-            new MinGwProbe(),
-            new MsvcProbe())
+                    new JavaHomeProbe(),
+                    new MavenProbe(),
+                    new PythonProbe(),
+                    new NodeProbe(),
+                    new MinGwProbe(),
+                    new MsvcProbe())
             : List.of(
-            new JavaHomeProbe(),
-            new MavenProbe(),
-            new PythonProbe(),
-            new NodeProbe(),
-            new GccProbe());
+                    new JavaHomeProbe(),
+                    new MavenProbe(),
+                    new PythonProbe(),
+                    new NodeProbe(),
+                    new GccProbe());
 
-    private EnvDetector() {}
+    private EnvDetector() {
+    }
 
     // @anchor: envDetector_main
     public static void main(String[] args) {
@@ -59,7 +60,8 @@ public final class EnvDetector {
         ConfigRenderer.printSummary(env, System.currentTimeMillis() - t0);
 
         String text = ConfigRenderer.render(env);
-        if (out.getParent() != null) Files.createDirectories(out.getParent());
+        if (out.getParent() != null)
+            Files.createDirectories(out.getParent());
         Files.writeString(out, text,
                 StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         return out;
@@ -74,11 +76,14 @@ public final class EnvDetector {
         }
 
         String mingw = m.getOrDefault("mingwCompiler", "");
-        String msvc  = m.getOrDefault("msvcCompiler", "");
+        String msvc = m.getOrDefault("msvcCompiler", "");
         String cppType;
-        if (!mingw.isEmpty())     cppType = Platform.isWindows() ? "mingw" : "gcc";
-        else if (!msvc.isEmpty()) cppType = "msvc";
-        else                      cppType = Platform.isWindows() ? "mingw" : "gcc";
+        if (!mingw.isEmpty())
+            cppType = Platform.isWindows() ? "mingw" : "gcc";
+        else if (!msvc.isEmpty())
+            cppType = "msvc";
+        else
+            cppType = Platform.isWindows() ? "mingw" : "gcc";
         m.put("cppCompilerType", cppType);
         return m;
     }

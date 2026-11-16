@@ -55,10 +55,12 @@ public final class ToolDefinitions {
         // 工具-03：describe_anchors 列出锚点及其职责描述
         tools.add(defineTool(
                 "describe_anchors",
-                "返回锚点信息。file 支持逗号分隔多个片段。每个片段：先按文件匹配（精确或后缀），命中则列出该文件的全部锚点（含 _end，按行号升序）；未命中则按目录匹配，列出该目录下所有文件的 _intro 锚点描述（文件职责概览）；传 '.' 表示整个项目。",
+                "获取锚点信息。file 支持逗号分隔。传文件：列出全部锚点（含行号与符号）；"
+                + "传目录：列出直接下属文件的 _intro 描述，若总文件过多（>60）则子目录折叠为数量统计，需传具体子目录查看；"
+                + "传 '.'：仅返回项目顶层目录概览。",
                 defineParams()
-                        .prop("project_path", "string", "项目名，相对沙箱根的一级目录，例如 'demo' 或 'cipher-translator'。")
-                        .prop("file", "string", "必填。文件路径（相对沙箱根，可逗号分隔多个）或目录路径（如 'src/main/java/game'）。传 '.' 表示整个项目。")
+                        .prop("project_path", "string", "项目名，相对沙箱根的一级目录。")
+                        .prop("file", "string", "必填。文件路径或目录路径（相对沙箱根）。传 '.' 表示整个项目概览。")
                         .build(),
                 List.of("project_path", "file")
         ));

@@ -4,6 +4,8 @@ package com.myagent.workflow.tools.anchor;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.tools.PathUtils;
+import com.myagent.workflow.tools.search.SearchFileFilter;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +51,8 @@ class AnchorFormatter {
             StringBuilder sb = new StringBuilder();
             for (String raw : filePath.split("[,;]")) {
                 String hint = raw.trim();
-                if (hint.isEmpty()) continue;
+                if (hint.isEmpty())
+                    continue;
                 appendDescribeOne(sb, normalizeHint(hint, projectPath), projectAnchors, projectDir);
             }
             return sb.toString();
@@ -61,18 +64,19 @@ class AnchorFormatter {
 
     // @anchor: anchorFormatter_appendOne
     private void appendDescribeOne(StringBuilder sb, String hint,
-                                   Map<String, List<Map<String,
-                                           Object>>> projectAnchors,
-                                   Path projectDir) {
+            Map<String, List<Map<String, Object>>> projectAnchors,
+            Path projectDir) {
         List<String> fileMatches = new ArrayList<>();
         for (String key : projectAnchors.keySet()) {
-            if (key.equals(hint) || key.endsWith("/" + hint)) fileMatches.add(key);
+            if (key.equals(hint) || key.endsWith("/" + hint))
+                fileMatches.add(key);
         }
 
         if (!fileMatches.isEmpty()) {
             if (fileMatches.size() > 1) {
                 sb.append("❌ 文件 ").append(hint).append(" 有歧义，匹配到多个：\n");
-                for (String m : fileMatches) sb.append("   - ").append(m).append("\n");
+                for (String m : fileMatches)
+                    sb.append("   - ").append(m).append("\n");
                 sb.append("\n");
                 return;
             }
@@ -91,29 +95,38 @@ class AnchorFormatter {
     // - 剥离 projectPath 前缀（若存在）
     // - 传项目名本身等价于传 "."（返回空串）
     private String normalizeHint(String hint, String projectPath) {
-        if (hint == null) return "";
+        if (hint == null)
+            return "";
         String h = hint.trim().replace('\\', '/');
-        if (h.startsWith("./")) h = h.substring(2);
+        if (h.startsWith("./"))
+            h = h.substring(2);
 
         if (projectPath != null && !projectPath.isBlank()) {
             String pp = projectPath.trim().replace('\\', '/');
-            if (pp.startsWith("./")) pp = pp.substring(2);
-            while (pp.endsWith("/")) pp = pp.substring(0, pp.length() - 1);
+            if (pp.startsWith("./"))
+                pp = pp.substring(2);
+            while (pp.endsWith("/"))
+                pp = pp.substring(0, pp.length() - 1);
 
-            if (h.equals(pp)) return "";
-            if (h.startsWith(pp + "/")) h = h.substring(pp.length() + 1);
+            if (h.equals(pp))
+                return "";
+            if (h.startsWith(pp + "/"))
+                h = h.substring(pp.length() + 1);
         }
         return h;
     }
 
     private String normalizeDirHint(String hint) {
-        if (hint == null || hint.isEmpty() || ".".equals(hint)) return "";
+        if (hint == null || hint.isEmpty() || ".".equals(hint))
+            return "";
         return hint.replace('\\', '/');
     }
 
     private boolean matchesDir(String fileKey, String dirPrefix) {
-        if (dirPrefix.isEmpty()) return true;
-        if (fileKey.equals(dirPrefix)) return true;
+        if (dirPrefix.isEmpty())
+            return true;
+        if (fileKey.equals(dirPrefix))
+            return true;
         return fileKey.startsWith(dirPrefix + "/") || fileKey.endsWith("/" + dirPrefix)
                 || fileKey.contains("/" + dirPrefix + "/");
     }
@@ -121,26 +134,20 @@ class AnchorFormatter {
     private void appendDirIntro(StringBuilder sb, String dirPrefix,
                                 Map<String, List<Map<String, Object>>> projectAnchors,
                                 Path projectDir, String rawHint) {
+        // ===== 1. 统计匹配文件 =====
+        List<String> matchedFiles = new ArrayList<>();
         int total = 0, withIntro = 0;
-        StringBuilder body = new StringBuilder();
         for (Map.Entry<String, List<Map<String, Object>>> e : projectAnchors.entrySet()) {
             if (!matchesDir(e.getKey(), dirPrefix)) continue;
             total++;
-            Map<String, Object> intro = findIntroAnchor(e.getValue());
-            body.append("\n📄 ").append(e.getKey()).append("\n");
-            if (intro != null) {
-                withIntro++;
-                String desc = (String) intro.getOrDefault("desc", "");
-                if (desc == null || desc.isEmpty()) desc = "（无描述）";
-                body.append("   ").append(desc).append("\n");
-            } else {
-                body.append("   （无 _intro 锚点）\n");
-            }
+            matchedFiles.add(e.getKey());
+            if (findIntroAnchor(e.getValue()) != null) withIntro++;
         }
 
         String label = dirPrefix.isEmpty() ? "整个项目" : dirPrefix;
+
+        // ===== 2. 零匹配诊断 =====
         if (total == 0) {
-            // 索引里没有匹配 → 去文件系统确认具体原因
             if (dirPrefix.isEmpty()) {
                 sb.append("📌 ").append(label).append(" 下没有锚点记录。\n\n");
                 return;
@@ -154,33 +161,133 @@ class AnchorFormatter {
                         return;
                     }
                     if (Files.isDirectory(candidate)) {
-                        sb.append("📌 ").append(rawHint)
-                                .append(" 目录存在，但目录下没有锚点记录。\n\n");
+                        sb.append("📌 ").append(rawHint).append(" 目录存在，但目录下没有锚点记录。\n\n");
                         return;
                     }
                 }
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
             sb.append("📌 ").append(rawHint).append(" 不存在，或没有锚点记录。\n\n");
             return;
         }
-        sb.append("📌 ").append(label).append(" 文件职责概览（")
-                .append(withIntro).append("/").append(total).append(" 已标注 _intro）\n")
-                .append(body).append("\n");
+
+        // ===== 3. 分类：直接文件 vs 子目录 =====
+        boolean isCollapse = total > 60;
+        List<String> directFiles = new ArrayList<>();
+        Map<String, List<String>> subDirsMap = new TreeMap<>(); 
+        
+        for (String fileKey : matchedFiles) {
+            String rel = getRelativeToDir(fileKey, dirPrefix);
+            int slash = rel.indexOf('/');
+            if (slash < 0) {
+                directFiles.add(fileKey);
+            } else {
+                String sub = rel.substring(0, slash);
+                subDirsMap.computeIfAbsent(sub, k -> new ArrayList<>()).add(fileKey);
+            }
+        }
+
+                // ===== 4. 补充文件系统中存在的空子目录 =====
+        Path actualDir = null;
+        if (dirPrefix.isEmpty()) {
+            actualDir = projectDir;
+        } else if (!matchedFiles.isEmpty()) {
+            String firstKey = matchedFiles.get(0);
+            String rel = getRelativeToDir(firstKey, dirPrefix);
+            // 如果 firstKey 和 rel 不等，说明前缀是存在的，直接切出来
+            if (!rel.equals(firstKey)) {
+                String prefixPart = firstKey.substring(0, firstKey.length() - rel.length());
+                if (prefixPart.endsWith("/")) prefixPart = prefixPart.substring(0, prefixPart.length() - 1);
+                actualDir = projectDir.resolve(prefixPart);
+            }
+        }
+        
+        if (actualDir != null && Files.isDirectory(actualDir)) {
+            try (var stream = Files.list(actualDir)) {
+                stream.filter(Files::isDirectory)
+                      .forEach(p -> {
+                          String name = p.getFileName().toString();
+                          if (name.startsWith(".")) return; 
+                          if (SearchFileFilter.DEFAULT_EXCLUDED_DIRS.contains(name)) return;
+                          subDirsMap.putIfAbsent(name, new ArrayList<>());
+                      });
+            } catch (IOException ignored) {}
+        }
+
+        // ===== 5. 渲染头部 =====
+        sb.append("📁 ").append(label).append("（共 ").append(total).append(" 个文件，其中 ")
+          .append(withIntro).append(" 个包含 intro");
+        if (isCollapse) sb.append("。由于总文件数超过 60，子目录内部详情已折叠");
+        sb.append("）\n\n");
+
+        // ===== 6. 渲染直接文件（无条件全列） =====
+        if (!directFiles.isEmpty()) {
+            directFiles.sort(String::compareTo);
+            sb.append("📄 直接位于此目录的文件：\n");
+            for (String fileKey : directFiles) {
+                String fileName = fileKey.substring(fileKey.lastIndexOf('/') + 1);
+                Map<String, Object> intro = findIntroAnchor(projectAnchors.get(fileKey));
+                String desc = intro != null ? (String) intro.getOrDefault("desc", "") : "（无 _intro 锚点）";
+                if (desc == null || desc.isEmpty()) desc = "（无描述）";
+                sb.append("  📄 ").append(fileName).append(": ").append(desc).append("\n");
+            }
+            sb.append("\n");
+        }
+
+        // ===== 7. 渲染子目录（按是否折叠区分） =====
+        if (!subDirsMap.isEmpty()) {
+            sb.append("📂 子目录：\n");
+            for (Map.Entry<String, List<String>> e : subDirsMap.entrySet()) {
+                String sub = e.getKey();
+                List<String> files = e.getValue();
+                int subTotal = files.size();
+                int subIntro = 0;
+                for (String f : files) {
+                    if (findIntroAnchor(projectAnchors.get(f)) != null) subIntro++;
+                }
+
+                sb.append("  ├─ 📂 ").append(sub).append("/ (").append(subIntro).append("/").append(subTotal).append(" 含 intro)");
+                
+                if (!isCollapse && subTotal > 0) {
+                    // 未超限，子目录内部原样列出
+                    sb.append("：\n");
+                    files.sort(String::compareTo);
+                    for (String fileKey : files) {
+                        String rel = getRelativeToDir(fileKey, dirPrefix);
+                        Map<String, Object> intro = findIntroAnchor(projectAnchors.get(fileKey));
+                        String desc = intro != null ? (String) intro.getOrDefault("desc", "") : "（无 _intro 锚点）";
+                        if (desc == null || desc.isEmpty()) desc = "（无描述）";
+                        sb.append("  │    📄 ").append(rel).append(": ").append(desc).append("\n");
+                    }
+                } else {
+                    // 超限或空目录，直接换行
+                    sb.append("\n");
+                }
+            }
+            sb.append("\n");
+        }
+
+        // ===== 8. 折叠提示 =====
+        if (isCollapse && !subDirsMap.isEmpty()) {
+            sb.append("💡 提示：请传入具体子目录路径（如 '")
+              .append(dirPrefix.isEmpty() ? "<子目录>" : dirPrefix + "/<子目录>")
+              .append("'）获取该子目录的完整详情。\n\n");
+        }
     }
 
     private Map<String, Object> findIntroAnchor(List<Map<String, Object>> anchors) {
-        if (anchors == null || anchors.isEmpty()) return null;
+        if (anchors == null || anchors.isEmpty())
+            return null;
         Map<String, Object> first = anchors.get(0);
         String id = (String) first.get("id");
-        if (id != null && id.endsWith("_intro")) return first;
+        if (id != null && id.endsWith("_intro"))
+            return first;
         return null;
     }
 
     // @anchor: anchorFormatter_appendFileDetail
-// 渲染单文件锚点列表；超出 MAX_DISPLAYED_ANCHORS 时保留首锚点与最新若干条
+    // 渲染单文件锚点列表；超出 MAX_DISPLAYED_ANCHORS 时保留首锚点与最新若干条
     private void appendFileDetail(StringBuilder sb, String fileKey,
-                                  List<Map<String, Object>> anchors) {
+            List<Map<String, Object>> anchors) {
         sb.append("📄 ").append(fileKey).append("\n");
         if (anchors == null || anchors.isEmpty()) {
             sb.append("   （无锚点）\n\n");
@@ -191,7 +298,8 @@ class AnchorFormatter {
         int maxLine = -1;
         for (Map<String, Object> a : anchors) {
             Object lineObj = a.get("line");
-            if (lineObj instanceof Integer line && line > maxLine) maxLine = line;
+            if (lineObj instanceof Integer line && line > maxLine)
+                maxLine = line;
         }
 
         // 仅对 UPDATE.md 生效：代码文件的锚点列表本身就是索引，全列供 Agent 精确选读
@@ -214,10 +322,13 @@ class AnchorFormatter {
             int line = (int) a.get("line");
             String desc = (String) a.getOrDefault("desc", "");
             String symbol = (String) a.get("symbol");
-            if (desc == null || desc.isEmpty()) desc = "（无描述）";
+            if (desc == null || desc.isEmpty())
+                desc = "（无描述）";
             sb.append("L").append(line).append(" | ").append(id);
-            if (symbol != null && !symbol.isEmpty()) sb.append(" | ").append(symbol);
-            if (line == maxLine) sb.append(" | [末尾锚点]");
+            if (symbol != null && !symbol.isEmpty())
+                sb.append(" | ").append(symbol);
+            if (line == maxLine)
+                sb.append(" | [末尾锚点]");
             sb.append(" | ").append(desc).append("\n");
 
             // 首锚点之后插入省略提示
@@ -233,10 +344,28 @@ class AnchorFormatter {
     // @anchor: anchorFormatter_isUpdateLogFile
     // 判断相对路径对应的文件名是否为 UPDATE.md（大小写不敏感）
     private boolean isUpdateLogFile(String fileKey) {
-        if (fileKey == null) return false;
+        if (fileKey == null)
+            return false;
         String n = fileKey.replace('\\', '/');
         int slash = n.lastIndexOf('/');
         String baseName = slash >= 0 ? n.substring(slash + 1) : n;
         return "UPDATE.md".equalsIgnoreCase(baseName);
+    }
+
+    // @anchor: anchorFormatter_getRelativeToDir
+    // 提取 fileKey 相对于 dirPrefix 的路径部分。
+    // 兼容 dirPrefix 在头部、中间或为空（根目录）的情况。
+    private String getRelativeToDir(String fileKey, String dirPrefix) {
+        if (dirPrefix.isEmpty())
+            return fileKey;
+        if (fileKey.startsWith(dirPrefix + "/")) {
+            return fileKey.substring(dirPrefix.length() + 1);
+        }
+        String mid = "/" + dirPrefix + "/";
+        int idx = fileKey.indexOf(mid);
+        if (idx >= 0) {
+            return fileKey.substring(idx + mid.length());
+        }
+        return fileKey;
     }
 }

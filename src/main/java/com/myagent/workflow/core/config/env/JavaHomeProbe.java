@@ -40,22 +40,22 @@ public class JavaHomeProbe implements Probe {
 
         // 3. 平台相关常见安装位置
         if (Platform.isWindows()) {
-            String pf    = EnvUtil.envOr("ProgramFiles", "C:\\Program Files");
-            String pf86  = EnvUtil.envOr("ProgramFiles(x86)", "C:\\Program Files (x86)");
+            String pf = EnvUtil.envOr("ProgramFiles", "C:\\Program Files");
+            String pf86 = EnvUtil.envOr("ProgramFiles(x86)", "C:\\Program Files (x86)");
             String localApp = System.getenv("LOCALAPPDATA");
             String home = EnvUtil.userHome();
 
             String[] patterns = {
-                    pf  + "\\Java\\jdk*",
-                    pf  + "\\Eclipse Adoptium\\jdk*",
-                    pf  + "\\Microsoft\\jdk*",
-                    pf  + "\\Amazon Corretto\\jdk*",
-                    pf  + "\\Zulu\\zulu*",
-                    pf  + "\\BellSoft\\LibericaJDK*",
-                    pf  + "\\Semeru\\jdk*",
-                    pf  + "\\SapMachine\\jdk*",
-                    pf  + "\\RedHat\\java-*",
-                    pf  + "\\GraalVM\\graalvm-*",
+                    pf + "\\Java\\jdk*",
+                    pf + "\\Eclipse Adoptium\\jdk*",
+                    pf + "\\Microsoft\\jdk*",
+                    pf + "\\Amazon Corretto\\jdk*",
+                    pf + "\\Zulu\\zulu*",
+                    pf + "\\BellSoft\\LibericaJDK*",
+                    pf + "\\Semeru\\jdk*",
+                    pf + "\\SapMachine\\jdk*",
+                    pf + "\\RedHat\\java-*",
+                    pf + "\\GraalVM\\graalvm-*",
                     pf86 + "\\Java\\jdk*",
                     localApp == null ? null : localApp + "\\Programs\\Eclipse Adoptium\\jdk*",
                     home + "\\scoop\\apps\\openjdk*\\current",
@@ -63,9 +63,11 @@ public class JavaHomeProbe implements Probe {
                     "C:\\tools\\jdk*",
             };
             for (String pat : patterns) {
-                if (pat == null) continue;
+                if (pat == null)
+                    continue;
                 String p = GlobUtil.latestDir(pat);
-                if (p != null && Files.isDirectory(Paths.get(p))) return EnvUtil.normalize(p);
+                if (p != null && Files.isDirectory(Paths.get(p)))
+                    return EnvUtil.normalize(p);
             }
         } else {
             // Linux / macOS 常见位置
@@ -82,7 +84,8 @@ public class JavaHomeProbe implements Probe {
             };
             for (String pat : patterns) {
                 String p = GlobUtil.latestDir(pat);
-                if (p != null && Files.isDirectory(Paths.get(p))) return EnvUtil.normalize(p);
+                if (p != null && Files.isDirectory(Paths.get(p)))
+                    return EnvUtil.normalize(p);
             }
         }
 

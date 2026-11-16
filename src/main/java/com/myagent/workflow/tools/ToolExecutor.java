@@ -31,10 +31,10 @@ public class ToolExecutor {
     private final FileOperator fileOp;
     private final CodeSearcher searcher;
     private final AnchorManager anchorMgr;
-    private final PathPolicy pathPolicy;                       // ← 新增
+    private final PathPolicy pathPolicy; // ← 新增
     private final CompileRunner compileRunner;
     private final FileStructureRunner fileStructureRunner;
-    private final Map<String, ToolHandler> handlers = new HashMap<>();  // ← 新增
+    private final Map<String, ToolHandler> handlers = new HashMap<>(); // ← 新增
     private Consumer<String> logConsumer;
     private ObjectMapper objectMapper;
     private final AgentConfig config;
@@ -63,7 +63,7 @@ public class ToolExecutor {
     }
 
     private ToolExecutor(AgentConfig config, ObjectMapper objectMapper,
-                         String workProject, boolean manualMode) {
+            String workProject, boolean manualMode) {
         this.config = config;
         this.fileOp = new FileOperator();
         this.objectMapper = objectMapper;
@@ -93,14 +93,12 @@ public class ToolExecutor {
             return result;
         });
 
-        handlers.put("compile_and_run", a ->
-                compileRunner.run(a.getString("filename"),
-                        a.getString("mode", "auto"),
-                        a.getBool("run", false)));
+        handlers.put("compile_and_run", a -> compileRunner.run(a.getString("filename"),
+                a.getString("mode", "auto"),
+                a.getBool("run", false)));
 
-        handlers.put("list_directory", a ->
-                fileOp.listDirectory(a.getString("path", "."),
-                        a.getBool("recursive", false)));
+        handlers.put("list_directory", a -> fileOp.listDirectory(a.getString("path", "."),
+                a.getBool("recursive", false)));
 
         handlers.put("read_file", a -> fileOp.readFile(a.getString("filename")));
 
@@ -113,61 +111,54 @@ public class ToolExecutor {
             return result;
         });
 
-        handlers.put("search_text", a ->
-                searcher.searchText(a.getString("keyword"),
-                        a.getString("file_pattern", ".*"),
-                        a.getString("path", ".")));
+        handlers.put("search_text", a -> searcher.searchText(a.getString("keyword"),
+                a.getString("file_pattern", ".*"),
+                a.getString("path", ".")));
 
         handlers.put("build_anchor_index", a -> {
             Consumer<String> lc = this.logConsumer;
             return anchorMgr.buildAnchorIndex(a.getString("project_path"),
-                    p -> { if (lc != null) lc.accept("[进度] " + p); });
+                    p -> {
+                        if (lc != null)
+                            lc.accept("[进度] " + p);
+                    });
         });
 
-        handlers.put("insert_at_anchor", a ->
-                anchorMgr.insertAtAnchor(a.getString("anchor_id"),
-                        a.getString("content"),
-                        a.getString("position", "after"),
-                        a.getString("file")));
+        handlers.put("insert_at_anchor", a -> anchorMgr.insertAtAnchor(a.getString("anchor_id"),
+                a.getString("content"),
+                a.getString("position", "after"),
+                a.getString("file")));
 
-        handlers.put("delete_between_anchors", a ->
-                anchorMgr.deleteBetweenAnchors(a.getString("startAnchor"),
-                        a.getString("endAnchor"),
-                        a.getString("file")));
-        handlers.put("edit_between_anchors", a ->
-                anchorMgr.editBetweenAnchors(
-                        a.getString("startAnchor"),
-                        a.getString("endAnchor"),
-                        a.getString("file"),
-                        a.getString("old_string"),
-                        a.getString("new_string")));
-        handlers.put("describe_anchors", a ->
-                anchorMgr.describeAnchors(a.getString("project_path"),
-                        a.getString("file")));
+        handlers.put("delete_between_anchors", a -> anchorMgr.deleteBetweenAnchors(a.getString("startAnchor"),
+                a.getString("endAnchor"),
+                a.getString("file")));
+        handlers.put("edit_between_anchors", a -> anchorMgr.editBetweenAnchors(
+                a.getString("startAnchor"),
+                a.getString("endAnchor"),
+                a.getString("file"),
+                a.getString("old_string"),
+                a.getString("new_string")));
+        handlers.put("describe_anchors", a -> anchorMgr.describeAnchors(a.getString("project_path"),
+                a.getString("file")));
 
-        handlers.put("find_references", a ->
-                searcher.findReferences(a.getString("symbol"),
-                        a.getString("path", "."),
-                        a.getString("file_pattern", null)));
+        handlers.put("find_references", a -> searcher.findReferences(a.getString("symbol"),
+                a.getString("path", "."),
+                a.getString("file_pattern", null)));
 
-        handlers.put("find_callers", a ->
-                searcher.findCallers(a.getString("functionName"),
-                        a.getString("path", "."),
-                        a.getString("file_pattern", null)));
+        handlers.put("find_callers", a -> searcher.findCallers(a.getString("functionName"),
+                a.getString("path", "."),
+                a.getString("file_pattern", null)));
 
-        handlers.put("find_callees", a ->
-                searcher.findCallees(a.getString("functionName"),
-                        a.getString("path", "."),
-                        a.getBool("recursive", false),
-                        a.getInt("depth", 1)));
+        handlers.put("find_callees", a -> searcher.findCallees(a.getString("functionName"),
+                a.getString("path", "."),
+                a.getBool("recursive", false),
+                a.getInt("depth", 1)));
 
-        handlers.put("read_between_anchors", a ->
-                anchorMgr.readBetweenAnchors(a.getString("startAnchor"),
-                        a.getString("endAnchor"),
-                        a.getString("file")));
+        handlers.put("read_between_anchors", a -> anchorMgr.readBetweenAnchors(a.getString("startAnchor"),
+                a.getString("endAnchor"),
+                a.getString("file")));
 
-        handlers.put("get_file_structure", a ->
-                fileStructureRunner.run(a.getString("filename")));
+        handlers.put("get_file_structure", a -> fileStructureRunner.run(a.getString("filename")));
     }
 
     // @anchor: toolExecutor_setLogConsumer
@@ -187,10 +178,12 @@ public class ToolExecutor {
         Args a = new Args(args);
 
         String violation = pathPolicy.check(functionName, a);
-        if (violation != null) return violation;
+        if (violation != null)
+            return violation;
 
         ToolHandler handler = handlers.get(functionName);
-        if (handler == null) return "未知工具: " + functionName;
+        if (handler == null)
+            return "未知工具: " + functionName;
         return handler.run(a);
     }
 
@@ -205,22 +198,30 @@ public class ToolExecutor {
     public void refreshAllProjectIndexes() {
         try {
             Path sandbox = Paths.get(AgentConfig.getSandboxDir()).toAbsolutePath().normalize();
-            if (!Files.isDirectory(sandbox)) return;
+            if (!Files.isDirectory(sandbox))
+                return;
 
             Consumer<String> lc = this.logConsumer;
             try (var stream = Files.list(sandbox)) {
                 for (Path projectDir : (Iterable<Path>) stream::iterator) {
-                    if (!Files.isDirectory(projectDir)) continue;
+                    if (!Files.isDirectory(projectDir))
+                        continue;
                     String name = projectDir.getFileName().toString();
-                    if (name.startsWith(".")) continue;
+                    if (name.startsWith("."))
+                        continue;
 
                     Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
-                    if (!Files.exists(anchorsFile)) continue;
+                    if (!Files.exists(anchorsFile))
+                        continue;
 
                     try {
                         // 索引仍新鲜（无外部改动）则跳过重建
-                        if (anchorMgr.isProjectFresh(name)) continue;
-                        anchorMgr.refreshProjectIndexes(name, p -> { if (lc != null) lc.accept("[进度] " + p); });
+                        if (anchorMgr.isProjectFresh(name))
+                            continue;
+                        anchorMgr.refreshProjectIndexes(name, p -> {
+                            if (lc != null)
+                                lc.accept("[进度] " + p);
+                        });
                     } catch (Exception e) {
                         logger.warn("刷新项目索引失败: {} -> {}", name, e.getMessage());
                     }
@@ -239,21 +240,27 @@ public class ToolExecutor {
         if (workProject != null && !workProject.isBlank()) {
             targets.add(workProject);
         }
-        targets.add("tmp");   // tmp 是公共临时区，任何会话都可能在用
+        targets.add("tmp"); // tmp 是公共临时区，任何会话都可能在用
 
         Consumer<String> lc = this.logConsumer;
         for (String name : targets) {
             try {
                 Path projectDir = Paths.get(AgentConfig.getSandboxDir())
                         .resolve(name).toAbsolutePath().normalize();
-                if (!Files.isDirectory(projectDir)) continue;
+                if (!Files.isDirectory(projectDir))
+                    continue;
                 Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
-                if (!Files.exists(anchorsFile)) continue;
+                if (!Files.exists(anchorsFile))
+                    continue;
 
                 boolean shouldRebuild = (forceWorkProject && name.equals(workProject))
                         || !anchorMgr.isProjectFresh(name);
-                if (!shouldRebuild) continue;
-                anchorMgr.refreshProjectIndexes(name, p -> { if (lc != null) lc.accept("[进度] " + p); });
+                if (!shouldRebuild)
+                    continue;
+                anchorMgr.refreshProjectIndexes(name, p -> {
+                    if (lc != null)
+                        lc.accept("[进度] " + p);
+                });
             } catch (Exception e) {
                 logger.warn("刷新项目索引失败: {} - {}", name, e.getMessage());
             }
@@ -267,7 +274,10 @@ public class ToolExecutor {
     // 一轮工具调用结束后批量刷新锚点索引中的脏文件
     public void flushDirtyAnchors() {
         Consumer<String> lc = this.logConsumer;
-        anchorMgr.flushDirty(p -> { if (lc != null) lc.accept("[进度] " + p); });
+        anchorMgr.flushDirty(p -> {
+            if (lc != null)
+                lc.accept("[进度] " + p);
+        });
     }
 
 }

@@ -8,7 +8,8 @@ import java.util.List;
 
 // @anchor: envUtil_class
 public final class EnvUtil {
-    private EnvUtil() {}
+    private EnvUtil() {
+    }
 
     // @anchor: envUtil_userHome
     public static String userHome() {
@@ -23,12 +24,14 @@ public final class EnvUtil {
 
     // @anchor: envUtil_normalize
     public static String normalize(String p) {
-        if (p == null || p.isEmpty()) return "";
+        if (p == null || p.isEmpty())
+            return "";
         return p.replace('\\', '/');
     }
 
     // @anchor: envUtil_addDirIfExists
     public static void addDirIfExists(List<String> list, String p) {
-        if (p != null && Files.isDirectory(Paths.get(p))) list.add(p);
+        if (p != null && Files.isDirectory(Paths.get(p)))
+            list.add(p);
     }
 }

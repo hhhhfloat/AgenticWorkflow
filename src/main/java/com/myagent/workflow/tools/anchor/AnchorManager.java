@@ -47,8 +47,8 @@ public class AnchorManager {
         this.workProject = workProject;
     }
 
-    public AnchorManager(ObjectMapper objectMapper){
-        this(objectMapper,null);
+    public AnchorManager(ObjectMapper objectMapper) {
+        this(objectMapper, null);
     }
 
     // ===== 转发：索引构建 =====
@@ -76,14 +76,16 @@ public class AnchorManager {
     // 全量重建的唯一底层入口：显式路径校验 + 统一进度格式
     // 进度消息格式：<tag> <project> <phase> <cur>/<total> <file>
     private String rebuildInternal(String projectPath, String tag, Consumer<String> progress) {
-        if (projectPath == null || projectPath.isBlank()) return "❌ 缺少参数 project_path";
+        if (projectPath == null || projectPath.isBlank())
+            return "❌ 缺少参数 project_path";
         try {
             PathUtils.safeResolve(projectPath);
         } catch (IOException e) {
             return "❌ 非法的项目路径: " + projectPath + "（" + e.getMessage() + "）";
         }
         return anchorIndex.rebuild(projectPath, p -> {
-            if (progress == null) return;
+            if (progress == null)
+                return;
             String phaseLabel = "scan".equals(p.phase()) ? "扫描" : "解析";
             progress.accept(String.format("%s %s %s %d/%d %s",
                     tag, projectPath, phaseLabel, p.current(), p.total(), p.currentFile()));
@@ -99,18 +101,21 @@ public class AnchorManager {
         if (anchorId == null || anchorId.isBlank()) {
             return "❌ 缺少参数 anchor_id";
         }
-        if (content == null) return "❌ 缺少参数 content";
-        
+        if (content == null)
+            return "❌ 缺少参数 content";
+
         position = normalizePosition(position);
         if (!"before".equals(position) && !"after".equals(position)) {
             return "❌ position 必须是 'before' 或 'after'，收到: " + position;
         }
         AnchorResolver.ResolveResult locRes = resolver.resolveOrError(anchorId, file);
-        if (!locRes.isOk()) return locRes.error();
+        if (!locRes.isOk())
+            return locRes.error();
         AnchorLocation loc = locRes.location();
 
         String permErr = checkWorkProjectPermission(loc);
-        if (permErr != null) return permErr;
+        if (permErr != null)
+            return permErr;
         // UPDATE.md 特殊约束：末尾锚点只能在其之前插入
         if ("after".equals(position)
                 && loc.filePath != null
@@ -122,7 +127,8 @@ public class AnchorManager {
 
         try {
             Path filePath = PathUtils.safeResolve(loc.projectPath, loc.filePath);
-            if (!Files.exists(filePath)) return "❌ 文件不存在: " + loc.filePath;
+            if (!Files.exists(filePath))
+                return "❌ 文件不存在: " + loc.filePath;
 
             List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
             int targetLine = loc.line - 1;
@@ -149,23 +155,28 @@ public class AnchorManager {
         startAnchor = normalizeAnchorId(startAnchor);
         endAnchor = normalizeAnchorId(endAnchor);
 
-        if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
-        if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";
+        if (startAnchor == null || startAnchor.isBlank())
+            return "❌ 缺少参数 startAnchor";
+        if (endAnchor == null || endAnchor.isBlank())
+            return "❌ 缺少参数 endAnchor";
         if (startAnchor.equals(endAnchor)) {
             return "❌ 无法删除：startAnchor 和 endAnchor 不能相同。\n" +
-                   "  💡 删除操作需要明确界定区间边界，请提供两个不同的锚点 ID（例如 'my_func' 和 'my_func_end'）。";
+                    "  💡 删除操作需要明确界定区间边界，请提供两个不同的锚点 ID（例如 'my_func' 和 'my_func_end'）。";
         }
 
         AnchorResolver.ResolveResult startRes = resolver.resolveOrError(startAnchor, file);
-        if (!startRes.isOk()) return startRes.error();
+        if (!startRes.isOk())
+            return startRes.error();
         AnchorLocation startLoc = startRes.location();
 
         AnchorResolver.ResolveResult endRes = resolver.resolveOrError(endAnchor, file);
-        if (!endRes.isOk()) return endRes.error();
+        if (!endRes.isOk())
+            return endRes.error();
         AnchorLocation endLoc = endRes.location();
 
         String permErr = checkWorkProjectPermission(startLoc);
-        if (permErr != null) return permErr;
+        if (permErr != null)
+            return permErr;
 
         // UPDATE.md 检查
         if (startLoc.filePath != null && startLoc.filePath.toLowerCase().endsWith("update.md")) {
@@ -227,11 +238,14 @@ public class AnchorManager {
         startAnchor = normalizeAnchorId(startAnchor);
         endAnchor = normalizeAnchorId(endAnchor);
 
-        if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
-        if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";
+        if (startAnchor == null || startAnchor.isBlank())
+            return "❌ 缺少参数 startAnchor";
+        if (endAnchor == null || endAnchor.isBlank())
+            return "❌ 缺少参数 endAnchor";
 
         AnchorResolver.ResolveResult startRes = resolver.resolveOrError(startAnchor, file);
-        if (!startRes.isOk()) return startRes.error();
+        if (!startRes.isOk())
+            return startRes.error();
         AnchorLocation startLoc = startRes.location();
 
         String effectiveEndAnchor = endAnchor;
@@ -242,7 +256,7 @@ public class AnchorManager {
             // 场景1：单锚点读取，优先找配对的 _end
             String pairedId = startAnchor + "_end";
             AnchorResolver.ResolveResult pairedRes = resolver.resolveOrError(pairedId, file);
-            
+
             if (pairedRes.isOk()) {
                 effectiveEndAnchor = pairedId;
                 endLoc = pairedRes.location();
@@ -251,7 +265,7 @@ public class AnchorManager {
                 // 场景2：没有配对 _end，找文件中的下一个锚点
                 List<AnchorLocation> anchorsInFile = anchorQuery.listAnchorsInFile(startLoc.filePath, workProject);
                 anchorsInFile.sort(Comparator.comparingInt(a -> a.line));
-                
+
                 for (AnchorLocation a : anchorsInFile) {
                     if (a.line > startLoc.line) {
                         endLoc = a;
@@ -260,14 +274,14 @@ public class AnchorManager {
                         break;
                     }
                 }
-                
+
                 // 场景3：已经是文件最后一个锚点，读到文件末尾
                 if (endLoc == null) {
                     try {
                         Path filePath = PathUtils.safeResolve(startLoc.projectPath, startLoc.filePath);
                         List<String> allLines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
                         int totalLines = allLines.size();
-                        
+
                         endLoc = new AnchorLocation();
                         endLoc.projectPath = startLoc.projectPath;
                         endLoc.filePath = startLoc.filePath;
@@ -284,7 +298,8 @@ public class AnchorManager {
         } else {
             // 场景4：传了两个不同的参数
             AnchorResolver.ResolveResult endRes = resolver.resolveOrError(endAnchor, file);
-            if (!endRes.isOk()) return endRes.error();
+            if (!endRes.isOk())
+                return endRes.error();
             endLoc = endRes.location();
 
             // 宽容处理：传反了自动纠正
@@ -292,11 +307,11 @@ public class AnchorManager {
                 AnchorLocation temp = startLoc;
                 startLoc = endLoc;
                 endLoc = temp;
-                
+
                 String tempId = startAnchor;
                 startAnchor = effectiveEndAnchor;
                 effectiveEndAnchor = tempId;
-                
+
                 note = "（⚠️ 检测到起止锚点顺序传反，已自动纠正）";
             }
         }
@@ -358,21 +373,25 @@ public class AnchorManager {
     // @anchor: anchorManager_editBetweenAnchors
     // 在锚点区间内精确替换 old_string → new_string（方案 B：old_string 只覆盖要改的片段）
     public String editBetweenAnchors(String startAnchor, String endAnchor,
-                                    String file, String oldString, String newString) {
+            String file, String oldString, String newString) {
         startAnchor = normalizeAnchorId(startAnchor);
         endAnchor = normalizeAnchorId(endAnchor);
 
-        if (startAnchor == null || startAnchor.isBlank()) return "❌ 缺少参数 startAnchor";
-        if (endAnchor == null || endAnchor.isBlank()) return "❌ 缺少参数 endAnchor";
+        if (startAnchor == null || startAnchor.isBlank())
+            return "❌ 缺少参数 startAnchor";
+        if (endAnchor == null || endAnchor.isBlank())
+            return "❌ 缺少参数 endAnchor";
         if (oldString == null || oldString.isEmpty()) {
             return "❌ old_string 不能为空。\n" +
-                "  💡 若要删除某段内容，请改用 delete_between_anchors";
+                    "  💡 若要删除某段内容，请改用 delete_between_anchors";
         }
-        if (newString == null) newString = "";  // 允许空字符串 = 删除
+        if (newString == null)
+            newString = ""; // 允许空字符串 = 删除
 
         // === 1. 解析锚点（复用宽容读逻辑，但不做传反纠正——写操作要求严格） ===
         AnchorResolver.ResolveResult startRes = resolver.resolveOrError(startAnchor, file);
-        if (!startRes.isOk()) return startRes.error();
+        if (!startRes.isOk())
+            return startRes.error();
         AnchorLocation startLoc = startRes.location();
 
         AnchorLocation endLoc;
@@ -385,18 +404,20 @@ public class AnchorManager {
                 endLoc = pairedRes.location();
             } else {
                 return "❌ 锚点 " + startAnchor + " 没有配对锚点 " + pairedId + "\n" +
-                    "  💡 edit_between_anchors 需要明确的区间。若是最后一个锚点，请显式传入一个更靠后的锚点作为 endAnchor。";
+                        "  💡 edit_between_anchors 需要明确的区间。若是最后一个锚点，请显式传入一个更靠后的锚点作为 endAnchor。";
             }
         } else {
             AnchorResolver.ResolveResult endRes = resolver.resolveOrError(endAnchor, file);
-            if (!endRes.isOk()) return endRes.error();
+            if (!endRes.isOk())
+                return endRes.error();
             endLoc = endRes.location();
             effectiveEndAnchor = endAnchor;
         }
 
         // === 2. 权限与一致性校验（严格） ===
         String permErr = checkWorkProjectPermission(startLoc);
-        if (permErr != null) return permErr;
+        if (permErr != null)
+            return permErr;
         // UPDATE.md 检查：edit 也属于修改既有内容，必须拦住
         if (startLoc.filePath != null && startLoc.filePath.toLowerCase().endsWith("update.md")) {
             return "❌ UPDATE.md 只允许追加，不允许修改既有内容。\n" +
@@ -410,22 +431,23 @@ public class AnchorManager {
         }
         if (startLoc.line >= endLoc.line) {
             return "❌ 起始锚点必须在结束锚点之前（行 " + startLoc.line + " >= 行 " + endLoc.line + "）\n" +
-                "  💡 检查是否把 startAnchor 和 endAnchor 传反了。";
+                    "  💡 检查是否把 startAnchor 和 endAnchor 传反了。";
         }
-        
+
         try {
             Path filePath = PathUtils.safeResolve(startLoc.projectPath, startLoc.filePath);
-            if (!Files.exists(filePath)) return "❌ 文件不存在: " + startLoc.filePath;
+            if (!Files.exists(filePath))
+                return "❌ 文件不存在: " + startLoc.filePath;
 
             List<String> lines = Files.readAllLines(filePath, StandardCharsets.UTF_8);
 
             // === 3. 提取区间内容（严格开区间：锚点行本身不可被编辑） ===
-            int startLine = startLoc.line - 1;     // 0-based 锚点行
+            int startLine = startLoc.line - 1; // 0-based 锚点行
             int endLine = endLoc.line - 1;
 
             if (endLine - startLine <= 1) {
                 return "⚠️ 锚点区间内无内容可编辑（锚点之间只有 " + (endLine - startLine - 1) + " 行）\n" +
-                    "  💡 锚点行本身不可被 edit 修改。如需修改锚点行附近，请用 insert_at_anchor。";
+                        "  💡 锚点行本身不可被 edit 修改。如需修改锚点行附近，请用 insert_at_anchor。";
             }
 
             // 区间内容行（不含起止锚点行）
@@ -439,7 +461,8 @@ public class AnchorManager {
                 return AnchorEditDiagnostics.buildNotFoundError(intervalLines, oldString, startLoc, endLoc);
             }
             if (matches.size() > 1) {
-                return AnchorEditDiagnostics.buildAmbiguousError(intervalText, oldString, matches, startLoc, endLoc, effectiveEndAnchor);
+                return AnchorEditDiagnostics.buildAmbiguousError(intervalText, oldString, matches, startLoc, endLoc,
+                        effectiveEndAnchor);
             }
 
             // === 5. 唯一匹配：执行替换 ===
@@ -460,9 +483,9 @@ public class AnchorManager {
 
             // === 6. 组装新文件内容 ===
             List<String> newFileLines = new ArrayList<>();
-            newFileLines.addAll(lines.subList(0, startLine + 1));      // 含起锚点行
+            newFileLines.addAll(lines.subList(0, startLine + 1)); // 含起锚点行
             newFileLines.addAll(newIntervalLines);
-            newFileLines.addAll(lines.subList(endLine, lines.size()));  // 含终锚点行及之后
+            newFileLines.addAll(lines.subList(endLine, lines.size())); // 含终锚点行及之后
 
             FileOperator.writeLinesAtomic(filePath, newFileLines);
             onFileModified(startLoc.projectPath, startLoc.filePath);
@@ -472,7 +495,8 @@ public class AnchorManager {
             int delta = newLineCount - oldLineCount;
 
             return "✅ 已在 " + startLoc.filePath + " 的锚点区间 [" + startAnchor + " → " + effectiveEndAnchor + "] 内完成替换\n" +
-                "   行数变化：" + oldLineCount + " 行 → " + newLineCount + " 行（净 " + (delta >= 0 ? "+" : "") + delta + " 行）";
+                    "   行数变化：" + oldLineCount + " 行 → " + newLineCount + " 行（净 " + (delta >= 0 ? "+" : "") + delta
+                    + " 行）";
 
         } catch (IOException e) {
             logger.error("editBetweenAnchors 失败", e);
@@ -495,11 +519,12 @@ public class AnchorManager {
         markDirty(projectPath, fileRelPath);
     }
 
-     // @anchor: anchorManager_flushDirty
+    // @anchor: anchorManager_flushDirty
     // 批量刷新所有脏文件。由 ToolExecutor 在一轮工具调用结束后触发。
     // 缺失索引的全量兜底用 tag=flush_rebuild 走带进度的路径
     public void flushDirty(Consumer<String> progress) {
-        if (dirtyFiles.isEmpty()) return;
+        if (dirtyFiles.isEmpty())
+            return;
         Set<String> fullRebuiltProjects = new HashSet<>();
         for (Map.Entry<String, Set<String>> e : dirtyFiles.entrySet()) {
             String project = e.getKey();
@@ -507,7 +532,8 @@ public class AnchorManager {
                 Path projectDir = PathUtils.safeResolve(project);
                 Path anchorsFile = projectDir.resolve(AgentConfig.getAnchorIndexName());
                 if (!Files.exists(anchorsFile)) {
-                    if (fullRebuiltProjects.contains(project)) continue;
+                    if (fullRebuiltProjects.contains(project))
+                        continue;
                     rebuildInternal(project, "flush_rebuild", progress);
                     fullRebuiltProjects.add(project);
                 } else {
@@ -515,7 +541,7 @@ public class AnchorManager {
                 }
             } catch (Exception ex) {
                 logger.warn("批量刷新脏文件失败: {} - {}", project, ex.getMessage());
-           }
+            }
         }
         dirtyFiles.clear();
     }
@@ -524,12 +550,14 @@ public class AnchorManager {
     // 从沙箱相对路径推导 (projectPath, fileRelPath)，标记为脏文件。
     public void markDirtyByFilename(String filename) {
         String[] parts = splitSandboxPath(filename);
-        if (parts == null) return;
+        if (parts == null)
+            return;
         String projectPath = parts[0];
         String fileRelPath = parts[1];
         try {
             Path projectDir = PathUtils.safeResolve(projectPath);
-            if (!Files.isDirectory(projectDir)) return;
+            if (!Files.isDirectory(projectDir))
+                return;
         } catch (IOException e) {
             logger.warn("标记脏文件失败（跳过）: {} - {}", projectPath, e.getMessage());
             return;
@@ -541,16 +569,20 @@ public class AnchorManager {
     // @anchor: anchorManager_splitSandboxPath
     // 把沙箱相对路径统一归一化为 (projectPath, fileRelPath)。
     private static String[] splitSandboxPath(String filename) {
-        if (filename == null || filename.isBlank()) return null;
+        if (filename == null || filename.isBlank())
+            return null;
         String n = filename.replace('\\', '/').trim();
-        while (n.startsWith("./")) n = n.substring(2);
+        while (n.startsWith("./"))
+            n = n.substring(2);
         if (n.startsWith("sandbox/")) {
             n = n.substring("sandbox/".length());
         }
-        if (n.isBlank()) return null;
+        if (n.isBlank())
+            return null;
         int slash = n.indexOf('/');
-        if (slash <= 0) return null;
-        return new String[]{ n.substring(0, slash), n.substring(slash + 1) };
+        if (slash <= 0)
+            return null;
+        return new String[] { n.substring(0, slash), n.substring(slash + 1) };
     }
 
     // ===== 转发：查找锚点 =====
@@ -562,14 +594,16 @@ public class AnchorManager {
 
     // @anchor: anchorManager_describeAnchors
     public String describeAnchors(String projectPath, String filePath) {
-        if (projectPath == null || projectPath.isBlank()) return "❌ 缺少参数 project_path";
+        if (projectPath == null || projectPath.isBlank())
+            return "❌ 缺少参数 project_path";
         return anchorFormatter.describe(projectPath, filePath);
     }
 
     // @anchor: anchorManager_describeByPath
     public String describeAnchorsByPath(String filename) {
         String[] parts = splitSandboxPath(filename);
-        if (parts == null) return "❌ 无法推导项目: " + filename;
+        if (parts == null)
+            return "❌ 无法推导项目: " + filename;
         String project = parts[0];
         String file = parts[1];
         String result = describeAnchors(project, file);
@@ -610,12 +644,14 @@ public class AnchorManager {
     private boolean isLastAnchorInFile(AnchorLocation loc) {
         try {
             Path filePath = PathUtils.safeResolve(loc.projectPath, loc.filePath);
-            if (!Files.exists(filePath)) return false;
+            if (!Files.exists(filePath))
+                return false;
             List<Map<String, Object>> anchors = AnchorScanner.scan(filePath);
             int maxLine = 0;
             for (Map<String, Object> a : anchors) {
                 Object lineObj = a.get("line");
-                if (lineObj instanceof Integer line && line > maxLine) maxLine = line;
+                if (lineObj instanceof Integer line && line > maxLine)
+                    maxLine = line;
             }
             return loc.line == maxLine && maxLine > 0;
         } catch (IOException e) {
@@ -628,14 +664,15 @@ public class AnchorManager {
     // @anchor: anchorManager_normalizeAnchorId
     // 剥离模型可能误传的 @anchor: 前缀、注释符、空格等
     private static String normalizeAnchorId(String raw) {
-        if (raw == null) return null;
+        if (raw == null)
+            return null;
         String id = raw.trim();
         id = id.replaceAll("^//\\s*", "")
-               .replaceAll("^/\\*\\s*", "")
-               .replaceAll("^<!--\\s*", "")
-               .replaceAll("^#\\s*", "")
-               .replaceAll("\\s*\\*/$", "")
-               .replaceAll("\\s*-->$", "");
+                .replaceAll("^/\\*\\s*", "")
+                .replaceAll("^<!--\\s*", "")
+                .replaceAll("^#\\s*", "")
+                .replaceAll("\\s*\\*/$", "")
+                .replaceAll("\\s*-->$", "");
         if (id.toLowerCase().startsWith("@anchor:")) {
             id = id.substring(8).trim();
         }
@@ -645,10 +682,13 @@ public class AnchorManager {
     // @anchor: anchorManager_normalizePosition
     // 兼容模型误传的 append/prepend，以及空值默认
     private static String normalizePosition(String raw) {
-        if (raw == null || raw.isBlank()) return "after";
+        if (raw == null || raw.isBlank())
+            return "after";
         String p = raw.trim().toLowerCase();
-        if ("append".equals(p) || "after".equals(p)) return "after";
-        if ("prepend".equals(p) || "before".equals(p)) return "before";
+        if ("append".equals(p) || "after".equals(p))
+            return "after";
+        if ("prepend".equals(p) || "before".equals(p))
+            return "before";
         return raw; // 交给后续逻辑报错
     }
 }

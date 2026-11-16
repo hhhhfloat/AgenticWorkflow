@@ -8,14 +8,15 @@ import java.util.Map;
 
 // @anchor: configRenderer_class
 public final class ConfigRenderer {
-    private ConfigRenderer() {}
+    private ConfigRenderer() {
+    }
 
     // @anchor: configRenderer_printSummary
     public static void printSummary(Map<String, String> env, long elapsedMs) {
         System.out.println();
-        for (String key : new String[]{
+        for (String key : new String[] {
                 "javaHome", "mavenCommand", "pythonInterpreter",
-                "nodeInterpreter", "cppCompilerType", "mingwCompiler", "msvcCompiler"}) {
+                "nodeInterpreter", "cppCompilerType", "mingwCompiler", "msvcCompiler" }) {
             String v = env.get(key);
             System.out.printf("  %-18s : %s%n", key, v == null || v.isEmpty() ? "(未找到)" : v);
         }
@@ -50,7 +51,8 @@ public final class ConfigRenderer {
     }
 
     private static String esc(String v) {
-        if (v == null || v.isEmpty()) return "";
+        if (v == null || v.isEmpty())
+            return "";
         return v.replace("\\", "/").replace(":", "\\:").replace("=", "\\=");
     }
 }

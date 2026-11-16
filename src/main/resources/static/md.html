@@ -2,25 +2,32 @@
 <!-- Markdown 预览页：读取 path 参数并用 marked 渲染，带标题目录侧栏 -->
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Markdown 预览</title>
     <script src="marked.min.js"></script>
     <style>
-        * { box-sizing: border-box; }
-        html, body {
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
             margin: 0;
             height: 100%;
             font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
             background: #1a1a1a;
             color: #ddd;
         }
+
         #layout {
             display: flex;
             height: 100vh;
             overflow: hidden;
         }
+
         #main {
             flex: 1;
             display: flex;
@@ -28,6 +35,7 @@
             min-width: 0;
             overflow: hidden;
         }
+
         #bar {
             background: #222;
             padding: 10px 16px;
@@ -38,6 +46,7 @@
             font-size: 13px;
             flex-shrink: 0;
         }
+
         #pathLabel {
             flex: 1;
             color: #9cdcfe;
@@ -46,13 +55,26 @@
             text-overflow: ellipsis;
             white-space: nowrap;
         }
-        #reloadBtn, #tocToggleBtn {
-            background: #4a8aff; color: #fff; border: none;
-            padding: 6px 14px; border-radius: 4px; cursor: pointer;
+
+        #reloadBtn,
+        #tocToggleBtn {
+            background: #4a8aff;
+            color: #fff;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
             font-size: 13px;
         }
-        #tocToggleBtn { display: inline-block; }
-        #reloadBtn:hover, #tocToggleBtn:hover { background: #5a9aff; }
+
+        #tocToggleBtn {
+            display: inline-block;
+        }
+
+        #reloadBtn:hover,
+        #tocToggleBtn:hover {
+            background: #5a9aff;
+        }
 
         #content {
             flex: 1;
@@ -60,34 +82,98 @@
             padding: 20px 32px;
             line-height: 1.7;
         }
-        #content h1, #content h2, #content h3 { color: #4a8aff; margin-top: 1.5em; }
-        #content h1:first-child { margin-top: 0; }
-        #content code { background: #2a2a2a; padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
-        #content pre { background: #1a1a1a; padding: 12px; border-radius: 4px; overflow-x: auto; }
-        #content pre code { background: none; padding: 0; }
-        #content ul, #content ol { padding-left: 1.5em; }
-        #content li { margin: 0.3em 0; }
-        #content table { border-collapse: collapse; margin: 1em 0; }
-        #content th, #content td { border: 1px solid #444; padding: 6px 12px; }
-        #content th { background: #2a2a2a; }
-                /* ===== 链接 ===== */
+
+        #content h1,
+        #content h2,
+        #content h3 {
+            color: #4a8aff;
+            margin-top: 1.5em;
+        }
+
+        #content h1:first-child {
+            margin-top: 0;
+        }
+
+        #content code {
+            background: #2a2a2a;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.9em;
+        }
+
+        #content pre {
+            background: #1a1a1a;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        #content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        #content ul,
+        #content ol {
+            padding-left: 1.5em;
+        }
+
+        #content li {
+            margin: 0.3em 0;
+        }
+
+        #content table {
+            border-collapse: collapse;
+            margin: 1em 0;
+        }
+
+        #content th,
+        #content td {
+            border: 1px solid #444;
+            padding: 6px 12px;
+        }
+
+        #content th {
+            background: #2a2a2a;
+        }
+
+        /* ===== 链接 ===== */
         #content a {
             color: #58a6ff;
             text-decoration: none;
             border-bottom: 1px solid rgba(88, 166, 255, 0.3);
             transition: color 0.15s, border-color 0.15s;
         }
+
         #content a:hover {
             color: #79c0ff;
             border-bottom-color: #79c0ff;
         }
-        #content a:visited { color: #a371f7; }
-        #content a:visited:hover { color: #d2a8ff; border-bottom-color: #d2a8ff; }
+
+        #content a:visited {
+            color: #a371f7;
+        }
+
+        #content a:visited:hover {
+            color: #d2a8ff;
+            border-bottom-color: #d2a8ff;
+        }
 
         /* ===== 强调 ===== */
-        #content strong, #content b { color: #f0f6fc; font-weight: 600; }
-        #content em, #content i { color: #d0d7de; }
-        #content del { color: #6e7681; }
+        #content strong,
+        #content b {
+            color: #f0f6fc;
+            font-weight: 600;
+        }
+
+        #content em,
+        #content i {
+            color: #d0d7de;
+        }
+
+        #content del {
+            color: #6e7681;
+        }
 
         /* ===== 引用块 ===== */
         #content blockquote {
@@ -98,8 +184,14 @@
             color: #b0b8c0;
             border-radius: 0 4px 4px 0;
         }
-        #content blockquote p { margin: 0.3em 0; }
-        #content blockquote a { color: #79c0ff; }
+
+        #content blockquote p {
+            margin: 0.3em 0;
+        }
+
+        #content blockquote a {
+            color: #79c0ff;
+        }
 
         /* ===== 分隔线 ===== */
         #content hr {
@@ -109,7 +201,7 @@
         }
 
         /* ===== 行内代码（与已有的 pre code 区分） ===== */
-        #content :not(pre) > code {
+        #content :not(pre)>code {
             background: #2a2a2a;
             color: #ff9d6f;
             padding: 2px 6px;
@@ -132,7 +224,10 @@
             vertical-align: middle;
             accent-color: #4a8aff;
         }
-        #content li > input[type="checkbox"] { margin-left: -1.3em; }
+
+        #content li>input[type="checkbox"] {
+            margin-left: -1.3em;
+        }
 
         /* ===== 代码块改进（语法高亮无插件，用色阶区分） ===== */
         #content pre {
@@ -141,21 +236,39 @@
             border-radius: 6px;
             padding: 14px 16px;
         }
+
         #content pre code {
             color: #e6edf3;
             font-size: 13px;
             line-height: 1.5;
         }
-        .empty { color: #888; text-align: center; padding: 40px 0; }
-        .error { color: #f88; }
+
+        .empty {
+            color: #888;
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .error {
+            color: #f88;
+        }
 
         /* 标题滚动时留出顶部一点空间 */
-        #content h1, #content h2, #content h3,
-        #content h4, #content h5, #content h6 {
+        #content h1,
+        #content h2,
+        #content h3,
+        #content h4,
+        #content h5,
+        #content h6 {
             scroll-margin-top: 60px;
         }
-        #content h1.flash, #content h2.flash, #content h3.flash,
-        #content h4.flash, #content h5.flash, #content h6.flash {
+
+        #content h1.flash,
+        #content h2.flash,
+        #content h3.flash,
+        #content h4.flash,
+        #content h5.flash,
+        #content h6.flash {
             background: #2a3a4a;
             transition: background 0.6s;
         }
@@ -170,12 +283,14 @@
             overflow: hidden;
             transition: width 0.25s ease, opacity 0.25s ease;
         }
+
         #tocPanel.collapsed {
             width: 0;
             opacity: 0;
             border-left: none;
             pointer-events: none;
         }
+
         #tocHeader {
             padding: 10px 16px;
             font-size: 13px;
@@ -184,11 +299,13 @@
             border-bottom: 1px solid #333;
             flex-shrink: 0;
         }
+
         #tocList {
             flex: 1;
             overflow-y: auto;
             padding: 8px 0;
         }
+
         .toc-item {
             padding: 5px 16px 5px 0;
             cursor: pointer;
@@ -199,32 +316,61 @@
             word-break: break-word;
             transition: background 0.15s, border-color 0.15s, color 0.15s;
         }
+
         .toc-item:hover {
             background: #252525;
             border-left-color: #4a8aff;
             color: #ddd;
         }
+
         .toc-item.active {
             background: #252525;
             border-left-color: #58a6ff;
             color: #58a6ff;
         }
+
         .toc-item .toc-dot {
             display: inline-block;
-            width: 4px; height: 4px;
+            width: 4px;
+            height: 4px;
             border-radius: 50%;
             background: #58a6ff;
             vertical-align: middle;
             margin-right: 6px;
             opacity: 0;
         }
-        .toc-item.active .toc-dot { opacity: 1; }
-        .toc-item.depth-1 { padding-left: 12px; font-size: 13px; color: #ddd; font-weight: 500; }
-        .toc-item.depth-2 { padding-left: 24px; }
-        .toc-item.depth-3 { padding-left: 36px; }
-        .toc-item.depth-4 { padding-left: 48px; }
-        .toc-item.depth-5 { padding-left: 60px; }
-        .toc-item.depth-6 { padding-left: 72px; }
+
+        .toc-item.active .toc-dot {
+            opacity: 1;
+        }
+
+        .toc-item.depth-1 {
+            padding-left: 12px;
+            font-size: 13px;
+            color: #ddd;
+            font-weight: 500;
+        }
+
+        .toc-item.depth-2 {
+            padding-left: 24px;
+        }
+
+        .toc-item.depth-3 {
+            padding-left: 36px;
+        }
+
+        .toc-item.depth-4 {
+            padding-left: 48px;
+        }
+
+        .toc-item.depth-5 {
+            padding-left: 60px;
+        }
+
+        .toc-item.depth-6 {
+            padding-left: 72px;
+        }
+
         .toc-empty {
             color: #666;
             font-style: italic;
@@ -233,12 +379,20 @@
             text-align: center;
         }
 
-        .toc-mask { display: none; }
-        #tocCloseBtn { display: none; }
+        .toc-mask {
+            display: none;
+        }
+
+        #tocCloseBtn {
+            display: none;
+        }
 
         /* 窄屏：侧栏浮动覆盖 */
         @media (max-width: 768px) {
-            #tocToggleBtn { display: inline-block; }
+            #tocToggleBtn {
+                display: inline-block;
+            }
+
             #tocPanel {
                 position: fixed;
                 top: 0;
@@ -249,10 +403,17 @@
                 transform: translateX(100%);
                 transition: transform 0.25s ease;
                 z-index: 100;
-                box-shadow: -4px 0 16px rgba(0,0,0,0.4);
+                box-shadow: -4px 0 16px rgba(0, 0, 0, 0.4);
             }
-            #tocPanel.show { transform: translateX(0); }
-            #content { padding: 16px; }
+
+            #tocPanel.show {
+                transform: translateX(0);
+            }
+
+            #content {
+                padding: 16px;
+            }
+
             /* 遮罩：只在窄屏出现 */
             .toc-mask {
                 display: block;
@@ -264,6 +425,7 @@
                 transition: opacity 0.25s ease, visibility 0.25s ease;
                 z-index: 99;
             }
+
             .toc-mask.show {
                 opacity: 1;
                 visibility: visible;
@@ -275,6 +437,7 @@
                 justify-content: space-between;
                 align-items: center;
             }
+
             #tocCloseBtn {
                 display: inline-block;
                 background: transparent;
@@ -285,243 +448,246 @@
                 padding: 4px 12px;
             }
         }
-
     </style>
 </head>
+
 <body>
-<div id="layout">
-    <main id="main">
-        <div id="bar">
-            <span id="pathLabel">加载中...</span>
-            <button id="tocToggleBtn" title="目录">☰</button>
-            <button id="reloadBtn">↻ 刷新</button>
-        </div>
-        <div id="content"><div class="empty">加载中...</div></div>
-    </main>
-    <div id="tocMask" class="toc-mask"></div>
-    <aside id="tocPanel">
-        <div id="tocHeader">
-            <span>📑 目录</span>
-            <button id="tocCloseBtn" title="关闭">✕</button>
-        </div>
-        <div id="tocList"></div>
-    </aside>
-</div>
+    <div id="layout">
+        <main id="main">
+            <div id="bar">
+                <span id="pathLabel">加载中...</span>
+                <button id="tocToggleBtn" title="目录">☰</button>
+                <button id="reloadBtn">↻ 刷新</button>
+            </div>
+            <div id="content">
+                <div class="empty">加载中...</div>
+            </div>
+        </main>
+        <div id="tocMask" class="toc-mask"></div>
+        <aside id="tocPanel">
+            <div id="tocHeader">
+                <span>📑 目录</span>
+                <button id="tocCloseBtn" title="关闭">✕</button>
+            </div>
+            <div id="tocList"></div>
+        </aside>
+    </div>
 
-<script>
-    const content = document.getElementById('content');
-    const pathLabel = document.getElementById('pathLabel');
-    const tocList = document.getElementById('tocList');
-    const tocPanel = document.getElementById('tocPanel');
+    <script>
+        const content = document.getElementById('content');
+        const pathLabel = document.getElementById('pathLabel');
+        const tocList = document.getElementById('tocList');
+        const tocPanel = document.getElementById('tocPanel');
 
-    const params = new URLSearchParams(location.search);
-    const filePath = params.get('path');
+        const params = new URLSearchParams(location.search);
+        const filePath = params.get('path');
 
-    let headingObserver = null;
+        let headingObserver = null;
 
-    if (!filePath) {
-        content.innerHTML = '<div class="empty error">缺少 path 参数</div>';
-    } else {
-        pathLabel.textContent = filePath;
-        loadMd(filePath);
-    }
-
-    document.getElementById('reloadBtn').addEventListener('click', () => {
-        if (filePath) loadMd(filePath);
-    });
-
-    const tocToggleBtn = document.getElementById('tocToggleBtn');
-
-    tocToggleBtn.addEventListener('click', () => {
-        // 窄屏：使用原有的浮动遮罩逻辑
-        if (window.matchMedia('(max-width: 768px)').matches) {
-            const show = !tocPanel.classList.contains('show');
-            setPanelOpen(show);
-        } 
-        // 宽屏：使用新增的 collapsed 类
-        else {
-            const isCollapsed = tocPanel.classList.toggle('collapsed');
-            // 可选：收起时改变图标提示
-            tocToggleBtn.textContent = isCollapsed ? '▶' : '☰';
-        }
-    });
-
-    // 新增：窗口大小切换时，清理不匹配的状态类，防止界面错乱
-    window.addEventListener('resize', () => {
-       if (window.innerWidth > 768) {
-            tocPanel.classList.remove('show');
-            document.getElementById('tocMask').classList.remove('show');
+        if (!filePath) {
+            content.innerHTML = '<div class="empty error">缺少 path 参数</div>';
         } else {
-            tocPanel.classList.remove('collapsed');
-            tocToggleBtn.textContent = '☰';
-        }
-    });
-    
-    document.getElementById('tocCloseBtn').addEventListener('click', () => {
-        setPanelOpen(false);
-    });
-    document.getElementById('tocMask').addEventListener('click', () => {
-        setPanelOpen(false);
-    });
-
-    // @anchor: md_setPanelOpen
-    // 打开/关闭目录面板，并同步遮罩显示
-    function setPanelOpen(open) {
-        tocPanel.classList.toggle('show', open);
-        const mask = document.getElementById('tocMask');
-        if (mask) mask.classList.toggle('show', open);
-    }
-
-    // @anchor: md_load
-    // 拉取并渲染 markdown，随后构建目录
-    async function loadMd(path) {
-        content.innerHTML = '<div class="empty">加载中...</div>';
-        tocList.innerHTML = '';
-        if (headingObserver) { headingObserver.disconnect(); headingObserver = null; }
-        try {
-            const res = await fetch('/' + path + '?t=' + Date.now());
-            if (!res.ok) {
-                content.innerHTML = '<div class="empty error">文件不存在（' + path + '）</div>';
-                return;
-            }
-            const md = await res.text();
-            if (!md.trim()) {
-                content.innerHTML = '<div class="empty">文件为空</div>';
-                return;
-            }
-            content.innerHTML = marked.parse(md, { gfm: true, breaks: true });
-            buildToc();
-        } catch (err) {
-            content.innerHTML = '<div class="empty error">加载失败：' + err.message + '</div>';
-        }
-    }
-
-    // @anchor: md_buildToc
-    // 提取渲染后 h1-h6，赋 id 并生成目录
-    function buildToc() {
-        const headings = content.querySelectorAll('h1, h2, h3, h4, h5, h6');
-        if (headings.length === 0) {
-            tocList.innerHTML = '<div class="toc-empty">无标题</div>';
-            return;
+            pathLabel.textContent = filePath;
+            loadMd(filePath);
         }
 
-        const usedIds = new Set();
-        const entries = [];
-
-        headings.forEach(h => {
-            const level = parseInt(h.tagName.substring(1), 10);
-            const text = (h.textContent || '').trim();
-            if (!text) return;
-
-            let id = h.id;
-            if (!id) {
-                id = slugify(text);
-                // 去重
-                let base = id, n = 1;
-                while (usedIds.has(id)) {
-                    id = base + '-' + (n++);
-                }
-                h.id = id;
-            }
-            usedIds.add(id);
-
-            entries.push({ id, level, text, el: h });
+        document.getElementById('reloadBtn').addEventListener('click', () => {
+            if (filePath) loadMd(filePath);
         });
 
-        if (entries.length === 0) {
-            tocList.innerHTML = '<div class="toc-empty">无有效标题</div>';
-            return;
-        }
+        const tocToggleBtn = document.getElementById('tocToggleBtn');
 
-        // 按最大层级归一化缩进
-        const minLevel = Math.min(...entries.map(e => e.level));
+        tocToggleBtn.addEventListener('click', () => {
+            // 窄屏：使用原有的浮动遮罩逻辑
+            if (window.matchMedia('(max-width: 768px)').matches) {
+                const show = !tocPanel.classList.contains('show');
+                setPanelOpen(show);
+            }
+            // 宽屏：使用新增的 collapsed 类
+            else {
+                const isCollapsed = tocPanel.classList.toggle('collapsed');
+                // 可选：收起时改变图标提示
+                tocToggleBtn.textContent = isCollapsed ? '▶' : '☰';
+            }
+        });
 
-        tocList.innerHTML = '';
-        for (const e of entries) {
-            const depth = Math.min(e.level - minLevel + 1, 6);
-            const item = document.createElement('div');
-            item.className = 'toc-item depth-' + depth;
-            item.dataset.targetId = e.id;
+        // 新增：窗口大小切换时，清理不匹配的状态类，防止界面错乱
+        window.addEventListener('resize', () => {
+            if (window.innerWidth > 768) {
+                tocPanel.classList.remove('show');
+                document.getElementById('tocMask').classList.remove('show');
+            } else {
+                tocPanel.classList.remove('collapsed');
+                tocToggleBtn.textContent = '☰';
+            }
+        });
 
-            const dot = document.createElement('span');
-            dot.className = 'toc-dot';
-            item.appendChild(dot);
-
-            item.appendChild(document.createTextNode(e.text));
-            item.addEventListener('click', () => jumpTo(e.id));
-            tocList.appendChild(item);
-        }
-
-        setupObserver(entries);
-    }
-
-    // @anchor: md_slugify
-    // 中文/英文标题转简单 id（保留中文，空白与标点折叠为 -）
-    function slugify(text) {
-        return text
-            .toLowerCase()
-            .replace(/\s+/g, '-')
-            .replace(/[^\w\u4e00-\u9fa5\-]/g, '')
-            .replace(/-+/g, '-')
-            .replace(/^-|-$/g, '')
-        || 'heading';
-    }
-
-    // @anchor: md_jumpTo
-    // 点击目录项：滚动 + 闪烁 + 主动高亮
-    function jumpTo(id) {
-        const el = document.getElementById(id);
-        if (!el) return;
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        el.classList.add('flash');
-        setTimeout(() => el.classList.remove('flash'), 1200);
-        setActive(id);
-        // 移动端：跳转后收起面板
-        if (window.innerWidth <= 768) {
+        document.getElementById('tocCloseBtn').addEventListener('click', () => {
             setPanelOpen(false);
-        }
-    }
-
-    // @anchor: md_setActive
-    // 设置目录高亮项
-    function setActive(id) {
-        tocList.querySelectorAll('.toc-item').forEach(it => {
-            it.classList.toggle('active', it.dataset.targetId === id);
         });
-        // 把活动项滚动到目录可视区
-        const active = tocList.querySelector('.toc-item.active');
-        if (active && active.scrollIntoView) {
-            active.scrollIntoView({ block: 'nearest' });
+        document.getElementById('tocMask').addEventListener('click', () => {
+            setPanelOpen(false);
+        });
+
+        // @anchor: md_setPanelOpen
+        // 打开/关闭目录面板，并同步遮罩显示
+        function setPanelOpen(open) {
+            tocPanel.classList.toggle('show', open);
+            const mask = document.getElementById('tocMask');
+            if (mask) mask.classList.toggle('show', open);
         }
-    }
 
-    // @anchor: md_setupObserver
-    // 用 IntersectionObserver 监听标题进入视口，自动高亮目录
-    function setupObserver(entries) {
-        if (!('IntersectionObserver' in window)) return;
-
-        // 记录可见标题，取最靠上的一个作为 active
-        const visible = new Set();
-
-        headingObserver = new IntersectionObserver((items) => {
-            for (const it of items) {
-                const id = it.target.id;
-                if (it.isIntersecting) visible.add(id);
-                else visible.delete(id);
+        // @anchor: md_load
+        // 拉取并渲染 markdown，随后构建目录
+        async function loadMd(path) {
+            content.innerHTML = '<div class="empty">加载中...</div>';
+            tocList.innerHTML = '';
+            if (headingObserver) { headingObserver.disconnect(); headingObserver = null; }
+            try {
+                const res = await fetch('/' + path + '?t=' + Date.now());
+                if (!res.ok) {
+                    content.innerHTML = '<div class="empty error">文件不存在（' + path + '）</div>';
+                    return;
+                }
+                const md = await res.text();
+                if (!md.trim()) {
+                    content.innerHTML = '<div class="empty">文件为空</div>';
+                    return;
+                }
+                content.innerHTML = marked.parse(md, { gfm: true, breaks: true });
+                buildToc();
+            } catch (err) {
+                content.innerHTML = '<div class="empty error">加载失败：' + err.message + '</div>';
             }
-            if (visible.size === 0) return;
-            // 按文档顺序取第一个可见的
+        }
+
+        // @anchor: md_buildToc
+        // 提取渲染后 h1-h6，赋 id 并生成目录
+        function buildToc() {
+            const headings = content.querySelectorAll('h1, h2, h3, h4, h5, h6');
+            if (headings.length === 0) {
+                tocList.innerHTML = '<div class="toc-empty">无标题</div>';
+                return;
+            }
+
+            const usedIds = new Set();
+            const entries = [];
+
+            headings.forEach(h => {
+                const level = parseInt(h.tagName.substring(1), 10);
+                const text = (h.textContent || '').trim();
+                if (!text) return;
+
+                let id = h.id;
+                if (!id) {
+                    id = slugify(text);
+                    // 去重
+                    let base = id, n = 1;
+                    while (usedIds.has(id)) {
+                        id = base + '-' + (n++);
+                    }
+                    h.id = id;
+                }
+                usedIds.add(id);
+
+                entries.push({ id, level, text, el: h });
+            });
+
+            if (entries.length === 0) {
+                tocList.innerHTML = '<div class="toc-empty">无有效标题</div>';
+                return;
+            }
+
+            // 按最大层级归一化缩进
+            const minLevel = Math.min(...entries.map(e => e.level));
+
+            tocList.innerHTML = '';
             for (const e of entries) {
-                if (visible.has(e.id)) { setActive(e.id); return; }
-            }
-        }, {
-            root: content,
-            rootMargin: '-10% 0px -70% 0px',
-            threshold: 0
-        });
+                const depth = Math.min(e.level - minLevel + 1, 6);
+                const item = document.createElement('div');
+                item.className = 'toc-item depth-' + depth;
+                item.dataset.targetId = e.id;
 
-        entries.forEach(e => headingObserver.observe(e.el));
-    }
-</script>
+                const dot = document.createElement('span');
+                dot.className = 'toc-dot';
+                item.appendChild(dot);
+
+                item.appendChild(document.createTextNode(e.text));
+                item.addEventListener('click', () => jumpTo(e.id));
+                tocList.appendChild(item);
+            }
+
+            setupObserver(entries);
+        }
+
+        // @anchor: md_slugify
+        // 中文/英文标题转简单 id（保留中文，空白与标点折叠为 -）
+        function slugify(text) {
+            return text
+                .toLowerCase()
+                .replace(/\s+/g, '-')
+                .replace(/[^\w\u4e00-\u9fa5\-]/g, '')
+                .replace(/-+/g, '-')
+                .replace(/^-|-$/g, '')
+                || 'heading';
+        }
+
+        // @anchor: md_jumpTo
+        // 点击目录项：滚动 + 闪烁 + 主动高亮
+        function jumpTo(id) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            el.classList.add('flash');
+            setTimeout(() => el.classList.remove('flash'), 1200);
+            setActive(id);
+            // 移动端：跳转后收起面板
+            if (window.innerWidth <= 768) {
+                setPanelOpen(false);
+            }
+        }
+
+        // @anchor: md_setActive
+        // 设置目录高亮项
+        function setActive(id) {
+            tocList.querySelectorAll('.toc-item').forEach(it => {
+                it.classList.toggle('active', it.dataset.targetId === id);
+            });
+            // 把活动项滚动到目录可视区
+            const active = tocList.querySelector('.toc-item.active');
+            if (active && active.scrollIntoView) {
+                active.scrollIntoView({ block: 'nearest' });
+            }
+        }
+
+        // @anchor: md_setupObserver
+        // 用 IntersectionObserver 监听标题进入视口，自动高亮目录
+        function setupObserver(entries) {
+            if (!('IntersectionObserver' in window)) return;
+
+            // 记录可见标题，取最靠上的一个作为 active
+            const visible = new Set();
+
+            headingObserver = new IntersectionObserver((items) => {
+                for (const it of items) {
+                    const id = it.target.id;
+                    if (it.isIntersecting) visible.add(id);
+                    else visible.delete(id);
+                }
+                if (visible.size === 0) return;
+                // 按文档顺序取第一个可见的
+                for (const e of entries) {
+                    if (visible.has(e.id)) { setActive(e.id); return; }
+                }
+            }, {
+                root: content,
+                rootMargin: '-10% 0px -70% 0px',
+                threshold: 0
+            });
+
+            entries.forEach(e => headingObserver.observe(e.el));
+        }
+    </script>
 </body>
+
 </html>

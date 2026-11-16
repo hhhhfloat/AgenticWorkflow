@@ -9,7 +9,8 @@ import java.util.concurrent.TimeUnit;
 // @anchor: commandRunner_class
 // 命令执行器：waitFor 带超时 + 超时强杀 + 异步读输出
 public final class CommandRunner {
-    private CommandRunner() {}
+    private CommandRunner() {
+    }
 
     // @anchor: commandRunner_run
     // 执行命令并返回输出（默认字符集）；超时强杀并抛 IOException
@@ -26,7 +27,8 @@ public final class CommandRunner {
                         output.append(new String(buf, 0, len, Charset.defaultCharset()));
                     }
                 }
-            } catch (IOException ignored) {}
+            } catch (IOException ignored) {
+            }
         });
         reader.setDaemon(true);
         reader.start();
@@ -34,7 +36,12 @@ public final class CommandRunner {
         try {
             boolean finished = p.waitFor(timeoutSeconds, TimeUnit.SECONDS);
             if (!finished) {
-                p.descendants().forEach(ph -> { try { ph.destroyForcibly(); } catch (Exception ignored) {} });
+                p.descendants().forEach(ph -> {
+                    try {
+                        ph.destroyForcibly();
+                    } catch (Exception ignored) {
+                    }
+                });
                 p.destroyForcibly();
                 p.waitFor(2, TimeUnit.SECONDS);
                 reader.join(500);
