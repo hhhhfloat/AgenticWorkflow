@@ -5,6 +5,7 @@ package com.myagent.workflow.tools;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.myagent.workflow.core.config.AgentConfig;
 import com.myagent.workflow.tools.anchor.AnchorManager;
+import com.myagent.workflow.tools.archive.UpdateArchive;
 import com.myagent.workflow.tools.runner.CompileRunner;
 import com.myagent.workflow.tools.runner.Compiler;
 import com.myagent.workflow.tools.runner.FileStructureRunner;
@@ -34,6 +35,7 @@ public class ToolExecutor {
     private final PathPolicy pathPolicy; // ← 新增
     private final CompileRunner compileRunner;
     private final FileStructureRunner fileStructureRunner;
+    private final UpdateArchive updateArchive;
     private final Map<String, ToolHandler> handlers = new HashMap<>(); // ← 新增
     private Consumer<String> logConsumer;
     private ObjectMapper objectMapper;
@@ -74,6 +76,7 @@ public class ToolExecutor {
         Compiler compiler = new Compiler(config);
         this.compileRunner = new CompileRunner(config, compiler);
         this.fileStructureRunner = new FileStructureRunner(anchorMgr);
+        this.updateArchive = new UpdateArchive(objectMapper, workProject);
         registerHandlers();
     }
 
@@ -110,6 +113,11 @@ public class ToolExecutor {
             }
             return result;
         });
+        handlers.put("append_log", a -> updateArchive.appendLog(
+                a.getString("threadId"), a.getString("title"), a.getString("summary"),
+                a.getString("details"), a.getString("files"), a.getString("status")));
+        handlers.put("query_log", a -> updateArchive.queryLog(
+                a.getString("threadId"), a.getInt("latestNumber", 3)));
 
         handlers.put("search_text", a -> searcher.searchText(a.getString("keyword"),
                 a.getString("file_pattern", ".*"),

@@ -215,12 +215,16 @@ public class HttpServerMain {
         reg(server, "/projects", new ProjectsHandler(), false);
         reg(server, "/browse", new BrowseHandler(), false);
         reg(server, "/archive", new ArchiveHandler(), true);
+        reg(server, "/archive/data", new ArchiveDataHandler(), false);
         reg(server, "/upload", new UploadHandler(), true);
         reg(server, "/createProject", new CreateProjectHandler(), true);
         reg(server, "/openFolder", new OpenFolderHandler(), true);
         reg(server, "/openTerminal", new OpenTerminalHandler(), true);
         reg(server, "/scan-files", new ScanFilesHandler(), false);
         reg(server, "/tool", new ToolHandler(), true);
+        // 更新档案馆
+        reg(server, "/update-log/data",   new UpdateLogDataHandler(),   false);
+        reg(server, "/update-log/action", new UpdateLogActionHandler(), true);
 
         // ── 静态资源（放行） ──
         reg(server, "/mobile", new StaticHandler(), false);
