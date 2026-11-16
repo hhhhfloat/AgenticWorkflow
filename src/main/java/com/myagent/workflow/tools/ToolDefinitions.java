@@ -237,10 +237,10 @@ public final class ToolDefinitions {
                 tools.add(defineTool("append_log",
                                 "向项目更新档案追加一条记录。如果 threadId 不存在会自动创建（首次需提供 title）。按主题归类，同一主题的迭代用同一个 threadId。",
                                 defineParams()
-                                                .prop("threadId", "string", "线程 ID，英文小写+下划线，如 'ui_optimization'")
+                                                .prop("threadId", "string", "线程 ID，仅支持字母、数字和下划线，如 'Ui_optimization'")
                                                 .prop("title", "string", "线程标题，仅在首次创建线程时必填")
                                                 .prop("summary", "string", "一句话摘要（≤80 字）")
-                                                .prop("details", "string", "详细说明（选填）")
+                                                .prop("details", "string", "详细说明（选填），可使用markdown格式")
                                                 .prop("files", "string", "涉及文件，逗号分隔（选填）")
                                                 .prop("status", "string", "线程状态：active / closed，选填，默认 active")
                                                 .build(),
@@ -252,7 +252,7 @@ public final class ToolDefinitions {
                                 "查询项目更新档案。不传 threadId 返回全部线程概览；传 threadId 返回该线程最近 N 条记录的纯文本。",
                                 defineParams()
                                                 .prop("threadId", "string", "线程 ID（选填）。不传则返回全部概览。")
-                                                .prop("latestNumber", "integer", "返回最近多少条，默认 3")
+                                                .prop("latestNumber", "integer", "返回最近多少条，默认 3，最小 1")
                                                 .build(),
                                 List.of()));
                 return tools;

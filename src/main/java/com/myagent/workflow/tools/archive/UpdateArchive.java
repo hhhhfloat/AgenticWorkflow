@@ -41,17 +41,23 @@ public class UpdateArchive {
     }
 
     // @anchor: updateArchive_getUpdateDir
-    // 获取（并创建）当前项目的 .update 目录
+    // 获取（并创建）当前项目的 .update 目录（用于写操作）
     private Path getUpdateDir() throws IOException {
-        if (workProject == null || workProject.isBlank()) {
-            throw new IOException("未绑定工作项目，无法使用更新档案馆");
-        }
-        Path projectDir = PathUtils.safeResolve(workProject);
-        Path updateDir = projectDir.resolve(".update");
+        Path updateDir = resolveUpdateDir();
         if (!Files.exists(updateDir)) {
             Files.createDirectories(updateDir);
         }
         return updateDir;
+    }
+
+    // @anchor: updateArchive_resolveUpdateDir
+    // 仅解析路径，不创建目录（用于读操作，避免只读产生副作用）
+    private Path resolveUpdateDir() throws IOException {
+        if (workProject == null || workProject.isBlank()) {
+            throw new IOException("未绑定工作项目，无法使用更新档案馆");
+        }
+        Path projectDir = PathUtils.safeResolve(workProject);
+        return projectDir.resolve(".update");
     }
 
     // @anchor: updateArchive_appendLog
@@ -65,6 +71,11 @@ public class UpdateArchive {
                 return "❌ threadId 只能包含字母、数字和下划线";
             if (summary == null || summary.isBlank())
                 return "❌ summary 不能为空";
+
+            if (status != null && !status.isBlank()
+                    && !"active".equals(status) && !"closed".equals(status)) {
+                return "❌ status 只能是 'active' 或 'closed'，收到: " + status;
+            }
 
             try {
                 Path updateDir = getUpdateDir();
@@ -105,6 +116,9 @@ public class UpdateArchive {
                         if (!t.isEmpty())
                             filesArr.add(t);
                     }
+                    if (filesArr.size() > 0) {
+                        update.set("files", filesArr);
+                    }
                     update.set("files", filesArr);
                 }
                 updates.add(update);
@@ -125,62 +139,76 @@ public class UpdateArchive {
         }
     }
 
-    // @anchor: updateArchive_queryLog
-    // 查询记录（保持不变）
+        // @anchor: updateArchive_queryLog
+    // 查询记录：返回人类/模型友好的纯文本
     public String queryLog(String threadId, int latestNumber) {
         try {
-            Path updateDir = getUpdateDir();
+            Path updateDir = resolveUpdateDir();
+            Path indexFile = updateDir.resolve("index.json");
+
             if (threadId == null || threadId.isBlank()) {
-                Path indexFile = updateDir.resolve("index.json");
-                if (!Files.exists(indexFile))
-                    return "📭 暂无更新档案";
+                if (!Files.exists(indexFile)) return "📭 暂无更新档案（还没有任何记录）";
+                
                 ObjectNode indexNode = (ObjectNode) mapper.readTree(indexFile.toFile());
                 ArrayNode threads = (ArrayNode) indexNode.get("threads");
-                if (threads.size() == 0)
-                    return "📭 更新档案为空";
+                if (threads.size() == 0) return "📭 更新档案为空";
+                
+                // 【新增】概览按 last_updated 倒序排列
+                List<JsonNode> list = new ArrayList<>();
+                for (JsonNode t : threads) list.add(t);
+                list.sort((a, b) -> b.path("last_updated").asText().compareTo(a.path("last_updated").asText()));
 
                 StringBuilder sb = new StringBuilder();
-                sb.append("📚 更新档案概览（共 ").append(threads.size()).append(" 个主题线程）：\n\n");
-                for (JsonNode t : threads) {
+                sb.append("📚 更新档案概览（共 ").append(list.size()).append(" 个主题线程）：\n\n");
+                for (JsonNode t : list) {
                     sb.append("- [").append(t.get("thread_id").asText()).append("] ")
-                            .append(t.get("title").asText())
-                            .append(" (").append(t.get("status").asText()).append(") | ")
-                            .append("最后更新: ").append(t.get("last_updated").asText()).append(" | ")
-                            .append("共 ").append(t.get("update_count").asInt()).append(" 条记录\n");
+                      .append(t.get("title").asText())
+                      .append(" (").append(t.get("status").asText()).append(") | ")
+                      .append("最后更新: ").append(t.get("last_updated").asText()).append(" | ")
+                      .append("共 ").append(t.get("update_count").asInt()).append(" 条记录\n");
                 }
                 sb.append("\n💡 提示：传入具体的 `threadId` 可查看该线程的最近记录。");
                 return sb.toString();
-            } else {
-                Path threadFile = updateDir.resolve("thread_" + threadId + ".json");
-                if (!Files.exists(threadFile))
-                    return "❌ 未找到线程: " + threadId;
-                ObjectNode threadNode = (ObjectNode) mapper.readTree(threadFile.toFile());
-                ArrayNode ups = (ArrayNode) threadNode.get("updates");
-                int start = Math.max(0, ups.size() - latestNumber);
-                int shown = ups.size() - start;
+            }
 
-                StringBuilder sb = new StringBuilder();
-                sb.append("📚 线程 [").append(threadId).append("]（")
-                        .append(threadNode.get("title").asText()).append("）最近 ")
-                        .append(shown).append(" 条更新：\n\n");
+            // ===== 明细分支 =====
+            Path threadFile = updateDir.resolve("thread_" + threadId + ".json");
+            if (!Files.exists(threadFile)) return "❌ 未找到线程: " + threadId;
+            ObjectNode threadNode = (ObjectNode) mapper.readTree(threadFile.toFile());
+            ArrayNode ups = (ArrayNode) threadNode.get("updates");
+            
+            // 【修复】updates 是倒序的（最新在 index 0），直接从头取 N 条
+            int safeLatest = Math.max(1, latestNumber);
+            int end = Math.min(ups.size(), safeLatest);
 
-                for (int i = start; i < ups.size(); i++) {
-                    ObjectNode u = (ObjectNode) ups.get(i);
-                    sb.append("[").append(u.get("timestamp").asText()).append("] ")
-                            .append(u.get("summary").asText()).append("\n");
-                    if (u.has("details"))
-                        sb.append("  详情: ").append(u.get("details").asText()).append("\n");
-                    if (u.has("files") && u.get("files").size() > 0) {
-                        sb.append("  文件: ");
-                        for (JsonNode f : u.get("files"))
-                            sb.append(f.asText()).append(", ");
-                        sb.setLength(sb.length() - 2);
-                        sb.append("\n");
+            StringBuilder sb = new StringBuilder();
+            sb.append("📚 线程 [").append(threadId).append("]（")
+              .append(threadNode.get("title").asText()).append("）最近 ")
+              .append(end).append(" 条更新：\n\n");
+
+            for (int i = 0; i < end; i++) {
+                ObjectNode u = (ObjectNode) ups.get(i);
+                sb.append("[").append(u.get("timestamp").asText()).append("] ")
+                  .append(u.get("summary").asText()).append("\n");
+                if (u.has("details")) {
+                    // 【优化】多行 details 缩进处理
+                    String details = u.get("details").asText();
+                    String[] lines = details.split("\n", -1);
+                    sb.append("  详情: ").append(lines[0]).append("\n");
+                    for (int j = 1; j < lines.length; j++) {
+                        sb.append("        ").append(lines[j]).append("\n");
                     }
+                }
+                if (u.has("files") && u.get("files").size() > 0) {
+                    sb.append("  文件: ");
+                    for (JsonNode f : u.get("files")) sb.append(f.asText()).append(", ");
+                    sb.setLength(sb.length() - 2);
                     sb.append("\n");
                 }
-                return sb.toString();
+                sb.append("\n");
             }
+            return sb.toString();
+
         } catch (Exception e) {
             return "❌ 读取更新档案失败: " + e.getMessage();
         }

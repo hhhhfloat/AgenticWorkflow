@@ -70,6 +70,12 @@ function addActionButtons(label, path, isRoot) {
                 window.open('/scan.html?path=' + encodeURIComponent('sandbox/' + projectName), '_blank');
             }
         });
+        items.push({
+            icon: '🗄️', label: '查看更新日志',
+            onClick: () => {
+                window.open('/update-log.html?project=' + encodeURIComponent('sandbox/' + projectName), '_blank');
+            }
+        });
     } else if (isTestProjectsProject) {
         const projectName = parts[2];
         items.push({
@@ -80,6 +86,12 @@ function addActionButtons(label, path, isRoot) {
                 if (typeof runRegisteredProject === 'function') {
                     await runRegisteredProject(projectName, meta.filename, meta.mode);
                 }
+            }
+        });
+        items.push({
+            icon: '🗄️', label: '查看更新日志',
+            onClick: () => {
+                window.open('/update-log.html?project=' + encodeURIComponent(path), '_blank');
             }
         });
     }
