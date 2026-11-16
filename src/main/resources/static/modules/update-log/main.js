@@ -143,6 +143,7 @@ async function ulInit() {
     ulBindThreadList();
     ulBindTimeline();
     ulBindRemoteSync();
+    await ulBuildFileIndex();
     await ulLoadData();
 }
 

@@ -110,12 +110,54 @@ function ulBuildUpdateCard(thread, update, index) {
     const files = document.createElement('div');
     files.className = 'ul-update-files';
     (update.files || []).forEach((file) => {
+        const result = ulFileHref(file);
+
+        if (result.missing) {
+            // 1. 文件已丢失（找不到）
+            const span = document.createElement('span');
+            span.className = 'ul-file-badge ul-file-missing';
+            span.title = '文件可能已被删除或重命名';
+            span.textContent = file + ' ⚠';
+            files.appendChild(span);
+            return;
+        }
+
+        if (result.ambiguous) {
+            // 2. 同名文件歧义（全项目有多个同名文件）
+            const link = document.createElement('a');
+            link.className = 'ul-file-badge ul-file-ambiguous';
+            link.href = 'javascript:void(0)';
+            link.title = '存在多个同名文件，点击选择目标路径';
+            link.textContent = file + ' ❓';
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const candidates = result.candidates;
+                // 为了不引入额外的弹窗组件，这里用原生 prompt 让用户选择序号
+                const msg = '存在多个同名文件，请选择序号打开：\n\n' +
+                    candidates.map((c, i) => `${i + 1}. ${c}`).join('\n');
+                const choice = window.prompt(msg);
+                if (choice) {
+                    const idx = parseInt(choice, 10) - 1;
+                    if (idx >= 0 && idx < candidates.length) {
+                        // 拿到精确路径后，重新调用 ulFileHref 并传入 resolvedPath 参数
+                        const finalResult = ulFileHref(candidates[idx], true);
+                        if (finalResult && finalResult.href) {
+                            window.open(finalResult.href, '_blank');
+                        }
+                    }
+                }
+            });
+            files.appendChild(link);
+            return;
+        }
+
+        // 3. 正常情况
         const link = document.createElement('a');
         link.className = 'ul-file-badge';
-        link.href = ulFileHref(file);
+        link.href = result.href;
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
-        link.title = '在代码预览中打开 ' + UL.project + '/' + file;
+        link.title = '在代码预览中打开 ' + file;
         link.textContent = file;
         files.appendChild(link);
     });

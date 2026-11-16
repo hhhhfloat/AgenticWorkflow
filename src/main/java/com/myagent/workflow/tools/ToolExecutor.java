@@ -113,12 +113,23 @@ public class ToolExecutor {
             }
             return result;
         });
+                // @anchor: toolExecutor_registerHandlers
         handlers.put("append_log", a -> updateArchive.appendLog(
-                a.getString("threadId"), a.getString("title"), a.getString("summary"),
-                a.getString("details"), a.getString("files"), a.getString("status")));
-        handlers.put("query_log", a -> updateArchive.queryLog(
-                a.getString("threadId"), a.getInt("latestNumber", 3)));
+                a.getString("threadId"), 
+                a.getString("title"), 
+                a.getString("summary"),
+                a.getString("details"), 
+                a.getString("files"), 
+                a.getString("status"),
+                a.getString("timestamp") // 新增透传
+        ));
 
+        handlers.put("query_log", a -> updateArchive.queryLog(
+                a.getString("threadId"), 
+                a.getString("keyword"),          // 新增透传
+                a.getString("latestNumber")      // 类型已改为 String
+        ));
+        
         handlers.put("search_text", a -> searcher.searchText(a.getString("keyword"),
                 a.getString("file_pattern", ".*"),
                 a.getString("path", ".")));

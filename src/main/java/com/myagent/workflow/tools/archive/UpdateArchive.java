@@ -63,7 +63,7 @@ public class UpdateArchive {
     // @anchor: updateArchive_appendLog
     // 追加更新记录。如果 thread 不存在会自动创建；如果已 closed，会自动激活。
     public String appendLog(String threadId, String title, String summary, String details, String filesStr,
-            String status) {
+            String status, String timestamp) {
         synchronized (lock()) {
             if (threadId == null || threadId.isBlank())
                 return "❌ threadId 不能为空";
@@ -97,14 +97,23 @@ public class UpdateArchive {
                     threadNode.put("thread_id", threadId);
                     threadNode.put("title", title);
                     threadNode.put("status", status != null ? status : "active");
-                    threadNode.put("created_at", LocalDateTime.now().format(DATE_FMT));
+                    // 创建时间也支持自定义
+                    String createDate = (timestamp != null && timestamp.length() >= 10)
+                            ? timestamp.substring(0, 10)
+                            : LocalDateTime.now().format(DATE_FMT);
+                    threadNode.put("created_at", createDate);
                     threadNode.putArray("updates");
                     isNew = true;
                 }
 
                 ArrayNode updates = (ArrayNode) threadNode.get("updates");
                 ObjectNode update = mapper.createObjectNode();
-                update.put("timestamp", LocalDateTime.now().format(TIME_FMT));
+
+                // 使用自定义时间戳，否则用当前时间
+                String ts = (timestamp != null && !timestamp.isBlank())
+                        ? timestamp.trim()
+                        : LocalDateTime.now().format(TIME_FMT);
+                update.put("timestamp", ts);
                 update.put("summary", summary);
                 if (details != null && !details.isBlank())
                     update.put("details", details);
@@ -139,69 +148,176 @@ public class UpdateArchive {
         }
     }
 
-        // @anchor: updateArchive_queryLog
+    // @anchor: updateArchive_queryLog
     // 查询记录：返回人类/模型友好的纯文本
-    public String queryLog(String threadId, int latestNumber) {
+    public String queryLog(String threadId, String keyword, String latestNumber) {
         try {
             Path updateDir = resolveUpdateDir();
             Path indexFile = updateDir.resolve("index.json");
 
+            // ===== 新增：全局关键词搜索分支 =====
+            if (keyword != null && !keyword.isBlank()) {
+                if (!Files.exists(updateDir))
+                    return "📭 暂无更新档案";
+                List<JsonNode> allMatches = new ArrayList<>();
+                String kw = keyword.trim().toLowerCase();
+
+                try (var stream = Files.list(updateDir)) {
+                    var files = stream.filter(
+                            p -> p.getFileName().toString().startsWith("thread_") && p.toString().endsWith(".json"))
+                            .toList();
+                    for (Path tf : files) {
+                        ObjectNode t = (ObjectNode) mapper.readTree(tf.toFile());
+                        String tid = t.get("thread_id").asText();
+                        String tTitle = t.get("title").asText();
+                        for (JsonNode u : t.get("updates")) {
+                            String uText = (u.path("summary").asText() + " " + u.path("details").asText() + " "
+                                    + u.path("files").toString()).toLowerCase();
+                            if (uText.contains(kw)) {
+                                // 为了展示方便，把 thread 信息塞进副本里
+                                ObjectNode match = u.deepCopy();
+                                match.put("_thread_id", tid);
+                                match.put("_thread_title", tTitle);
+                                allMatches.add(match);
+                            }
+                        }
+                    }
+                }
+
+                if (allMatches.isEmpty())
+                    return "🔍 未找到包含「" + keyword + "」的记录。";
+
+                // 按时间倒序排
+                allMatches.sort((a, b) -> b.path("timestamp").asText().compareTo(a.path("timestamp").asText()));
+
+                // 解析 String 类型的 latestNumber 决定搜索结果上限
+                int searchLimit = 20; // 全局搜索默认返回 20 条
+                if (latestNumber != null && !latestNumber.isBlank()) {
+                    String s = latestNumber.trim();
+                    // 全局搜索不支持单点定位，如果传了 "#5"，剥离 "#" 当条数上限用
+                    if (s.startsWith("#"))
+                        s = s.substring(1);
+                    try {
+                        int parsed = Integer.parseInt(s);
+                        if (parsed > 0)
+                            searchLimit = parsed;
+                    } catch (NumberFormatException ignored) {
+                    }
+                }
+
+                int showCount = Math.min(allMatches.size(), searchLimit);
+
+                StringBuilder sb = new StringBuilder();
+                sb.append("🔍 找到 ").append(allMatches.size()).append(" 条包含「").append(keyword).append("」的记录（展示前 ")
+                        .append(showCount).append(" 条）：\n\n");
+                for (int i = 0; i < showCount; i++) {
+                    JsonNode u = allMatches.get(i);
+                    sb.append("[").append(u.path("timestamp").asText()).append("] ")
+                            .append("[").append(u.path("_thread_id").asText()).append("] ")
+                            .append(u.path("summary").asText()).append("\n");
+                    if (u.has("details"))
+                        sb.append("  详情: ").append(u.path("details").asText().replace("\n", "\n        ")).append("\n");
+                    sb.append("\n");
+                }
+                return sb.toString();
+            }
+
             if (threadId == null || threadId.isBlank()) {
-                if (!Files.exists(indexFile)) return "📭 暂无更新档案（还没有任何记录）";
-                
+                if (!Files.exists(indexFile))
+                    return "📭 暂无更新档案（还没有任何记录）";
+
                 ObjectNode indexNode = (ObjectNode) mapper.readTree(indexFile.toFile());
                 ArrayNode threads = (ArrayNode) indexNode.get("threads");
-                if (threads.size() == 0) return "📭 更新档案为空";
-                
+                if (threads.size() == 0)
+                    return "📭 更新档案为空";
+
                 // 【新增】概览按 last_updated 倒序排列
                 List<JsonNode> list = new ArrayList<>();
-                for (JsonNode t : threads) list.add(t);
+                for (JsonNode t : threads)
+                    list.add(t);
                 list.sort((a, b) -> b.path("last_updated").asText().compareTo(a.path("last_updated").asText()));
 
                 StringBuilder sb = new StringBuilder();
                 sb.append("📚 更新档案概览（共 ").append(list.size()).append(" 个主题线程）：\n\n");
                 for (JsonNode t : list) {
                     sb.append("- [").append(t.get("thread_id").asText()).append("] ")
-                      .append(t.get("title").asText())
-                      .append(" (").append(t.get("status").asText()).append(") | ")
-                      .append("最后更新: ").append(t.get("last_updated").asText()).append(" | ")
-                      .append("共 ").append(t.get("update_count").asInt()).append(" 条记录\n");
+                            .append(t.get("title").asText())
+                            .append(" (").append(t.get("status").asText()).append(") | ")
+                            .append("最后更新: ").append(t.get("last_updated").asText()).append(" | ")
+                            .append("共 ").append(t.get("update_count").asInt()).append(" 条记录\n");
                 }
                 sb.append("\n💡 提示：传入具体的 `threadId` 可查看该线程的最近记录。");
                 return sb.toString();
             }
 
-            // ===== 明细分支 =====
+            // ===== 3. 明细分支 =====
             Path threadFile = updateDir.resolve("thread_" + threadId + ".json");
-            if (!Files.exists(threadFile)) return "❌ 未找到线程: " + threadId;
+            if (!Files.exists(threadFile))
+                return "❌ 未找到线程: " + threadId;
             ObjectNode threadNode = (ObjectNode) mapper.readTree(threadFile.toFile());
             ArrayNode ups = (ArrayNode) threadNode.get("updates");
-            
-            // 【修复】updates 是倒序的（最新在 index 0），直接从头取 N 条
-            int safeLatest = Math.max(1, latestNumber);
-            int end = Math.min(ups.size(), safeLatest);
 
-            StringBuilder sb = new StringBuilder();
-            sb.append("📚 线程 [").append(threadId).append("]（")
-              .append(threadNode.get("title").asText()).append("）最近 ")
-              .append(end).append(" 条更新：\n\n");
-
-            for (int i = 0; i < end; i++) {
-                ObjectNode u = (ObjectNode) ups.get(i);
-                sb.append("[").append(u.get("timestamp").asText()).append("] ")
-                  .append(u.get("summary").asText()).append("\n");
-                if (u.has("details")) {
-                    // 【优化】多行 details 缩进处理
-                    String details = u.get("details").asText();
-                    String[] lines = details.split("\n", -1);
-                    sb.append("  详情: ").append(lines[0]).append("\n");
-                    for (int j = 1; j < lines.length; j++) {
-                        sb.append("        ").append(lines[j]).append("\n");
+            // 解析二分指令
+            int limit = 3; // 默认全列 3 条
+            int singleIndex = -1; // >0 时代表单点查询
+            if (latestNumber != null && !latestNumber.isBlank()) {
+                String s = latestNumber.trim();
+                try {
+                    if (s.startsWith("#")) {
+                        singleIndex = Integer.parseInt(s.substring(1));
+                    } else {
+                        limit = Integer.parseInt(s);
                     }
+                } catch (NumberFormatException ignored) {
+                    // 格式错误则回退默认值
+                }
+            }
+
+            // 单点精确查询
+            if (singleIndex > 0) {
+                if (singleIndex > ups.size())
+                    return "❌ 索引越界：" + threadId + " 只有 " + ups.size() + " 条记录。";
+                ObjectNode u = (ObjectNode) ups.get(singleIndex - 1); // 1-based 转 0-based
+                StringBuilder sb = new StringBuilder();
+                sb.append("📚 线程 [").append(threadId).append("] 第 ").append(singleIndex).append(" 条更新：\n\n");
+                sb.append("[").append(u.get("timestamp").asText()).append("] ")
+                        .append(u.get("summary").asText()).append("\n");
+                if (u.has("details")) {
+                    String details = u.get("details").asText();
+                    sb.append("  详情:\n        ").append(details.replace("\n", "\n        ")).append("\n");
                 }
                 if (u.has("files") && u.get("files").size() > 0) {
                     sb.append("  文件: ");
-                    for (JsonNode f : u.get("files")) sb.append(f.asText()).append(", ");
+                    for (JsonNode f : u.get("files"))
+                        sb.append(f.asText()).append(", ");
+                    sb.setLength(sb.length() - 2);
+                    sb.append("\n");
+                }
+                return sb.toString();
+            }
+
+            // 范围查询（全列 N 条）
+            int safeLimit = Math.max(1, limit);
+            int end = Math.min(ups.size(), safeLimit);
+
+            StringBuilder sb = new StringBuilder();
+            sb.append("📚 线程 [").append(threadId).append("]（")
+                    .append(threadNode.get("title").asText()).append("）最近 ")
+                    .append(end).append(" 条更新：\n\n");
+
+            for (int i = 0; i < end; i++) {
+                ObjectNode u = (ObjectNode) ups.get(i);
+                // 带上 [#序号]，方便后续单点查询
+                sb.append("[#").append(i + 1).append("] [").append(u.get("timestamp").asText()).append("] ")
+                        .append(u.get("summary").asText()).append("\n");
+                if (u.has("details")) {
+                    String details = u.get("details").asText();
+                    sb.append("  详情: ").append(details.replace("\n", "\n        ")).append("\n");
+                }
+                if (u.has("files") && u.get("files").size() > 0) {
+                    sb.append("  文件: ");
+                    for (JsonNode f : u.get("files"))
+                        sb.append(f.asText()).append(", ");
                     sb.setLength(sb.length() - 2);
                     sb.append("\n");
                 }

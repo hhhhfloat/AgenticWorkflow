@@ -224,6 +224,7 @@ public class HttpServerMain {
         reg(server, "/tool", new ToolHandler(), true);
         // 更新档案馆
         reg(server, "/update-log/data",   new UpdateLogDataHandler(),   false);
+        reg(server, "/find-file", new FindFileHandler(), false);
         reg(server, "/update-log/action", new UpdateLogActionHandler(), true);
 
         // ── 静态资源（放行） ──

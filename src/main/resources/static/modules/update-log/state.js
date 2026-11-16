@@ -14,7 +14,8 @@ const UL = {
     loading: false,
     remoteReloading: false, // 静默刷新中（不显示骨架）
     error: null,
-    theme: 'gh-dark'
+    theme: 'gh-dark',
+    fileIndex: null
 };
 
 // @anchor: ulState_dom
@@ -196,46 +197,40 @@ function ulRenderMarkdown(source) {
 }
 
 // @anchor: ulState_fileLink
-// 文件标签跳转地址：剥离前缀，并根据扩展名路由到对应的预览页（md / html / 图片 / 代码）
+// 文件标签跳转地址：优先用 fileName 查索引还原完整路径，兜底回退原逻辑
 function ulFileHref(fileName) {
     let path = ulText(fileName).trim().replace(/^\.\//, '').replace(/^\/+/, '');
     let proj = ulText(UL.project).trim().replace(/^\.\//, '').replace(/^\/+/, '');
-    
-    // 1. 剥离 UL.project 可能带的 "sandbox/" 前缀
-    if (proj.startsWith('sandbox/')) {
-        proj = proj.substring('sandbox/'.length);
+
+    // 剥掉可能前缀
+    if (proj.startsWith('sandbox/')) proj = proj.substring('sandbox/'.length);
+    if (path.startsWith('sandbox/')) path = path.substring('sandbox/'.length);
+    if (path.startsWith(proj + '/')) path = path.substring(proj.length + 1);
+
+    // 【新增】如果 fileName 不带 "/"，尝试从索引还原完整相对路径
+    if (path.indexOf('/') < 0 && UL.fileIndex) {
+        const candidates = UL.fileIndex.get(path);
+        if (candidates && candidates.length === 1) {
+            path = candidates[0];   // 唯一匹配 → 直接用完整路径
+        } else if (candidates && candidates.length > 1) {
+            // 多个匹配 → 无法确定，返回 # 并标记（由渲染层处理弹窗）
+            return { href: '#', candidates: candidates, ambiguous: true };
+        } else {
+            // 索引里没有 → 文件可能已删除或改名
+            return { href: '#', missing: true };
+        }
     }
 
-    // 2. 剥离 fileName 可能带的 "sandbox/" 前缀
-    if (path.startsWith('sandbox/')) {
-        path = path.substring('sandbox/'.length);
-    }
-
-    // 3. 剥离 fileName 可能带的纯项目名前缀
-    if (path.startsWith(proj + '/')) {
-        path = path.substring(proj.length + 1);
-    }
-
-    // 4. 统一拼装最终的站点相对路径
+    // 最终拼装
     const finalPath = 'sandbox/' + proj + '/' + path;
     const encodedPath = encodeURIComponent(finalPath);
 
-    // 5. 根据扩展名路由（与 tree-render.js 的逻辑保持一致）
+    // 扩展名路由
     const ext = path.split('.').pop().toLowerCase();
-    
-    if (ext === 'md') {
-        return '/md.html?path=' + encodedPath;
-    }
-    if (ext === 'html' || ext === 'htm') {
-        // 对于 html 文件，树里是直接在新窗口打开运行，这里保持一致
-        return '/' + finalPath;
-    }
-    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'svg'].includes(ext)) {
-        return '/' + finalPath;
-    }
-
-    // 默认走代码预览
-    return '/code.html?path=' + encodedPath;
+    if (ext === 'md') return { href: '/md.html?path=' + encodedPath };
+    if (ext === 'html' || ext === 'htm') return { href: '/' + finalPath };
+    if (['png','jpg','jpeg','gif','webp','ico','svg'].includes(ext)) return { href: '/' + finalPath };
+    return { href: '/code.html?path=' + encodedPath };
 }
 
 function ulParseFiles(raw) {
@@ -243,4 +238,27 @@ function ulParseFiles(raw) {
         .split(',')
         .map((item) => item.trim())
         .filter(Boolean);
+}
+
+// @anchor: ulState_buildFileIndex
+// 拉取项目所有源文件列表，建立 filename -> [relative paths] 索引
+async function ulBuildFileIndex() {
+    try {
+        const res = await fetch('/find-file?project=' + encodeURIComponent(UL.project));
+        if (!res.ok) {
+            UL.fileIndex = null;
+            return;
+        }
+        const data = await res.json();
+        const files = Array.isArray(data.files) ? data.files : [];
+        const index = new Map();
+        for (const rel of files) {
+            const name = rel.split('/').pop();
+            if (!index.has(name)) index.set(name, []);
+            index.get(name).push(rel);
+        }
+        UL.fileIndex = index;
+    } catch (err) {
+        UL.fileIndex = null;
+    }
 }

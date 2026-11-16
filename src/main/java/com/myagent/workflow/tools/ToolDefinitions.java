@@ -31,14 +31,15 @@ public final class ToolDefinitions {
 
                 // @anchor: toolDef_listDirectory
                 // 工具-01：list_directory 列出目录树
-            tools.add(defineTool(
-                "list_directory",
-                "列出沙箱目录下指定路径的所有文件和子目录。",
-                defineParams()
-                    .prop("path", "string", "要列出的相对路径，例如 '.' 表示沙箱根目录。默认为 '.'。")
-                    .prop("recursive", "boolean","是否递归列出所有子目录内容。默认为 false。仅在需要全面了解项目结构时设为 true。")
-                    .build(),
-                List.of()));
+                tools.add(defineTool(
+                                "list_directory",
+                                "列出沙箱目录下指定路径的所有文件和子目录。",
+                                defineParams()
+                                                .prop("path", "string", "要列出的相对路径，例如 '.' 表示沙箱根目录。默认为 '.'。")
+                                                .prop("recursive", "boolean",
+                                                                "是否递归列出所有子目录内容。默认为 false。仅在需要全面了解项目结构时设为 true。")
+                                                .build(),
+                                List.of()));
 
                 // @anchor: toolDef_getFileStructure
                 // 工具-02：get_file_structure 获取代码结构
@@ -234,25 +235,31 @@ public final class ToolDefinitions {
                                 List.of("project_path")));
                 // @anchor: toolDef_appendLog
                 // 工具-17：append_log 新增更新档案
-                tools.add(defineTool("append_log",
+                tools.add(defineTool(
+                                "append_log",
                                 "向项目更新档案追加一条记录。如果 threadId 不存在会自动创建（首次需提供 title）。按主题归类，同一主题的迭代用同一个 threadId。",
                                 defineParams()
-                                                .prop("threadId", "string", "线程 ID，仅支持字母、数字和下划线，如 'Ui_optimization'")
+                                                .prop("threadId", "string", "线程 ID，仅支持字母、数字和下划线，如 'UI_Optimization'")
                                                 .prop("title", "string", "线程标题，仅在首次创建线程时必填")
                                                 .prop("summary", "string", "一句话摘要（≤80 字）")
-                                                .prop("details", "string", "详细说明（选填），可使用markdown格式")
+                                                .prop("details", "string", "详细说明（选填）")
                                                 .prop("files", "string", "涉及文件，逗号分隔（选填）")
                                                 .prop("status", "string", "线程状态：active / closed，选填，默认 active")
+                                                .prop("timestamp", "string",
+                                                                "发生时间（格式：yyyy-MM-dd HH:mm:ss），历史迁移时必填，日常不填默认当前时间")
                                                 .build(),
                                 List.of("threadId", "summary")));
-
                 // @anchor: toolDef_queryLog
                 // 工具-18：query_log 查询档案
-                tools.add(defineTool("query_log",
-                                "查询项目更新档案。不传 threadId 返回全部线程概览；传 threadId 返回该线程最近 N 条记录的纯文本。",
+                tools.add(defineTool(
+                                "query_log",
+                                "查询项目更新档案。不传 threadId 返回全部线程概览；传 threadId 返回该线程的更新记录；传 keyword 进行全局搜索。",
                                 defineParams()
                                                 .prop("threadId", "string", "线程 ID（选填）。不传则返回全部概览。")
-                                                .prop("latestNumber", "integer", "返回最近多少条，默认 3，最小 1")
+                                                .prop("keyword", "string",
+                                                                "搜索关键词（选填）。全局搜索包含该词的 summary / details / files。")
+                                                .prop("latestNumber", "string",
+                                                                "缺省返回最近 3 条。传数字如 '5' 表示最近 5 条；传 '#5' 表示只看第 5 条（带 # 为单点查询）。")
                                                 .build(),
                                 List.of()));
                 return tools;

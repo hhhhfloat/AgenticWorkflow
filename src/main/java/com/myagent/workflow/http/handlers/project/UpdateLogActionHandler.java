@@ -60,7 +60,9 @@ public class UpdateLogActionHandler implements HttpHandler {
                             body.path("summary").asText(),
                             body.path("details").asText(null),
                             body.path("files").asText(null),
-                            null);
+                            body.path("status").asText(null), // 补上 status
+                            body.path("timestamp").asText(null) // 补上 timestamp
+                    );
                     break;
                 case "delete":
                     result = archive.deleteUpdate(

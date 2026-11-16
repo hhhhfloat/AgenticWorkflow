@@ -1332,3 +1332,13 @@ body.ul-busy [data-ul-write] {
     color: var(--ul-danger);
     font-weight: 600;
 }
+
+.ul-file-missing {
+    color: #6e7681;
+    text-decoration: line-through;
+    cursor: not-allowed;
+}
+.ul-file-ambiguous {
+    color: #d29922;
+    border: 1px dashed #d29922;
+}
