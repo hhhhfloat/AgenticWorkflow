@@ -8,72 +8,74 @@ html[data-theme="gh-dark"] {
     --ul-bg: #1e1e1e;
     --ul-bg-panel: #252526;
     --ul-bg-elev: #2d2d2d;
-    --ul-bg-hover: #333338;
-    --ul-bg-active: rgba(74, 138, 255, 0.14);
-    --ul-fg: #d4d4d4;
-    --ul-fg-strong: #f0f6fc;
-    --ul-fg-dim: #9aa4ad;
-    --ul-fg-muted: #6e7681;
+    --ul-bg-hover: #38383c;
+    --ul-bg-active: rgba(74, 138, 255, 0.16);
+    --ul-fg: #e4e4e6;
+    --ul-fg-strong: #ffffff;
+    --ul-fg-dim: #b8c2cc;
+    --ul-fg-muted: #8792a0;
     --ul-border: #3a3a3c;
-    --ul-border-strong: #4a4a4d;
+    --ul-border-strong: #4d4d50;
     --ul-accent: #4a8aff;
     --ul-accent-fg: #ffffff;
-    --ul-accent-soft: rgba(74, 138, 255, 0.16);
+    --ul-accent-soft: rgba(74, 138, 255, 0.18);
     --ul-ok: #3fb950;
-    --ul-warn: #d29922;
-    --ul-danger: #f44747;
-    --ul-danger-soft: rgba(244, 71, 71, 0.14);
-    --ul-mark: rgba(210, 153, 34, 0.32);
+    --ul-warn: #e3b341;
+    --ul-danger: #f85149;
+    --ul-danger-soft: rgba(248, 81, 73, 0.16);
+    --ul-mark: rgba(227, 179, 65, 0.32);
     --ul-timeline: #3a3a3c;
     --ul-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
 }
 
+/* 东京夜色：深邃蓝灰，文字提亮一档 */
 html[data-theme="midnight"] {
-    --ul-bg: #05123c;
-    --ul-bg-panel: #0a1a4a;
-    --ul-bg-elev: #102450;
-    --ul-bg-hover: #172e5f;
-    --ul-bg-active: rgba(111, 158, 232, 0.18);
-    --ul-fg: #e1ebef;
-    --ul-fg-strong: #ffffff;
-    --ul-fg-dim: #a9bdd6;
-    --ul-fg-muted: #637693;
-    --ul-border: #1b3260;
-    --ul-border-strong: #253d68;
-    --ul-accent: #6f9ee8;
-    --ul-accent-fg: #04102f;
-    --ul-accent-soft: rgba(111, 158, 232, 0.18);
-    --ul-ok: #64d2a0;
-    --ul-warn: #e6c07b;
-    --ul-danger: #e8635f;
-    --ul-danger-soft: rgba(232, 99, 95, 0.18);
-    --ul-mark: rgba(230, 192, 123, 0.3);
-    --ul-timeline: #253d68;
-    --ul-shadow: 0 20px 52px rgba(2, 8, 28, 0.7);
+    --ul-bg: #1a1b26;
+    --ul-bg-panel: #16161e;
+    --ul-bg-elev: #24283b;
+    --ul-bg-hover: #2f344a;
+    --ul-bg-active: rgba(122, 162, 247, 0.20);
+    --ul-fg: #c8d1f0;
+    --ul-fg-strong: #e0e6ff;
+    --ul-fg-dim: #a8b2d8;
+    --ul-fg-muted: #8590b5;
+    --ul-border: #2c3150;
+    --ul-border-strong: #414868;
+    --ul-accent: #7aa2f7;
+    --ul-accent-fg: #1a1b26;
+    --ul-accent-soft: rgba(122, 162, 247, 0.20);
+    --ul-ok: #9ece6a;
+    --ul-warn: #e0af68;
+    --ul-danger: #f7768e;
+    --ul-danger-soft: rgba(247, 118, 142, 0.18);
+    --ul-mark: rgba(224, 175, 104, 0.32);
+    --ul-timeline: #2c3150;
+    --ul-shadow: 0 20px 52px rgba(10, 12, 20, 0.7);
 }
 
-html[data-theme="victorian"] {
-    --ul-bg: #2a1d2c;
-    --ul-bg-panel: #302232;
-    --ul-bg-elev: #3b2b3e;
-    --ul-bg-hover: #463349;
-    --ul-bg-active: rgba(184, 74, 99, 0.2);
-    --ul-fg: #e5dce2;
-    --ul-fg-strong: #fdf7fa;
-    --ul-fg-dim: #bdaec1;
-    --ul-fg-muted: #736789;
-    --ul-border: #4a3950;
-    --ul-border-strong: #5d4864;
-    --ul-accent: #b84a63;
-    --ul-accent-fg: #fdf7fa;
-    --ul-accent-soft: rgba(184, 74, 99, 0.2);
-    --ul-ok: #8fae7d;
-    --ul-warn: #d6a25a;
-    --ul-danger: #c94a52;
-    --ul-danger-soft: rgba(201, 74, 82, 0.2);
-    --ul-mark: rgba(214, 162, 90, 0.3);
-    --ul-timeline: #5d4864;
-    --ul-shadow: 0 20px 52px rgba(20, 10, 22, 0.7);
+/* 薄荷浅绿：日光阅读，柔和绿调 */
+html[data-theme="mint"] {
+    --ul-bg: #f0f7f1;
+    --ul-bg-panel: #e2efe4;
+    --ul-bg-elev: #f7fbf7;
+    --ul-bg-hover: #d4e6d7;
+    --ul-bg-active: rgba(46, 125, 79, 0.14);
+    --ul-fg: #26352b;
+    --ul-fg-strong: #0e1f15;
+    --ul-fg-dim: #4a6355;
+    --ul-fg-muted: #6b8576;
+    --ul-border: #c5d9c8;
+    --ul-border-strong: #a8c2ac;
+    --ul-accent: #2e7d4f;
+    --ul-accent-fg: #ffffff;
+    --ul-accent-soft: rgba(46, 125, 79, 0.14);
+    --ul-ok: #2e7d4f;
+    --ul-warn: #b07d00;
+    --ul-danger: #c73a3a;
+    --ul-danger-soft: rgba(199, 58, 58, 0.12);
+    --ul-mark: rgba(176, 125, 0, 0.24);
+    --ul-timeline: #a8c2ac;
+    --ul-shadow: 0 18px 44px rgba(30, 60, 40, 0.15);
 }
 
 /* @anchor: ulCss_base */
@@ -185,6 +187,10 @@ mark {
     border-color: var(--ul-accent);
     filter: brightness(1.12);
     color: var(--ul-accent-fg);
+}
+
+html[data-theme="mint"] .ul-btn-primary:hover {
+    filter: brightness(0.92);   /* 浅色主题下主色深一点，更沉稳 */
 }
 
 .ul-btn-danger {
@@ -960,7 +966,7 @@ body.ul-busy [data-ul-write] {
     align-items: center;
     justify-content: center;
     padding: 24px;
-    background: rgba(0, 0, 0, 0.58);
+    background: rgba(0, 0, 0, 0.62);   /* 从 0.58 提到 0.62 */
     pointer-events: auto;
     animation: ulFadeIn 0.16s ease-out;
 }

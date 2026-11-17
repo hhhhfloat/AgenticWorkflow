@@ -2,6 +2,7 @@
 <!-- 更新档案馆页面：左栏线程列表 + 右栏时间线，支持检索与增删移改 -->
 <!DOCTYPE html>
 <html lang="zh-CN" data-theme="gh-dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,69 +10,78 @@
     <!-- @anchor: updateLog_head -->
     <!-- 页面 head：Markdown 渲染库与页面级样式表 -->
     <link rel="stylesheet" href="update-log.css">
+    <script>
+        (function () {
+            try {
+                var t = localStorage.getItem('ul-theme');
+                if (t) document.documentElement.setAttribute('data-theme', t);
+            } catch (e) { }
+        })();
+    </script>
 </head>
+
 <body>
-<!-- @anchor: updateLog_topbar -->
-<!-- 顶部工具条：项目标识、主题切换、刷新与两个主操作按钮 -->
-<header id="ulTopbar">
-    <div class="ul-brand"><span class="ul-brand-icon">🗄️</span><span>更新档案馆</span></div>
-    <div id="ulProjectTag" class="ul-project-tag" title="当前项目">—</div>
-    <div class="ul-topbar-spacer"></div>
-    <div id="ulThemeSwitch" class="ul-theme-switch" role="group" aria-label="主题切换">
-        <button type="button" data-theme="gh-dark" title="终端暗色">终端</button>
-        <button type="button" data-theme="midnight" title="寂夜叙事">寂夜</button>
-        <button type="button" data-theme="victorian" title="维多利亚">维多利亚</button>
+    <!-- @anchor: updateLog_topbar -->
+    <!-- 顶部工具条：项目标识、主题切换、刷新与两个主操作按钮 -->
+    <header id="ulTopbar">
+        <div class="ul-brand"><span class="ul-brand-icon">🗄️</span><span>更新档案馆</span></div>
+        <div id="ulProjectTag" class="ul-project-tag" title="当前项目">—</div>
+        <div id="ulThemeSwitch" class="ul-theme-switch" role="group" aria-label="主题切换">
+            <button type="button" data-theme="gh-dark" title="终端暗色">终端</button>
+            <button type="button" data-theme="midnight" title="东京夜色">东京</button>
+            <button type="button" data-theme="mint" title="薄荷浅绿">薄荷</button>
+        </div>
+        <button type="button" id="ulDrawerBtn" class="ul-btn ul-btn-icon" title="主题列表">☰</button>
+        <button type="button" id="ulRefreshBtn" class="ul-btn ul-btn-icon" title="重新加载">↻</button>
+        <button type="button" id="ulNewThreadBtn" class="ul-btn ul-btn-ghost" data-ul-write>＋ 新建主题</button>
+        <button type="button" id="ulAppendBtn" class="ul-btn ul-btn-primary" data-ul-write>＋ 手动添加记录</button>
+    </header>
+
+    <!-- @anchor: updateLog_body -->
+    <!-- 双栏主体：左栏检索 + 线程列表，右栏线程详情 + 时间线 -->
+    <div id="ulBody">
+        <aside id="ulSidebar">
+            <div class="ul-search">
+                <input id="ulSearchInput" type="search" placeholder="搜索标题 / thread_id / 记录内容…" autocomplete="off"
+                    spellcheck="false" aria-label="搜索线程">
+                <button type="button" id="ulSearchClear" class="ul-search-clear" title="清空">✕</button>
+            </div>
+            <div id="ulThreadList" class="ul-thread-list">
+                <div class="ul-placeholder">加载中…</div>
+            </div>
+            <footer id="ulSidebarFooter" class="ul-sidebar-footer"></footer>
+        </aside>
+
+        <main id="ulMain">
+            <div id="ulThreadHeader" class="ul-thread-header"></div>
+            <div id="ulTimeline" class="ul-timeline-wrap">
+                <div class="ul-placeholder">加载中…</div>
+            </div>
+        </main>
+
+        <!-- @anchor: updateLog_drawer -->
+        <!-- 窄屏抽屉遮罩：点空白处收起左栏 -->
+        <div id="ulDrawerBackdrop" class="ul-drawer-backdrop"></div>
     </div>
-    <button type="button" id="ulDrawerBtn" class="ul-btn ul-btn-icon" title="主题列表">☰</button>
-    <button type="button" id="ulRefreshBtn" class="ul-btn ul-btn-icon" title="重新加载">↻</button>
-    <button type="button" id="ulNewThreadBtn" class="ul-btn ul-btn-ghost" data-ul-write>＋ 新建主题</button>
-    <button type="button" id="ulAppendBtn" class="ul-btn ul-btn-primary" data-ul-write>＋ 手动添加记录</button>
-</header>
-
-<!-- @anchor: updateLog_body -->
-<!-- 双栏主体：左栏检索 + 线程列表，右栏线程详情 + 时间线 -->
-<div id="ulBody">
-    <aside id="ulSidebar">
-        <div class="ul-search">
-            <input id="ulSearchInput" type="search" placeholder="搜索标题 / thread_id / 记录内容…"
-                   autocomplete="off" spellcheck="false" aria-label="搜索线程">
-            <button type="button" id="ulSearchClear" class="ul-search-clear" title="清空">✕</button>
-        </div>
-        <div id="ulThreadList" class="ul-thread-list">
-            <div class="ul-placeholder">加载中…</div>
-        </div>
-        <footer id="ulSidebarFooter" class="ul-sidebar-footer"></footer>
-    </aside>
-
-    <main id="ulMain">
-        <div id="ulThreadHeader" class="ul-thread-header"></div>
-        <div id="ulTimeline" class="ul-timeline-wrap">
-            <div class="ul-placeholder">加载中…</div>
-        </div>
-    </main>
-
-    <!-- @anchor: updateLog_drawer -->
-    <!-- 窄屏抽屉遮罩：点空白处收起左栏 -->
-    <div id="ulDrawerBackdrop" class="ul-drawer-backdrop"></div>
-</div>
 
 
-<!-- @anchor: updateLog_layers -->
-<!-- 覆盖层容器：轻提示栈与模态框挂载点 -->
-<div id="ulToastLayer" class="ul-toast-layer" aria-live="polite"></div>
-<div id="ulModalLayer" class="ul-modal-layer"></div>
+    <!-- @anchor: updateLog_layers -->
+    <!-- 覆盖层容器：轻提示栈与模态框挂载点 -->
+    <div id="ulToastLayer" class="ul-toast-layer" aria-live="polite"></div>
+    <div id="ulModalLayer" class="ul-modal-layer"></div>
 
-<!-- @anchor: updateLog_scripts -->
-<!-- 脚本顺序即依赖顺序：库 → 状态与工具 → 主题/数据/模态框 → 渲染 → 操作 → 入口 -->
-<script src="marked.min.js"></script>
-<script src="modules/update-log/state.js"></script>
-<script src="modules/update-log/theme.js"></script>
-<script src="modules/update-log/api.js"></script>
-<script src="modules/update-log/modal.js"></script>
-<script src="modules/update-log/thread-list.js"></script>
-<script src="modules/update-log/timeline.js"></script>
-<script src="modules/update-log/update-actions.js"></script>
-<script src="modules/update-log/thread-actions.js"></script>
-<script src="modules/update-log/main.js"></script>
+    <!-- @anchor: updateLog_scripts -->
+    <!-- 脚本顺序即依赖顺序：库 → 状态与工具 → 主题/数据/模态框 → 渲染 → 操作 → 入口 -->
+    <script src="marked.min.js"></script>
+    <script src="modules/update-log/state.js"></script>
+    <script src="modules/update-log/theme.js"></script>
+    <script src="modules/update-log/api.js"></script>
+    <script src="modules/update-log/modal.js"></script>
+    <script src="modules/update-log/thread-list.js"></script>
+    <script src="modules/update-log/timeline.js"></script>
+    <script src="modules/update-log/update-actions.js"></script>
+    <script src="modules/update-log/thread-actions.js"></script>
+    <script src="modules/update-log/main.js"></script>
 </body>
+
 </html>

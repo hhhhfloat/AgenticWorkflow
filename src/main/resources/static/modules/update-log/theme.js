@@ -4,9 +4,9 @@
 // @anchor: ulTheme_constants
 // 可选主题清单与 localStorage 键名
 const UL_THEMES = [
-    { id: 'gh-dark', label: '终端', hint: '沿用工作台的 GitHub 暗色' },
-    { id: 'midnight', label: '寂夜', hint: '寂夜叙事：深蓝 + 雾蓝' },
-    { id: 'victorian', label: '维多利亚', hint: '维多利亚：绛紫 + 酒红' }
+    { id: 'gh-dark',  label: '终端', hint: '深色 · 沿用工作台的 GitHub 暗色' },
+    { id: 'midnight', label: '东京', hint: '深色 · Tokyo Night，深邃宁静' },
+    { id: 'mint',     label: '薄荷', hint: '浅色 · 温和薄荷绿，日光阅读' }
 ];
 const UL_THEME_KEY = 'ul-theme';
 
