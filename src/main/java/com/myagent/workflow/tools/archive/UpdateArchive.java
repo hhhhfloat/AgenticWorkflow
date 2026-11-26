@@ -443,6 +443,57 @@ public class UpdateArchive {
         }
     }
 
+    // @anchor: updateArchive_editUpdate
+    // 编辑指定索引的单条记录（不改 timestamp，保持原始发生时间）
+    public String editUpdate(String threadId, int updateIndex, String summary,
+            String details, String filesStr) {
+        if (summary == null || summary.isBlank())
+            return "❌ summary 不能为空";
+        try {
+            Path updateDir = getUpdateDir();
+            Path threadFile = updateDir.resolve("thread_" + threadId + ".json");
+            if (!Files.exists(threadFile))
+                return "❌ 未找到线程: " + threadId;
+
+            ObjectNode threadNode = (ObjectNode) mapper.readTree(threadFile.toFile());
+            ArrayNode updates = (ArrayNode) threadNode.get("updates");
+            if (updateIndex < 0 || updateIndex >= updates.size()) {
+                return "❌ 索引越界：" + threadId + " 只有 " + updates.size() + " 条记录";
+            }
+
+            ObjectNode update = (ObjectNode) updates.get(updateIndex);
+            update.put("summary", summary);
+
+            if (details != null && !details.isBlank()) {
+                update.put("details", details);
+            } else {
+                update.remove("details");
+            }
+
+            if (filesStr != null && !filesStr.isBlank()) {
+                ArrayNode filesArr = mapper.createArrayNode();
+                for (String f : filesStr.split(",")) {
+                    String t = f.trim();
+                    if (!t.isEmpty())
+                        filesArr.add(t);
+                }
+                if (filesArr.size() > 0)
+                    update.set("files", filesArr);
+                else
+                    update.remove("files");
+            } else {
+                update.remove("files");
+            }
+
+            // timestamp 保持不变，不参与排序（编辑不应改变时序）
+            saveThread(threadFile, threadNode);
+            rebuildIndex(updateDir);
+            return "✅ 已更新记录 #" + (updateIndex + 1);
+        } catch (Exception e) {
+            return "❌ 编辑失败: " + e.getMessage();
+        }
+    }
+    
     // ===== 内部辅助 =====
 
     private void saveThread(Path file, ObjectNode node) throws IOException {

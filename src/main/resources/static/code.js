@@ -23,15 +23,39 @@ document.getElementById('reloadBtn').addEventListener('click', () => {
 
 document.getElementById('copyBtn').addEventListener('click', async () => {
     if (!currentRawCode) return;
-    try {
-        await navigator.clipboard.writeText(currentRawCode);
-        pathLabel.textContent = '✅ 已复制 ' + filePath;
-        setTimeout(() => { pathLabel.textContent = filePath; }, 1200);
-    } catch (e) {
-        pathLabel.textContent = '⚠️ 复制失败';
-        setTimeout(() => { pathLabel.textContent = filePath; }, 1200);
-    }
+
+    const copied = await copyToClipboard(currentRawCode);
+    pathLabel.textContent = copied ? '✅ 已复制 ' + filePath : '⚠️ 复制失败';
+    setTimeout(() => { pathLabel.textContent = filePath; }, 1200);
 });
+
+async function copyToClipboard(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (e) {
+            // Fall back if the API is denied or fails.
+        }
+    }
+
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.top = '-9999px';
+    textarea.setAttribute('readonly', '');
+    document.body.appendChild(textarea);
+
+    try {
+        textarea.select();
+        textarea.setSelectionRange(0, textarea.value.length);
+        return document.execCommand('copy');
+    } catch (e) {
+        return false;
+    } finally {
+        textarea.remove();
+    }
+}
 
 // @anchor: codePreview_loadFile
 // 主入口：拉取文件内容并渲染

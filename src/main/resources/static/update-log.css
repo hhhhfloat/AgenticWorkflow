@@ -918,6 +918,7 @@ body.ul-busy [data-ul-write] {
     font-size: 13px;
     box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
     animation: ulToastIn 0.18s ease-out;
+    transition: background-color 0.35s ease, color 0.35s ease, border-color 0.35s ease;
 }
 
 .ul-toast-info {

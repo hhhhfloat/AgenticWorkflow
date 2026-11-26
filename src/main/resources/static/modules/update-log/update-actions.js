@@ -288,3 +288,91 @@ function ulOpenAppendModal(options) {
         ]
     });
 }
+
+// @anchor: ulEditUpdate
+// 编辑单条记录：预填旧值，复用 append 模态框的左右分栏
+function ulEditUpdate(threadId, updateIndex) {
+    const thread = ulFindThread(threadId);
+    if (!thread) return;
+    const update = thread.updates[updateIndex];
+    if (!update) return;
+
+    // 新鲜度校验：Agent 可能在中间删/加了记录，导致 index 偏移
+    UpdateArchive.lock(async () => {
+        const fresh = await ulEnsureFresh(threadId, updateIndex, update);
+        if (!fresh.ok) {
+            ulToast('该记录已变化，请刷新后重试', 'warn');
+            return;
+        }
+        openEditModal(thread, update, updateIndex);
+    });
+}
+
+function openEditModal(thread, update, updateIndex) {
+    const body = `
+        <div class="ul-form">
+            <div class="ul-field">
+                <label class="ul-field-label">摘要 <span class="ul-field-star">*</span></label>
+                <input type="text" id="ulEditSummary" maxlength="200" value="${ulEscapeHtml(update.summary || '')}">
+            </div>
+            <div class="ul-field">
+                <label class="ul-field-label">详情（Markdown，左写右预览）</label>
+                <div class="ul-split">
+                    <textarea id="ulEditDetails" class="ul-split-editor" placeholder="支持 Markdown…">${ulText(update.details || '')}</textarea>
+                    <div id="ulEditPreview" class="ul-split-preview ul-markdown"></div>
+                </div>
+            </div>
+            <div class="ul-field">
+                <label class="ul-field-label">涉及文件（逗号分隔）</label>
+                <input type="text" id="ulEditFiles" value="${ulEscapeHtml((update.files || []).join(', '))}">
+            </div>
+            <div class="ul-form-note">记录时间保持不变：${ulEscapeHtml(update.timestamp)}</div>
+        </div>
+    `;
+
+    ulOpenModal({
+        title: '编辑记录 #' + (updateIndex + 1),
+        body: body,
+        wide: true,
+        actions: [
+            { label: '取消', kind: 'ghost' },
+            {
+                label: '保存修改', kind: 'primary', onClick: async () => {
+                    const summary = document.getElementById('ulEditSummary').value.trim();
+                    if (!summary) {
+                        ulToast('摘要不能为空', 'error');
+                        return false;
+                    }
+                    try {
+                        await ulPostAction({
+                            action: 'edit',
+                            threadId: thread.thread_id,
+                            updateIndex: updateIndex,
+                            summary: summary,
+                            details: document.getElementById('ulEditDetails').value,
+                            files: document.getElementById('ulEditFiles').value
+                        });
+                        ulToast('记录已更新', 'success');
+                        await ulLoadData({ keepSelection: true });
+                        return true;
+                    } catch (err) {
+                        ulHandleActionError(err);
+                        return false;
+                    }
+                }
+            }
+        ],
+        onReady: () => {
+            const ta = document.getElementById('ulEditDetails');
+            const preview = document.getElementById('ulEditPreview');
+            const render = () => {
+                const src = ta.value;
+                preview.innerHTML = src.trim()
+                    ? ulRenderMarkdown(src)
+                    : '<span class="ul-preview-empty">预览区</span>';
+            };
+            render();
+            ta.addEventListener('input', ulDebounce(render, 150));
+        }
+    });
+}

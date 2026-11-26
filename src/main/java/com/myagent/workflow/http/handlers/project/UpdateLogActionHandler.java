@@ -69,6 +69,15 @@ public class UpdateLogActionHandler implements HttpHandler {
                             body.path("threadId").asText(),
                             body.path("updateIndex").asInt());
                     break;
+                case "edit":
+                    result = archive.editUpdate(
+                            body.path("threadId").asText(),
+                            body.path("updateIndex").asInt(),
+                            body.path("summary").asText(),
+                            body.path("details").asText(null),
+                            body.path("files").asText(null)
+                    );
+                    break;
                 case "move":
                     result = archive.moveUpdate(
                             body.path("fromThread").asText(),

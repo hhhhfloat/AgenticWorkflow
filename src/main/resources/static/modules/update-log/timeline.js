@@ -169,6 +169,7 @@ function ulBuildUpdateCard(thread, update, index) {
     const actions = document.createElement('div');
     actions.className = 'ul-update-actions';
     actions.innerHTML = ''
+        + '<button type="button" class="ul-btn ul-btn-tiny" data-ul-write data-role="edit">编辑</button>'
         + '<button type="button" class="ul-btn ul-btn-tiny" data-ul-write data-role="move">移动到…</button>'
         + '<button type="button" class="ul-btn ul-btn-tiny ul-btn-danger" data-ul-write data-role="delete">删除</button>';
     actions.dataset.threadId = thread.thread_id;
@@ -194,6 +195,7 @@ function ulBindTimeline() {
             const index = Number(holder.dataset.index);
             if (btn.dataset.role === 'delete') ulDeleteUpdate(threadId, index);
             if (btn.dataset.role === 'move') ulMoveUpdate(threadId, index);
+            if (btn.dataset.role === 'edit') ulEditUpdate(threadId, index);
         });
     }
 

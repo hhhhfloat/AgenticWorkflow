@@ -140,6 +140,7 @@ function ulOpenModal(config) {
         if (focusTarget) focusTarget.focus();
         else closeBtn.focus();
     }, 30);
+    if (typeof options.onReady === 'function') options.onReady(api);
     return api;
 }
 
